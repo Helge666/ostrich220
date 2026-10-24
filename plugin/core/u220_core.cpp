@@ -653,6 +653,9 @@ uint8_t U220Core::readMem(uint16_t addr) const
 void U220Core::writeMem(uint16_t addr, uint8_t value)
 { m_impl->program.write_byte(addr, value); }
 
+double U220Core::emulatedSeconds() const
+{ return double(m_impl->frames_done) / double(kCoreSampleRate); }
+
 uint8_t U220Core::readNvram(uint32_t addr) const
 { return addr < kNvramBytes ? m_impl->ram[addr] : 0xff; }
 

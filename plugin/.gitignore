@@ -23,3 +23,7 @@ build-win/
 bin-win/
 *.o
 *.d
+
+# Ostrich (U-220): core build and Windows products
+build-u220/
+bin-win/

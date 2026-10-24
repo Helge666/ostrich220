@@ -151,6 +151,9 @@ public:
 	uint8_t readMem(uint16_t addr) const;
 	void writeMem(uint16_t addr, uint8_t value);
 
+	/// Emulated seconds since the core was built: the clock midiInAtTime() counts in.
+	double emulatedSeconds() const;
+
 	/// IC10 by its own address, 0..0x7FFF, independent of the window.
 	uint8_t readNvram(uint32_t addr) const;
 
