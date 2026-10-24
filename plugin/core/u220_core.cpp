@@ -41,6 +41,7 @@ namespace {
 TRACE_FLAG(trace_tg,   "U220_TGTRACE")
 TRACE_FLAG(trace_midi, "U220_MIDITRACE")
 TRACE_FLAG(trace_lcd,  "U220_LCDTRACE")
+TRACE_FLAG(trace_fx,   "U220_FXTRACE")
 #undef TRACE_FLAG
 
 constexpr u32 CPU_CLOCK = 12000000;         // 12 MHz XTAL
@@ -339,6 +340,8 @@ void U220Core::Impl::window_w(offs_t offset, u8 data)
 		lcd_timer->adjust(attotime::from_usec(40));
 		break;
 	case 0x4:
+		if (trace_fx())
+			std::fprintf(stderr, "FX %f %03X = %02X\n", machine.time().as_double(), unsigned(offset), data);
 		fx->write(u16(offset), data, machine.time().as_double());
 		break;
 	case 0x6:
