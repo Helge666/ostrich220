@@ -72,6 +72,10 @@ dass die Toolchain funktioniert, bevor wir etwas ändern.
 | Bauen, Tests, Offline-Renders | kellerkind2: `~/dev/ostrich`, Renders in `~/dev/renders` |
 | Anhören, Plugin in der DAW | **nur Windows**, bis der Windows-Build den ersten erkennbaren Ton hat |
 
+- **Achtung, Windows:** Alles, was Claude unter `%LOCALAPPDATA%` neu anlegt, leitet Windows
+  in den privaten Bereich der Claude-App um (MSIX-Paket). Cubase sieht es nicht. ROMs für
+  Tests deshalb nach `C:\ProgramData\Voltaire110\roms`; Plugins nach
+  `%LOCALAPPDATA%\Programs\Common\VST3` funktionieren, weil der Ordner schon existierte.
 - Übertragung übers LAN: `git push kk2 main` (Ostrich) und `git -C mame push kk2 u220` (MAME).
   Auf kellerkind2 steht `receive.denyCurrentBranch=updateInstead`, der Push aktualisiert
   also direkt die Arbeitskopie.
@@ -153,6 +157,11 @@ Geräten, und ein Austausch mit ValleyBell (MAME, CM-32P) lohnt sich.
    (emu110 hat hier ein Lizenzproblem mit `earth.ttf`, siehe `CLONING.md`).
 3. **ROM-Suche:** Dateien per SHA1 erkennen und alle bekannten Namen akzeptieren
    (`roms/README.md`); verständliche Meldung, wenn etwas fehlt.
+   **Geführtes ROM-Setup für Erstbenutzer** (Wunsch von Helge): Fehlt eine Firmware- oder
+   Wave-ROM-Datei, öffnet sich ein Dialog, der die gesuchte Datei beim Namen nennt (Chip,
+   Inhalt, erwartete Größe) und eine Dateiauswahl anbietet. Die gewählte Datei wird per
+   SHA1 geprüft und in den ROM-Ordner des Benutzers kopiert, danach bootet die Maschine.
+   Lohnt sich schon für Voltaire 110, nicht erst für den U-220.
 4. Formate: CLAP und VST3 unter Windows. Bei emu110 aktualisiert sich das VST3-Panel noch
    nicht, das müssen wir beheben. Standalone; macOS später.
 5. Patch-Bibliothek, SysEx-Import und -Export (U-220-Bulk-Dumps).
