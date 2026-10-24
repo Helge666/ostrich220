@@ -11,6 +11,7 @@
 #include "OstrichShared.hpp"
 
 #include "u220_core.h"
+#include "u220_reverb.h"
 #include "../src/Resampler.hpp"
 
 #include <algorithm>
@@ -183,6 +184,7 @@ public:
 		: Plugin(kParamCount, 0, kStateCount)
 	{
 		for (auto &k : m_keySeq) k.store(0);
+		m_core.setEffects(&m_reverb);
 		loadRoms();
 		setupRate(getSampleRate());
 	}
@@ -623,6 +625,7 @@ private:
 
 	mutable std::mutex m_machine;
 	U220Core m_core;
+	U220Reverb m_reverb;            // reverb/delay, tuned to Helge's U-220 (u220_reverb.h)
 	bool m_romsLoaded = false;
 	bool m_needFirstBoot = true;
 	fs::path m_factoryPath;

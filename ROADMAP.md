@@ -348,6 +348,16 @@ MAME ↔ Kern in Stereo weiter ±1 LSB. Hall und Chorus bekommen die Send-Busse.
 Ostrich, eins davon phasengedreht: die beiden löschen sich weitgehend aus. Kanal 10 spielt
 die Drums (nach DPF-Patch 0006), Stereo stimmt.
 
+**Hall-Modul v1 (24.10.2026)**, `plugin/core/u220_reverb.{h,cpp}` (EffectsModule): FDN mit 8
+Leitungen + 4 Diffusoren für Room1–3/Hall1–2, Nachhallzeit bei 250 Hz und 8 kHz aus den
+gemessenen Tabellen über Time interpoliert; Gate = Netzwerk mit Gate (450 ms ab Anschlag);
+Delay/CrossDelay = Echoleitung 10 + 12,9 ms × Time (CrossDelay rechts bei halber Periode).
+Parameter liest der Kern aus dem RAM (Temp-Patch-Effektbytes 0x143C, Schalter 0x1401 Bit 4/5).
+Impulsantworten: Messung gegen trockene Emulation + Hall-Send entfaltet (`renders/
+u220_reverb_irs.npz`). Abgleich mit der Probe: Fahnenpegel pro Typ im Median ±1 dB,
+Nachhallzeit Room/Hall/Delay ±2–8 % (Gate +27 %). Chorus fehlt noch; bei „Pre Rev“ geht
+der Chorus-Bus trocken in den Hall.
+
 **Vorgehen (Entscheidung Helge, 24.10.2026):** Phase 4 kommt vor Phase 3. Der Effektteil wird
 als eigenes, austauschbares Modul gebaut (klare Schnittstelle: Effekt-Typ und -Parameter rein,
 Stereo-Audio rein/raus) und zunächst **nach Gehör angenähert**, nicht emuliert (Schritt 3).
