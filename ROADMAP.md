@@ -312,6 +312,15 @@ globale Schalter in `Edit → Setup → Efct` (Chorus On/Off, Reverb On/Off).
   Ein DT1 an 00 06 00 (erstes Paket des Temp-Dumps) setzt sie am laufenden Gerät.
 - Emulation erzeugt Bulk-Dumps selbst (`Data → Bulk → Temp`, `u220_render --midi-out`).
 
+**Hall-Messung am Gerät (24.10.2026)**, `tools/make_reverb_probe.py` + `tools/reverb_decay.py`,
+Aufnahme `renders/hw_reverb_probe3.wav` (Velocity 60, kein Clipping), Nachhallzeit RT60
+(T20 × 3, Fenster 4,8 s, lange Hallen daher eher unterschätzt) für Time 0 → 31:
+Room1 1,1 → 2,3 s · Room2 1,7 → 4,4 s · Room3 1,4 → 3,5 s · Hall1 2,7 → 6,6 s ·
+Hall2 2,5 → 6,4 s · Gate ~0,8 s (unabhängig von Time) · Delay/CrossDelay: Time = Verzögerung,
+Delay FB 31 ≈ endlos (Helge: „unendliches Feedback“). Level 0/10/20/31 → Fahne −27/−24/−19/−11 dB
+unter dem Direktschall (Hall2 Time 4). Die erste Messung (138-Byte-Pakete) war wirkungslos,
+siehe MIDIFACE-Hinweis in Phase 4.
+
 **Vorgehen (Entscheidung Helge, 24.10.2026):** Phase 4 kommt vor Phase 3. Der Effektteil wird
 als eigenes, austauschbares Modul gebaut (klare Schnittstelle: Effekt-Typ und -Parameter rein,
 Stereo-Audio rein/raus) und zunächst **nach Gehör angenähert**, nicht emuliert (Schritt 3).
