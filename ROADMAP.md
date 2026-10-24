@@ -104,21 +104,32 @@ Arbeitsort: neuer Treiber `mame/src/mame/roland/roland_u220.cpp`. Er übernimmt 
 `u220`-Eintrag aus `roland_u20.cpp` und nimmt sich `roland_u110.cpp` (Aufbau) und
 `roland_cm32p.cpp` (P8098, 8-Bit-Bus) zum Vorbild.
 
-1. **Firmware disassemblieren.** Reset- und Interrupt-Vektoren lesen, die
-   Bank-Umschaltung finden (welcher Port-Pin blendet welche 64-KB-Hälfte ein?) und die
-   Adressen der Peripherie aus den Zugriffen ableiten. Werkzeug: MAMEs `unidasm`
-   für MCS-96 oder Ghidra.
-2. **Speicherkarte** aus Firmware-Zugriffen und dem Adressdecoder der Service Notes
-   ableiten: ROM-Fenster, 32 KB RAM, PCM-Registerfenster, IC12, IC25.
-3. **NVRAM:** Batterie-RAM sichern, damit eigene Patches einen Neustart überleben.
-4. **LCD 24×2:** den Controller bestimmen (HD44780-kompatibel oder MSM6222B wie beim
-   U-110?) und an IC12 anbinden.
-5. **Bedienteil:** Tasten, Drehregler und LEDs über IC12 abbilden.
-6. **MIDI IN/OUT** über die serielle Schnittstelle des P8098, wie beim U-110.
-7. Prüfen, an welcher Interrupt-Leitung der PCM-Chip hängt. Das Skeleton sagt `HSI0`, der
-   U-110 nutzt `EXTINT`. emu110 warnt ausdrücklich davor, das ungeprüft zu übernehmen.
+1. [x] **Firmware disassemblieren** (`unidasm -arch i8x9x`). Vektoren: HSI0 → `0x2130`
+   (LCD-Warteschlange), Software-Timer → `0x218B`, Seriell → `0x224E` (MIDI),
+   **EXTINT → `0x22DD` (PCM-Chip)**, Reset → `0x2100` → Init `0x25BC`, Hauptschleife `0x27E7`.
+   Der Skeleton-Treiber lag mit `HSI0` für den PCM-Chip falsch: HSI0 ist das LCD.
+2. [x] **Speicherkarte.** `0x2000`–`0xFFFF` = untere ROM-Hälfte, fest (kein Code-Banking).
+   `0x1000` (IC12) wählt, was im Fenster `0x0800`–`0x0FFF` erscheint:
+   `00`–`0F` SRAM-Seiten, `10` LCD, `30` Tasten, `40` Effekt-Chip?, `60` PCM-Chip,
+   `80`–`9F` obere ROM-Hälfte (Daten, Texte). `0x1002`–`0x1FFF` = SRAM-Seiten `0E`/`0F`, fest.
+   Die Firmware lädt ihre Wählwerte aus ROM `0x1B256` — die Tabelle steht also im ROM selbst.
+3. [x] **NVRAM:** 32 KB über MAMEs NVRAM-Gerät.
+4. [~] **LCD 24×2:** Text wird mitgeschrieben (Log), Darstellung fehlt noch. MAMEs HD44780
+   braucht ein nicht gedumptes Zeichen-ROM; Zeichensatz wie bei emu110 aus einer freien Schrift.
+5. [x] **Tasten:** 14-Bit-Matrix über `0x080E`/`0x080D` (Bank `30`), aktiv low. Zuordnung per
+   Versuch ermittelt und mit Gegenproben bestätigt: Bit 0 EDIT, 1 DATA, 2 EXIT, 3 ENTER,
+   4 PART/INST ◀◀, 5 PART/INST ▶▶, 8 MARK, 9 JUMP, 10 CURSOR ◀, 11 CURSOR ▶, 12 VALUE ▼,
+   13 VALUE ▲; Bits 6/7 frei. LEDs (MIDI) noch offen.
+6. [ ] **MIDI IN/OUT** über die serielle Schnittstelle des P8098, wie beim U-110.
+7. [x] PCM-Chip hängt an **EXTINT** (Handler `0x22DD` schreibt die Chip-Register).
+
+Werkzeuge: `tools/u220_run.sh` (bauen + kopflos laufen lassen, LCD-Text aus dem Log),
+`tools/u220_keys.lua` (Tasten nach Zeitplan drücken, `U220_PRESS="3@4"` = ENTER bei 4 s).
 
 **Meilenstein 1:** Bootscreen, Menüs bedienbar, MIDI wird angenommen, alles noch stumm.
+**Stand 24.10.2026:** Die Firmware v1.02 bootet („RS-PCM Sound Module“), bietet bei leerem
+Speicher „Memory Initialize“ an, initialisiert auf ENTER und zeigt den Spielmodus
+`P-01: Acoust Piano [001]`. EDIT-, DATA-, MARK- und JUMP-Menüs öffnen sich. Es fehlt MIDI.
 
 ## Phase 2 — Erster Ton (ohne Effekte)
 
