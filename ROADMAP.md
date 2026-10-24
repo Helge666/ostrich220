@@ -251,7 +251,7 @@ mit Werksdaten auf beiden Seiten, Effekte am Gerät aus:
   Drums?); (b) Hi-Hats/Tamburin/Becken (42, 44, 54, 59, 94) relativ +3…5 dB in der
   Emulation, passend zur fehlenden Höhendämpfung der Ausgangsstufe; (c) einzelne F.X.-Tasten
   (35, 44, 69, 86) und Dry 35 mit anderem Spektrum, Hörprobe ausstehend. Hardware-Aufnahme
-  clippte nur bei F.X. 90.
+  clippte nur bei F.X. 91 (dort daher −3,5 dB).
 - **Vorsicht bei Drum-Vergleichen:** Laut Helge klingen einige Drums schon zwischen echten
   Geräten leicht verschieden (Aufnahmen seines ersten U-220 von Ende der 80er/Anfang der
   90er gegen das heutige Gerät; Firmware des ersten unbekannt, Alterung der Analogstufe
