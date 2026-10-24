@@ -76,7 +76,7 @@ const char *const kWaveNames[6][2] = {
 
 int main(int argc, char **argv)
 {
-	std::string roms = "roms", out, nvram, save_nvram, midi_events, presses;
+	std::string roms = "roms", out, nvram, save_nvram, midi_events, presses, midi_out;
 	double seconds = 10.0;
 	bool show_lcd = false, filter = true;
 	uint32_t blocksize = 512;
@@ -95,6 +95,7 @@ int main(int argc, char **argv)
 		else if (a == "--midi-at")    midi_events = next();
 		else if (a == "--no-filter")  filter = false;
 		else if (a == "--press")      presses = next();
+		else if (a == "--midi-out")   midi_out = next();     // raw bytes the machine sends
 		else { std::fprintf(stderr, "unknown option %s\n", a.c_str()); return 2; }
 	}
 
@@ -189,6 +190,16 @@ int main(int argc, char **argv)
 		}
 
 		core.renderStereo(l.data(), r.data(), n);
+		if (!midi_out.empty())
+		{
+			uint8_t mo[4096];
+			const size_t got = core.midiOut(mo, sizeof(mo), nullptr);
+			if (got)
+			{
+				FILE *f = std::fopen(midi_out.c_str(), "ab");
+				if (f) { std::fwrite(mo, 1, got, f); std::fclose(f); }
+			}
+		}
 		for (uint32_t i = 0; i < n; i ++)
 		{
 			pcm.push_back(quantise(l[i]));
