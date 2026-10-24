@@ -4,11 +4,11 @@
 Restyle the Voltaire 110 artwork towards the look of a Roland U-220 front panel.
 
     tools/restyle_panel.py style            rewrite the Inkscape sources in place
-    tools/restyle_panel.py centre QUERY     centre the labels, from `inkscape --query-all`
+    tools/restyle_panel.py centre DIR       centre the labels, from `inkscape --query-all`
 
 Two passes because the second needs the label widths in the NEW face, and only Inkscape
-can tell those: run `style`, then `inkscape --query-all overall_panel_inkscape.svg >
-query.txt`, then `centre query.txt`.  Afterwards export as usual
+can tell those: run `style`, then for every source `inkscape --query-all X.svg >
+DIR/X.svg.query`, then `centre DIR`.  Afterwards export as usual
 (`plugin/tools/panel_export.py --text-to-path --background`).
 
 What changes, and why:
@@ -189,7 +189,9 @@ def style_panel():
                 parent.remove(child)
     logo = by_label['logo_text']
     restyle_text(logo, LOGO, weight='700')
-    set_style(logo, display='inline', font_style='italic')
+    # Upright: only the upright Barlow is checked in, and a slanted roman is worse than
+    # none.
+    set_style(logo, display='inline', font_style=None)
     logo.attrib.pop(f'{{{SODI}}}insensitive', None)
 
     for lab, e in by_label.items():
@@ -209,6 +211,8 @@ def style_panel():
             e.set('rx', '3')
         elif lab == 'KNOB_volume_outline':
             set_style(e, fill=KNOB, stroke=KEY_EDGE, stroke_width='3')
+        elif lab == 'KNOB_volume_pointer':
+            set_style(e, stroke=LABEL)
         elif lab.startswith('LED_'):
             set_style(e, fill=LED_OFF, stroke='#000000', stroke_width='1')
         elif lab == 'VU_Horiz_Stereo':
@@ -217,24 +221,95 @@ def style_panel():
     tree.write(PANEL, encoding='utf-8', xml_declaration=True)
 
 
+ACCENT_OLD = '#ffa228'          # the slider taps keep it; outlines lose it
+
+
 def style_pages():
     for name in PAGES:
         path = os.path.join(GFX, name)
         tree = ET.parse(path)
-        for e in tree.getroot().iter(f'{{{SVG}}}text'):
-            restyle_text(e, LABEL)
+        for e in tree.getroot().iter():
+            tag = e.tag.split('}')[1]
+            style = e.get('style') or ''
+            if tag == 'text':
+                restyle_text(e, LABEL)
+            elif label(e).startswith('BUT_') or (tag == 'rect' and 'fill:#999999' in style):
+                set_style(e, fill=KEY, fill_opacity='1', stroke=KEY_EDGE,
+                          stroke_width='2.5')
+                if tag == 'rect':
+                    e.set('rx', '2.2')
+            elif 'fill:none' in style and f'stroke:{ACCENT_OLD}' in style:
+                set_style(e, stroke=LABEL_TAB)
         tree.write(path, encoding='utf-8', xml_declaration=True)
 
 
-def centre(query_path):
-    """Move each label so its box is centred on its control's."""
+def read_query(path):
     boxes = {}
-    with open(query_path) as f:
+    with open(path) as f:
         for line in f:
             parts = line.strip().split(',')
             if len(parts) == 5:
                 boxes[parts[0]] = tuple(float(v) for v in parts[1:])
+    return boxes
 
+
+SLIDER_LABEL_SIZE = '12.7px'
+
+
+def centre_page(path, boxes):
+    """Centre each slider's caption under it, one size for all of them.
+
+    A caption is the text whose box overlaps a slider body (an SB_ group) sideways and
+    starts below it.  Captions become middle-anchored, so every line of a two- or
+    three-line caption is centred on its own, which moving the block as a whole would
+    not do.
+    """
+    tree = ET.parse(path)
+    root = tree.getroot()
+    sliders = [e for e in root.iter(f'{{{SVG}}}g')
+               if label(e).startswith('SB_') and e.get('id') in boxes]
+    # User units per query unit, from the page's own width.
+    vb = [float(v) for v in root.get('viewBox').split()]
+    k = boxes[root.get('id')][2] / vb[2] if root.get('id') in boxes else 96 / 25.4
+
+    done = 0
+    for t in root.iter(f'{{{SVG}}}text'):
+        if t.get('id') not in boxes:
+            continue
+        tx, ty, tw, th = boxes[t.get('id')]
+        best = None
+        for s in sliders:
+            sx, sy, sw, sh = boxes[s.get('id')]
+            if ty >= sy + sh * 0.5 and tx < sx + sw and tx + tw > sx:
+                gap = ty - (sy + sh)
+                if best is None or gap < best[0]:
+                    best = (gap, s)
+        if best is None:
+            continue
+        sx, sy, sw, sh = boxes[best[1].get('id')]
+        x0 = float(t.get('x'))
+        # Start-anchored, so the text's x is (near enough) its box's left edge.
+        x_new = x0 + ((sx + sw / 2) - tx) / k
+        for e in [t] + list(t.iter(f'{{{SVG}}}tspan')):
+            set_style(e, text_anchor='middle', text_align='center',
+                      font_size=SLIDER_LABEL_SIZE)
+            if e.get('x') is not None:
+                e.set('x', f'{x_new:.5f}')
+        done += 1
+    tree.write(path, encoding='utf-8', xml_declaration=True)
+    return done
+
+
+def centre(query_dir):
+    """Move each label so its box is centred on its control's."""
+    pages = 0
+    for name in PAGES:
+        q = os.path.join(query_dir, name + '.query')
+        if os.path.exists(q):
+            pages += centre_page(os.path.join(GFX, name), read_query(q))
+    print(f'restyle_panel: centred {pages} slider captions on the DIVE pages')
+
+    boxes = read_query(os.path.join(query_dir, os.path.basename(PANEL) + '.query'))
     tree = ET.parse(PANEL)
     root = tree.getroot()
     by_label = {label(e): e for e in root.iter() if label(e)}
