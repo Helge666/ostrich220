@@ -321,6 +321,17 @@ Delay FB 31 ≈ endlos (Helge: „unendliches Feedback“). Level 0/10/20/31 →
 unter dem Direktschall (Hall2 Time 4). Die erste Messung (138-Byte-Pakete) war wirkungslos,
 siehe MIDIFACE-Hinweis in Phase 4.
 
+**Wichtiger Befund (24.10.2026): Panorama und Effekt-Sends macht IC25, nicht der PCM-Chip.**
+Die Emulation ist bisher mono (L = R exakt), das Gerät stereo (Drums verteilt, Korrelation
+L/R 0,75 ohne Effekte). Die PCM-Register 00/01 bleiben bei allen Drums 0; dafür schreibt
+die CPU bei jedem Anschlag Gruppen an IC25 (Fenster-Bank 0x40, U220_FXTRACE):
+`00A = Kanal, 000 = F0, 001 = Adresse (stimmenabhängig), 002 = Wert, 006 = Kanal`.
+Kanal FE/FF tragen für eine Stimme ein Gain-Paar (Kick 36/36, Hi-Hat 2B/3F, High Tom 1E/47
+= Pan), Kanal 00/01 vermutlich die Reverb-/Chorus-Sends. Außerdem schreibt die CPU auch im
+Leerlauf ~4000 Werte/s an 000/001/002/004/006/00A (Koeffizienten, LFO?). Folge: Der Mischer
+von IC25 (pro Stimme L/R-Gain und Sends) muss vor dem Hall nachgebildet werden; der
+PCM-Chip braucht dafür Einzelstimmen- statt Summenausgang.
+
 **Vorgehen (Entscheidung Helge, 24.10.2026):** Phase 4 kommt vor Phase 3. Der Effektteil wird
 als eigenes, austauschbares Modul gebaut (klare Schnittstelle: Effekt-Typ und -Parameter rein,
 Stereo-Audio rein/raus) und zunächst **nach Gehör angenähert**, nicht emuliert (Schritt 3).
