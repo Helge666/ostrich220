@@ -92,7 +92,8 @@ def main():
     ap.add_argument('base')
     ap.add_argument('mid')
     ap.add_argument('--slot', type=float, default=6.0)
-    ap.add_argument('--list')
+    ap.add_argument("--list")
+    ap.add_argument("--velocity", type=int, default=60)   # 110 clipped the XR18 at +9.5 dB gain
     a = ap.parse_args()
 
     base = load_patch(a.base)
@@ -105,12 +106,12 @@ def main():
         ev.append((t, b'\xf0' + vlq(len(msg) - 1) + msg[1:]))
         hit = t + 1.0
         for key in (36, 38, 42):
-            ev.append((hit, bytes([0x99, key, 110])))
+            ev.append((hit, bytes([0x99, key, a.velocity])))
             ev.append((hit + 0.1, bytes([0x89, key, 0])))
         # Plus a short piano chord on channel 1, in case the rhythm part is not sent to
         # the reverb: P-01's six parts all listen there.
         for key in (48, 72, 96):
-            ev.append((hit, bytes([0x90, key, 110])))
+            ev.append((hit, bytes([0x90, key, a.velocity])))
             ev.append((hit + 0.15, bytes([0x80, key, 0])))
         labels.append((hit, label))
         t += a.slot
