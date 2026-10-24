@@ -18,7 +18,7 @@ import time
 from ctypes import wintypes
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from syx_to_mid import load_dump                                    # noqa: E402
+from syx_to_mid import load_dump, split_dt1                         # noqa: E402
 
 winmm = ctypes.WinDLL('winmm')
 
@@ -68,9 +68,14 @@ def main():
     ap.add_argument('syx')
     ap.add_argument('--midi-out', default='MIDIOUT2 (MIDIFACE 2x2)')   # Helge's U-220
     ap.add_argument('--gap-ms', type=float, default=20.0)
+    ap.add_argument('--max-data', type=int, default=64,
+                    help='split DT1 packets to this many data bytes (0 = never); the '
+                         'MIDIFACE truncates SysEx after ~128 bytes')
     a = ap.parse_args()
 
     msgs = load_dump(a.syx)
+    if a.max_data > 0:
+        msgs = [p for m in msgs for p in split_dt1(m, a.max_data)]
     h = open_out(a.midi_out)
     t0 = time.perf_counter()
     for n, m in enumerate(msgs, 1):
