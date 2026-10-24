@@ -7,6 +7,7 @@
 #include "DistrhoUI.hpp"
 #include "OstrichShared.hpp"
 
+#include <chrono>
 #include <cmath>
 #include <string>
 
@@ -309,7 +310,9 @@ private:
 	// The HD44780 blinks its block cursor at about 1.9 Hz.
 	bool blinkPhase() const
 	{
-		return (getApp().getTime() * 1.9 - std::floor(getApp().getTime() * 1.9)) < 0.5;
+		const double t = std::chrono::duration<double>(
+				std::chrono::steady_clock::now().time_since_epoch()).count() * 1.9;
+		return (t - std::floor(t)) < 0.5;
 	}
 
 	void uiIdle() override
