@@ -1,0 +1,3 @@
+# Keep LF everywhere, also in Windows checkouts: the scripts run on Linux (kellerkind2),
+# and an earlier Windows export turned every text file into CRLF.
+* text=auto eol=lf
