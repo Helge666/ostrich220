@@ -120,7 +120,10 @@ Arbeitsort: neuer Treiber `mame/src/mame/roland/roland_u220.cpp`. Er übernimmt 
    Versuch ermittelt und mit Gegenproben bestätigt: Bit 0 EDIT, 1 DATA, 2 EXIT, 3 ENTER,
    4 PART/INST ◀◀, 5 PART/INST ▶▶, 8 MARK, 9 JUMP, 10 CURSOR ◀, 11 CURSOR ▶, 12 VALUE ▼,
    13 VALUE ▲; Bits 6/7 frei. LEDs (MIDI) noch offen.
-6. [ ] **MIDI IN/OUT** über die serielle Schnittstelle des P8098, wie beim U-110.
+6. [x] **MIDI IN/OUT/THRU** wie beim U-110 (bitgenau 31250 Baud, THRU als Leitung).
+   Getestet mit `tools/make_test_mid.py` über MAMEs `-min` (spielt ab 10 s): Program Change
+   auf Kanal 16 schaltet auf P-06, eine Roland-RQ1-Anfrage (Gerät 10h, Modell 2Bh)
+   beantwortet der U-220 mit einer korrekten DT1 auf MIDI OUT.
 7. [x] PCM-Chip hängt an **EXTINT** (Handler `0x22DD` schreibt die Chip-Register).
 
 Werkzeuge: `tools/u220_run.sh` (bauen + kopflos laufen lassen, LCD-Text aus dem Log),
@@ -129,7 +132,14 @@ Werkzeuge: `tools/u220_run.sh` (bauen + kopflos laufen lassen, LCD-Text aus dem 
 **Meilenstein 1:** Bootscreen, Menüs bedienbar, MIDI wird angenommen, alles noch stumm.
 **Stand 24.10.2026:** Die Firmware v1.02 bootet („RS-PCM Sound Module“), bietet bei leerem
 Speicher „Memory Initialize“ an, initialisiert auf ENTER und zeigt den Spielmodus
-`P-01: Acoust Piano [001]`. EDIT-, DATA-, MARK- und JUMP-Menüs öffnen sich. Es fehlt MIDI.
+`P-01: Acoust Piano [001]`. EDIT-, DATA-, MARK- und JUMP-Menüs öffnen sich. MIDI läuft in
+beide Richtungen. **Meilenstein 1 erreicht.**
+
+Bekannt und nach Phase 2 verschoben: Ab P-02 zeigt das LCD statt des Namens `############`.
+Im Programm-ROM steht nur der Startpatch „Acoust Piano“; die 64 Werkspatches und 128
+Timbres liest „Memory Initialize“ wie beim U-110 über den Lesekanal des PCM-Chips aus den
+Wave-ROMs. Solange der Chip ein Platzhalter ist, kommen Nullen. Bank `0x70` wird von der
+Firmware auf Anwesenheit getestet (Muster `7F`/`01`/`FF`), vermutlich eine Karte; bleibt leer.
 
 ## Phase 2 — Erster Ton (ohne Effekte)
 
