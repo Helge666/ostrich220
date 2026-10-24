@@ -17,7 +17,7 @@ gfx="$here/resources/graphics"
 preview=""
 [ "${1:-}" = "--preview" ] && preview="${2:?--preview needs a directory}"
 
-if [ "$(fc-match -f '%{family}' 'Barlow Semi Condensed')" != "Barlow Semi Condensed" ]; then
+if [ "$(fc-match -f '%{family}' 'Barlow Semi Condensed' | cut -d, -f1)" != "Barlow Semi Condensed" ]; then
 	echo "restyle_all: Barlow Semi Condensed is not installed for fontconfig" >&2
 	exit 1
 fi
