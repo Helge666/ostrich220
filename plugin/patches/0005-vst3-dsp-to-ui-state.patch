@@ -1,0 +1,230 @@
+diff --git a/distrho/src/DistrhoPluginVST3.cpp b/distrho/src/DistrhoPluginVST3.cpp
+index 7295c892..ef01d46e 100644
+--- a/distrho/src/DistrhoPluginVST3.cpp
++++ b/distrho/src/DistrhoPluginVST3.cpp
+@@ -54,6 +54,8 @@
+ #include "travesty/factory.h"
+ #include "travesty/host.h"
+ 
++#include <atomic>
++#include <cstring>
+ #include <map>
+ #include <string>
+ #include <vector>
+@@ -68,6 +70,9 @@ static constexpr const writeMidiFunc writeMidiCallback = nullptr;
+ #if ! DISTRHO_PLUGIN_WANT_PARAMETER_VALUE_CHANGE_REQUEST
+ static constexpr const requestParameterValueChangeFunc requestParameterValueChangeCallback = nullptr;
+ #endif
++#if ! (DISTRHO_PLUGIN_WANT_STATE && DISTRHO_PLUGIN_HAS_UI)
++static constexpr const updateStateValueFunc updateStateValueCallback = nullptr;
++#endif
+ 
+ typedef std::map<const String, String> StringMap;
+ 
+@@ -583,7 +588,7 @@ class PluginVst3
+ 
+ public:
+     PluginVst3(v3_host_application** const host, const bool isComponent)
+-        : fPlugin(this, writeMidiCallback, requestParameterValueChangeCallback, nullptr),
++        : fPlugin(this, writeMidiCallback, requestParameterValueChangeCallback, updateStateValueCallback),
+           fComponentHandler(nullptr),
+         #if DISTRHO_PLUGIN_HAS_UI
+          #if DPF_VST3_USES_SEPARATE_CONTROLLER
+@@ -2156,6 +2161,30 @@ public:
+        #if DISTRHO_PLUGIN_WANT_STATE
+         if (std::strcmp(msgid, "state-set") == 0)
+             return notify_state(attrs);
++
++        // DSP -> UI state, the component's half.  The controller asks on every UI idle;
++        // this runs on the main thread, so it may send what run() could only queue.
++        if (std::strcmp(msgid, "state-poll") == 0)
++        {
++            drainStateQueue();
++            return V3_OK;
++        }
++
++        // ...and the controller's half: hand it to the view.  Deliberately NOT notify_state:
++        // these are values the DSP reports, not settings, and must not be set back into the
++        // controller's own plugin instance.
++        if (std::strcmp(msgid, "state-push") == 0)
++        {
++            if (fConnectionFromCtrlToView == nullptr || ! fConnectedToUI)
++                return V3_OK;
++
++            String key, value;
++            const v3_result res = readStateAttributes(attrs, key, value);
++            DISTRHO_SAFE_ASSERT_INT_RETURN(res == V3_OK, res, res);
++
++            sendStateSetToUI(key, value);
++            return V3_OK;
++        }
+        #endif
+ 
+         d_stderr("comp2ctrl_notify received unknown msg '%s'", msgid);
+@@ -2267,6 +2296,27 @@ public:
+                                      fCachedParameterValues[kVst3InternalParameterBaseCount + i]);
+             }
+ 
++           #if DISTRHO_PLUGIN_WANT_STATE
++            // Anything the DSP pushed since the last idle.  With a separate controller the
++            // DSP is the component, so ask it; it answers with "state-push" messages.
++           #if DPF_VST3_USES_SEPARATE_CONTROLLER
++            if (fConnectionFromCompToCtrl != nullptr)
++            {
++                if (v3_message** const poll = createMessage("state-poll"))
++                {
++                    if (v3_attribute_list** const pollattrs = v3_cpp_obj(poll)->get_attributes(poll))
++                    {
++                        v3_cpp_obj(pollattrs)->set_int(pollattrs, "__dpf_msg_target__", 1);
++                        v3_cpp_obj(fConnectionFromCompToCtrl)->notify(fConnectionFromCompToCtrl, poll);
++                    }
++                    v3_cpp_obj_unref(poll);
++                }
++            }
++           #else
++            drainStateQueue();
++           #endif
++           #endif
++
+             sendReadyToUI();
+             return V3_OK;
+         }
+@@ -2419,8 +2469,86 @@ public:
+         std::free(value16);
+         return V3_OK;
+     }
++
++    // The key/value pair of a state message, without acting on it.
++    v3_result readStateAttributes(v3_attribute_list** const attrs, String& key, String& value)
++    {
++        int64_t keyLength = -1;
++        int64_t valueLength = -1;
++        v3_result res;
++
++        res = v3_cpp_obj(attrs)->get_int(attrs, "key:length", &keyLength);
++        DISTRHO_SAFE_ASSERT_INT_RETURN(res == V3_OK, res, res);
++        DISTRHO_SAFE_ASSERT_INT_RETURN(keyLength >= 0, keyLength, V3_INTERNAL_ERR);
++
++        res = v3_cpp_obj(attrs)->get_int(attrs, "value:length", &valueLength);
++        DISTRHO_SAFE_ASSERT_INT_RETURN(res == V3_OK, res, res);
++        DISTRHO_SAFE_ASSERT_INT_RETURN(valueLength >= 0, valueLength, V3_INTERNAL_ERR);
++
++        std::vector<int16_t> key16(static_cast<size_t>(keyLength + 1), 0);
++        std::vector<int16_t> value16(static_cast<size_t>(valueLength + 1), 0);
++        std::vector<char> key8(static_cast<size_t>(keyLength + 1), '\0');
++        std::vector<char> value8(static_cast<size_t>(valueLength + 1), '\0');
++
++        res = v3_cpp_obj(attrs)->get_string(attrs, "key", key16.data(), sizeof(int16_t)*(keyLength+1));
++        DISTRHO_SAFE_ASSERT_INT2_RETURN(res == V3_OK, res, keyLength, res);
++
++        if (valueLength != 0)
++        {
++            res = v3_cpp_obj(attrs)->get_string(attrs, "value", value16.data(), sizeof(int16_t)*(valueLength+1));
++            DISTRHO_SAFE_ASSERT_INT2_RETURN(res == V3_OK, res, valueLength, res);
++        }
++
++        // the same cheap conversion as notify_state: state is ASCII
++        for (int64_t i=0; i<keyLength; ++i)
++            key8[i] = static_cast<char>(key16[i]);
++        for (int64_t i=0; i<valueLength; ++i)
++            value8[i] = static_cast<char>(value16[i]);
++
++        key = key8.data();
++        value = value8.data();
++        return V3_OK;
++    }
+    #endif // DISTRHO_PLUGIN_WANT_STATE
+ 
++   #if DISTRHO_PLUGIN_WANT_STATE
++    // Main thread only.  Empties what updateState() queued from run(): straight to the view
++    // when this instance has one, otherwise across to the controller as "state-push".
++    void drainStateQueue()
++    {
++        for (uint32_t read = fStateQueueRead.load(std::memory_order_relaxed);
++             read != fStateQueueWrite.load(std::memory_order_acquire);
++             read = (read + 1) % kStateQueueSize)
++        {
++            const StateMessage& msg(fStateQueue[read]);
++
++           #if DPF_VST3_USES_SEPARATE_CONTROLLER
++            if (fConnectionFromCompToCtrl != nullptr)
++            {
++                if (v3_message** const message = createMessage("state-push"))
++                {
++                    if (v3_attribute_list** const attrlist = v3_cpp_obj(message)->get_attributes(message))
++                    {
++                        v3_cpp_obj(attrlist)->set_int(attrlist, "__dpf_msg_target__", 1);
++                        v3_cpp_obj(attrlist)->set_int(attrlist, "key:length", std::strlen(msg.key));
++                        v3_cpp_obj(attrlist)->set_int(attrlist, "value:length", std::strlen(msg.value));
++                        v3_cpp_obj(attrlist)->set_string(attrlist, "key", ScopedUTF16String(msg.key));
++                        v3_cpp_obj(attrlist)->set_string(attrlist, "value", ScopedUTF16String(msg.value));
++                        v3_cpp_obj(fConnectionFromCompToCtrl)->notify(fConnectionFromCompToCtrl, message);
++                    }
++                    v3_cpp_obj_unref(message);
++                }
++            }
++           #else
++            if (fConnectionFromCtrlToView != nullptr && fConnectedToUI)
++                sendStateSetToUI(msg.key, msg.value);
++           #endif
++
++            fStateQueueRead.store((read + 1) % kStateQueueSize, std::memory_order_release);
++        }
++    }
++   #endif
++
+    #if DISTRHO_PLUGIN_WANT_MIDI_INPUT
+     v3_result notify_midi(v3_attribute_list** const attrs)
+     {
+@@ -2473,6 +2601,16 @@ private:
+    #if DISTRHO_PLUGIN_HAS_UI
+     bool* fParameterValueChangesForUI; // basic offset + real
+     bool fConnectedToUI;
++    #if DISTRHO_PLUGIN_WANT_STATE
++    // DSP -> UI state: written by run() through updateState(), read on the main thread by
++    // drainStateQueue().  Single producer, single consumer.  Sized like the CLAP patch's
++    // queue, for a state that is a whole list rather than a scalar.
++    static constexpr uint32_t kStateQueueSize = 16;
++    struct StateMessage { char key[64]; char value[16384]; };
++    StateMessage fStateQueue[kStateQueueSize];
++    std::atomic<uint32_t> fStateQueueWrite { 0 };
++    std::atomic<uint32_t> fStateQueueRead { 0 };
++    #endif
+    #endif
+    #if DISTRHO_PLUGIN_WANT_LATENCY
+     uint32_t fLastKnownLatency;
+@@ -3060,6 +3198,34 @@ private:
+     }
+    #endif
+ 
++   #if DISTRHO_PLUGIN_WANT_STATE && DISTRHO_PLUGIN_HAS_UI
++    // DSP -> UI state, which this backend never implemented: the exporter was handed
++    // nullptr, so a plugin that pushes its display to its own UI drew a dead panel under
++    // VST3.  Called from run(); queues only -- no allocation, no lock, no host call --
++    // and drainStateQueue() delivers it on the main thread at the next UI idle.
++    bool updateState(const char* const key, const char* const value)
++    {
++        const uint32_t write = fStateQueueWrite.load(std::memory_order_relaxed);
++        const uint32_t next = (write + 1) % kStateQueueSize;
++        if (next == fStateQueueRead.load(std::memory_order_acquire))
++            return false;                       // full; drop rather than block
++
++        StateMessage& msg(fStateQueue[write]);
++        std::strncpy(msg.key, key, sizeof(msg.key) - 1);
++        msg.key[sizeof(msg.key) - 1] = '\0';
++        std::strncpy(msg.value, value, sizeof(msg.value) - 1);
++        msg.value[sizeof(msg.value) - 1] = '\0';
++
++        fStateQueueWrite.store(next, std::memory_order_release);
++        return true;
++    }
++
++    static bool updateStateValueCallback(void* const ptr, const char* const key, const char* const value)
++    {
++        return static_cast<PluginVst3*>(ptr)->updateState(key, value);
++    }
++   #endif
++
+    #if DISTRHO_PLUGIN_WANT_MIDI_OUTPUT
+     bool writeMidi(const MidiEvent& midiEvent)
+     {

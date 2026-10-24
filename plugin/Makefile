@@ -137,24 +137,33 @@ CROSS_PREFIX ?= x86_64-w64-mingw32-
 WIN_BUILD    = $(CURDIR)/build-win
 WIN_BIN      = $(CURDIR)/bin-win
 
+# Ostrich: VST3 as well, because Cubase loads nothing else (patches/0005 gives it the DSP ->
+# UI path it lacked), and the standalone, which on Windows talks to the sound card through
+# DPF's RtAudio backend instead of JACK.
+WIN_TARGETS  = clap vst3 jack
+WIN_PRODUCTS = $(WIN_BIN)/$(NAME).clap \
+               $(WIN_BIN)/$(NAME).vst3/Contents/x86_64-win/$(NAME).vst3 \
+               $(WIN_BIN)/$(NAME).exe
+
 win:
 	@command -v $(CROSS_PREFIX)g++ > /dev/null \
 		|| { echo "  $(CROSS_PREFIX)g++ not found -- see CLONING.md, the Windows section"; exit 1; }
 	@$(MAKE) --no-print-directory patches generated
 	@U110_CORE_BUILD=$(WIN_BUILD) CXX=$(CROSS_PREFIX)g++ AR=$(CROSS_PREFIX)ar \
 		tools/build_core.sh
-	@if [ -e "$(WIN_BIN)/$(NAME).clap" ] \
-	   && [ "$(WIN_BUILD)/libu110core.a" -nt "$(WIN_BIN)/$(NAME).clap" ]; then \
-		echo "  core is newer than $(NAME).clap -- forcing a relink"; \
-		rm -f "$(WIN_BIN)/$(NAME).clap"; \
-	fi
-	@$(MAKE) --no-print-directory clap \
+	@for f in $(WIN_PRODUCTS); do \
+		if [ -e "$$f" ] && [ "$(WIN_BUILD)/libu110core.a" -nt "$$f" ]; then \
+			echo "  core is newer than $$(basename $$f) -- forcing a relink"; \
+			rm -f "$$f"; \
+		fi; \
+	done
+	@$(MAKE) --no-print-directory $(WIN_TARGETS) \
 		CC=$(CROSS_PREFIX)gcc CXX=$(CROSS_PREFIX)g++ AR=$(CROSS_PREFIX)ar \
 		BUILD_DIR_SUFFIX=-win \
 		DPF_BUILD_DIR=$(WIN_BUILD)/$(NAME) \
 		DPF_TARGET_DIR=$(WIN_BIN) \
 		CORE_LIB=build-win/libu110core.a
-	@file $(WIN_BIN)/$(NAME).clap
+	@file $(WIN_PRODUCTS)
 
 .PHONY: win
 
