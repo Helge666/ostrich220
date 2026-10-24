@@ -78,6 +78,8 @@ struct PanelState
 
 	/// Character codes, row 0 then row 1.  0x00-0x07 are the custom glyphs in cgram.
 	uint8_t  lcd[kLcdColumns * kLcdRows];
+	uint8_t  cursor_pos;        ///< 0..47 into lcd[], 0xFF = off screen
+	uint8_t  cursor_flags;      ///< bit 1 underline cursor on, bit 0 blinking block on
 	uint8_t  cgram_dirty;
 	uint8_t  cgram[64];         ///< 8 glyphs x 8 rows, low 5 bits = the dots across
 	uint8_t  leds;              ///< reserved: the MIDI lamp is not wired up yet

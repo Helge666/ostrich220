@@ -41,6 +41,7 @@ namespace {
     inline bool NAME() { static const bool on = std::getenv(ENV) != nullptr; return on; }
 TRACE_FLAG(trace_tg,   "U220_TGTRACE")
 TRACE_FLAG(trace_midi, "U220_MIDITRACE")
+TRACE_FLAG(trace_lcd,  "U220_LCDTRACE")
 #undef TRACE_FLAG
 
 constexpr u32 CPU_CLOCK = 12000000;         // 12 MHz XTAL
@@ -123,6 +124,11 @@ struct U220Core::Impl
 	u8   cgram[64] = {};
 	u8   cgram_addr = 0;
 	bool cgram_dirty = false;
+	// What the UI needs for the controller's own cursor, which the driver's shadow does
+	// not model: display control (bit 1 underline, bit 0 blinking block) and where the
+	// cursor is.  Kept apart from lcd_addr so nothing the CPU reads back can change.
+	u8   display_ctrl = 0;
+	u8   cursor_addr = 0;
 
 	emu_timer *lcd_timer = nullptr;
 	emu_timer *stream_timer = nullptr;
@@ -390,6 +396,14 @@ void U220Core::Impl::pcm_w(offs_t offset, u8 data)
 // window, so it must agree).  CGRAM is tracked separately, for the UI only.
 void U220Core::Impl::lcd_cmd(u8 data)
 {
+	if (trace_lcd())
+		std::fprintf(stderr, "LCD %f cmd %02X
+", machine.time().as_double(), data);
+	if ((data & 0xf8) == 0x08)
+		display_ctrl = data & 0x07;
+	else if ((data & 0xf8) == 0x10)                 // cursor move, S/C = 0
+		cursor_addr = (data & 0x04) ? u8((cursor_addr + 1) & 0x7f) : u8((cursor_addr - 1) & 0x7f);
+
 	if (data == 0x01)
 	{
 		std::fill(std::begin(ddram), std::end(ddram), u8(' '));
@@ -411,6 +425,8 @@ void U220Core::Impl::lcd_cmd(u8 data)
 		lcd_to_cgram = true;
 		cgram_addr = data & 0x3f;
 	}
+	if (data == 0x01 || (data & 0xfe) == 0x02 || (data & 0x80))
+		cursor_addr = lcd_addr;
 }
 
 void U220Core::Impl::lcd_data(u8 data)
@@ -424,6 +440,7 @@ void U220Core::Impl::lcd_data(u8 data)
 	}
 	ddram[lcd_addr & 0x7f] = data;
 	lcd_addr = (lcd_addr + 1) & 0x7f;
+	cursor_addr = lcd_addr;
 }
 
 attotime U220Core::Impl::midi_due() const
@@ -645,6 +662,10 @@ void U220Core::snapshot(PanelState &out) const
 	std::memcpy(out.lcd + kLcdColumns, m.ddram + 0x40, kLcdColumns);
 	std::memcpy(out.cgram, m.cgram, sizeof(out.cgram));
 	out.cgram_dirty = m.cgram_dirty;
+	// DDRAM 0x00-0x17 is row 0, 0x40-0x57 row 1; anywhere else the cursor is off screen.
+	const u8 a = m.cursor_addr;
+	out.cursor_pos = (a < kLcdColumns) ? a : (a >= 0x40 && a < 0x40 + kLcdColumns) ? u8(a - 0x40 + kLcdColumns) : 0xff;
+	out.cursor_flags = (m.display_ctrl & 0x04) ? (m.display_ctrl & 0x03) : 0;
 }
 
 uint8_t U220Core::readMem(uint16_t addr) const

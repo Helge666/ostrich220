@@ -200,7 +200,11 @@ int main(int argc, char **argv)
 		{
 			char r0[ostrich::kLcdColumns + 1], r1[ostrich::kLcdColumns + 1];
 			core.lcdText(r0, r1);
-			std::string text = std::string("[") + r0 + "][" + r1 + "]";
+			ostrich::PanelState st;
+			core.snapshot(st);
+			char cur[32];
+			std::snprintf(cur, sizeof(cur), "  cursor %d flags %d", st.cursor_pos == 0xff ? -1 : int(st.cursor_pos), st.cursor_flags);
+			std::string text = std::string("[") + r0 + "][" + r1 + "]" + cur;
 			if (text != last_lcd)
 			{
 				std::printf("LCD %8.3f %s\n", double(done) / rate, text.c_str());
