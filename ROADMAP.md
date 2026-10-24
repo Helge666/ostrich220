@@ -344,6 +344,10 @@ innerhalb ~0,8 dB am Gerät (Hi-Hat +2,9 / Gerät +3,7 dB, High Tom +7,5 / +7,8 
 Drums und Melodie jetzt beide +2 dB gegen das Gerät (vorher −4,2 / +2,0). Nulltest
 MAME ↔ Kern in Stereo weiter ±1 LSB. Hall und Chorus bekommen die Send-Busse.
 
+**Helges Gegenprobe in Cubase (24.10.2026):** gleicher MIDI-Track zeitgleich an U-220 und
+Ostrich, eins davon phasengedreht: die beiden löschen sich weitgehend aus. Kanal 10 spielt
+die Drums (nach DPF-Patch 0006), Stereo stimmt.
+
 **Vorgehen (Entscheidung Helge, 24.10.2026):** Phase 4 kommt vor Phase 3. Der Effektteil wird
 als eigenes, austauschbares Modul gebaut (klare Schnittstelle: Effekt-Typ und -Parameter rein,
 Stereo-Audio rein/raus) und zunächst **nach Gehör angenähert**, nicht emuliert (Schritt 3).
