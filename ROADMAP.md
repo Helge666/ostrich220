@@ -171,6 +171,9 @@ Geräten, und ein Austausch mit ValleyBell (MAME, CM-32P) lohnt sich.
 
 ## Phase 5 — Veröffentlichung und Rückfluss
 
+- [ ] **Umbenennung in „Ostrich 220“ (kurz O-220)**, Idee von Helge, erst viel später. Der
+      Bezug zum Roland U-220 steht dann in der README. Betrifft Plugin-Name, VST3/CLAP-IDs
+      (neue IDs, damit Sessions mit Voltaire 110 nicht verwechselt werden), Datenordner.
 - [ ] Vor jedem öffentlichen Push: Prüfung, dass die Historie keine ROM-, Wave- oder
       Handbuch-Datei enthält (`git log --all --stat` gegen die `.gitignore`-Regeln).
 - [ ] Repo öffentlich machen, Releases nur mit Binärdateien ohne ROMs. Die
