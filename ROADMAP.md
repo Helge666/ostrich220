@@ -45,9 +45,14 @@ dass die Toolchain funktioniert, bevor wir etwas ändern.
 - [x] Build-Pakete auf kellerkind2 installiert (45 neu, 0 Upgrades; Sunshine lief durch)
 - [x] Voltaire 110 gebaut: Linux LV2/VST3/CLAP/JACK und Windows-CLAP (`make`, `make win`),
       je unter 30 s; `make selftest` offline grün (CLAP-UI-Test mangels Display übersprungen)
-- [ ] Windows-CLAP hier in der DAW testen. Installiert für den Benutzer unter
-      `%LOCALAPPDATA%\Programs\Common\CLAP\Voltaire110.clap`, ROMs unter
+- [x] Windows-VST3 für Cubase 15 (kann kein CLAP): `patches/0005` gibt DPFs VST3 den
+      fehlenden Rückkanal DSP → Oberfläche (LCD), `make win` baut CLAP, VST3 und das
+      Standalone-Programm (RtAudio statt JACK)
+- [ ] **VST3 in Cubase testen**: lädt, klingt, LCD aktualisiert sich. Installiert für den
+      Benutzer unter `%LOCALAPPDATA%\Programs\Common\VST3\Voltaire110.vst3`, ROMs unter
       `%LOCALAPPDATA%\Voltaire110\roms\`
+- [ ] Standalone `Voltaire110.exe` unter Windows testen (Audio- und MIDI-Geräteauswahl)
+- [ ] `AGENTS.md` ist noch der Text von emu110 (U-110, dessen Rechner); für Ostrich anpassen
 - [ ] **Vollständiges MAME** aus `mame/` bauen, nur mit den Roland-Treibern
       (`make SUBTARGET=roland SOURCES=src/mame/roland/roland_u110.cpp,src/mame/roland/roland_u20.cpp`).
       Der MAME-Debugger ist das wichtigste Werkzeug für Phase 1.
