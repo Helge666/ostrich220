@@ -18,6 +18,13 @@ CORE_LIB = build/libu110core.a
 BUILD_CXX_FLAGS += -Icore -Isrc -Igenerated -std=c++20
 LINK_FLAGS      += $(CURDIR)/$(CORE_LIB)
 
+# The UI calls clock_gettime(), which mingw keeps in winpthread.  DPF links that into the
+# CLAP and the standalone (-lpthread in CLAP_LIBS/JACK_LIBS) but not into the VST3, which
+# then fails to link.  Static like the rest, via DPF's -static.
+ifeq ($(WINDOWS),true)
+EXTRA_LIBS      += -lpthread
+endif
+
 # The standalone is the daily development loop -- MIDI in, audio out, no host in the way --
 # and a first-class deliverable, not a compromise.  On Linux it speaks JACK, which under
 # PipeWire Just Works.
