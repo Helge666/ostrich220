@@ -65,7 +65,7 @@ constexpr unsigned BASE_LEN[8] = { 1031, 1201, 1361, 1493, 1657, 1777, 1913, 205
 constexpr float TYPE_SIZE[6]   = { 0.55f, 0.75f, 0.65f, 1.15f, 1.0f, 0.6f };   // ..Hall2, Gate
 constexpr float TYPE_PRE_MS[6] = { 6.0f, 10.0f, 8.0f, 22.0f, 18.0f, 4.0f };
 // Output calibration per type (all 8 types), against the tail level of the hardware probe.
-constexpr float TYPE_GAIN[8]   = { 0.35f, 0.35f, 0.35f, 0.35f, 0.35f, 0.35f, 0.5f, 0.5f };
+constexpr float TYPE_GAIN[8]   = { 0.74f, 0.29f, 0.49f, 0.25f, 0.17f, 0.38f, 0.96f, 0.96f };
 constexpr unsigned DIFF_LEN[4] = { 142, 107, 379, 277 };
 constexpr float DIFF_G = 0.65f;
 
@@ -133,9 +133,9 @@ void U220Reverb::configure()
 	const int type = std::clamp(m_p.reverb_type, 0, 7);
 	const int time = std::clamp(m_p.reverb_time, 0, 31);
 
-	// Level: 31 is the reference; 20 and 10 measured 7.8 and 16.3 dB down, 0 is off.
+	// Level: 31 is the reference; 20 measured 7.9 dB down, 10 about 16 dB, 0 is off.
 	const float lv = float(std::clamp(m_p.reverb_level, 0, 31)) / 31.0f;
-	m_gain = (m_p.reverb_on ? 1.0f : 0.0f) * std::pow(lv, 1.75f) * TYPE_GAIN[type];
+	m_gain = (m_p.reverb_on ? 1.0f : 0.0f) * std::pow(lv, 1.9f) * TYPE_GAIN[type];
 
 	if (type <= EffectParams::Gate)
 	{
@@ -156,8 +156,11 @@ void U220Reverb::configure()
 	{
 		const double period = (10.0 + 12.9 * time) * 1e-3;
 		m_echolen = std::clamp<unsigned>(unsigned(period * FS), 2u, unsigned(m_echo.size() - 1));
+		// Measured per-repeat gains: Delay 0.26 at FB 15 and 0.75 at FB 31 (none at 0);
+		// CrossDelay rings on even at FB 0 and less than Delay at 31.
 		const float fb = float(std::clamp(m_p.delay_feedback, 0, 31)) / 31.0f;
-		m_echofb = 0.8f * fb * fb;
+		m_echofb = type == EffectParams::CrossDelay ? 0.30f + 0.35f * fb
+				: 0.75f * std::pow(fb, 1.5f);
 	}
 }
 
@@ -232,7 +235,7 @@ void U220Reverb::process(const float *revL, const float *revR, const float *choL
 				// Open on any input, hold ~250 ms after it stops, close in ~15 ms.
 				const float a = std::fabs(in);
 				m_env = std::max(a, m_env * 0.9995f);
-				if (a > 1e-4f) m_hold = unsigned(0.25 * FS);
+				if (a > 1e-4f) m_hold = unsigned(0.18 * FS);
 				else if (m_hold) m_hold --;
 				const float target = m_hold ? 1.0f : 0.0f;
 				m_gate += (target - m_gate) * (target > m_gate ? 0.05f : 0.002f);
