@@ -208,11 +208,14 @@ float U220Reverb::network(float in, float &outR)
 	for (int i = 0; i < LINES; i ++)
 	{
 		const unsigned n = unsigned(m_line[i].size());
-		m_line[i][m_pos[i]] = h[i] * s + x;
+		// The input goes in with alternating signs, so no two lines start out alike.
+		m_line[i][m_pos[i]] = h[i] * s + ((i & 1) ? -x : x);
 		m_pos[i] = (m_pos[i] + 1) % n;
 	}
-	outR = o[1] - o[3] + o[5] - o[7];
-	return o[0] - o[2] + o[4] - o[6];
+	// Disjoint sets of lines for the two sides: the hardware's room and hall tails are
+	// uncorrelated left to right (measured -0.03..+0.05).
+	outR = o[1] + o[2] + o[4] + o[7];
+	return o[0] + o[3] + o[5] + o[6];
 }
 
 void U220Reverb::process(const float *revL, const float *revR, const float *choL,
@@ -246,8 +249,10 @@ void U220Reverb::process(const float *revL, const float *revR, const float *choL
 				m_env = std::max(a, m_env * 0.99995f);
 				const float target = m_hold ? 1.0f : 0.0f;
 				m_gate += (target - m_gate) * (target > m_gate ? 0.05f : 0.002f);
-				l *= m_gate;
-				r *= m_gate;
+				// The gate is nearly mono on the hardware (L/R correlation 0.74): cross-mix.
+				const float gl = m_gate * (l + 0.45f * r), gr = m_gate * (r + 0.45f * l);
+				l = gl;
+				r = gr;
 			}
 		}
 		else
