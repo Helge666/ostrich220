@@ -66,6 +66,9 @@ constexpr float TYPE_SIZE[6]   = { 0.55f, 0.75f, 0.65f, 1.15f, 1.0f, 0.6f };   /
 constexpr float TYPE_PRE_MS[6] = { 6.0f, 10.0f, 8.0f, 22.0f, 18.0f, 4.0f };
 // Output calibration per type (all 8 types), against the tail level of the hardware probe.
 constexpr float TYPE_GAIN[8]   = { 0.74f, 0.29f, 0.49f, 0.25f, 0.17f, 0.38f, 0.96f, 0.96f };
+// The network's own diffusion lengthens the decay it is set to; measured hw/emulation
+// ratios of the decay time, applied to the targets.
+constexpr float RT_SCALE[5]    = { 0.79f, 1.05f, 0.85f, 1.10f, 0.98f };
 constexpr unsigned DIFF_LEN[4] = { 142, 107, 379, 277 };
 constexpr float DIFF_G = 0.65f;
 
@@ -141,8 +144,8 @@ void U220Reverb::configure()
 	{
 		const int t = std::min(type, 4);
 		// The gate runs the network as a mid-size hall and cuts it short.
-		const float rt_lo = type == EffectParams::Gate ? 1.2f : rt_at(t, time, 0);
-		const float rt_hi = type == EffectParams::Gate ? 0.9f : rt_at(t, time, 5);
+		const float rt_lo = type == EffectParams::Gate ? 1.2f : rt_at(t, time, 0) * RT_SCALE[t];
+		const float rt_hi = type == EffectParams::Gate ? 0.9f : rt_at(t, time, 5) * RT_SCALE[t];
 		for (int i = 0; i < LINES; i ++)
 		{
 			m_len[i] = std::min<unsigned>(unsigned(BASE_LEN[i] * TYPE_SIZE[type]), unsigned(m_line[i].size() - 1));
@@ -159,7 +162,7 @@ void U220Reverb::configure()
 		// Measured per-repeat gains: Delay 0.26 at FB 15 and 0.75 at FB 31 (none at 0);
 		// CrossDelay rings on even at FB 0 and less than Delay at 31.
 		const float fb = float(std::clamp(m_p.delay_feedback, 0, 31)) / 31.0f;
-		m_echofb = type == EffectParams::CrossDelay ? 0.30f + 0.35f * fb
+		m_echofb = type == EffectParams::CrossDelay ? 0.25f + 0.38f * std::pow(fb, 2.2f)
 				: 0.75f * std::pow(fb, 1.5f);
 	}
 }
@@ -232,11 +235,15 @@ void U220Reverb::process(const float *revL, const float *revR, const float *choL
 			l = network(in, r);
 			if (type == EffectParams::Gate)
 			{
-				// Open on any input, hold ~250 ms after it stops, close in ~15 ms.
+				// Opened by an attack (a new peak), held ~180 ms whatever follows, closed in
+				// ~15 ms: the hardware's gate is as short after a sustained note as after
+				// a drum hit.
 				const float a = std::fabs(in);
-				m_env = std::max(a, m_env * 0.9995f);
-				if (a > 1e-4f) m_hold = unsigned(0.18 * FS);
-				else if (m_hold) m_hold --;
+				if (a > 1e-4f && a >= m_env)
+					m_hold = unsigned(0.18 * FS);
+				else if (m_hold)
+					m_hold --;
+				m_env = std::max(a, m_env * 0.99995f);
 				const float target = m_hold ? 1.0f : 0.0f;
 				m_gate += (target - m_gate) * (target > m_gate ? 0.05f : 0.002f);
 				l *= m_gate;
