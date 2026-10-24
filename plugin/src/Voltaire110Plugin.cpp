@@ -29,6 +29,17 @@
 
 #include <dirent.h>
 #include <sys/stat.h>
+#include <cerrno>
+
+#ifdef _WIN32
+# ifndef NOMINMAX
+#  define NOMINMAX
+# endif
+# ifndef WIN32_LEAN_AND_MEAN
+#  define WIN32_LEAN_AND_MEAN
+# endif
+# include <windows.h>
+#endif
 
 START_NAMESPACE_DISTRHO
 
@@ -176,6 +187,66 @@ long fileSize(const std::string &path)
     if (::stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode))
         return -1;
     return long(st.st_size);
+}
+
+/// The report's lines for a directory opendir() would not open: what the C library and,
+/// on Windows, the OS itself say about it.
+///
+/// "There is no such directory" was all it used to say, and in Cubase on Windows it said
+/// it about a directory that a standalone program built by the same compiler opened
+/// without complaint.  The errno, the Win32 view (ANSI and wide) and any byte in the path
+/// that is not printable ASCII tell those cases apart.
+std::string whyNoDirectory(const std::string &path, int err)
+{
+    char buf[512];
+    std::string r;
+    if (err == ENOENT)
+        r += "     -- there is no such directory\n";
+    else
+    {
+        std::snprintf(buf, sizeof(buf), "     -- it would not open: %s\n", std::strerror(err));
+        r += buf;
+    }
+    std::snprintf(buf, sizeof(buf), "        errno %d\n", err);
+    r += buf;
+
+   #ifdef _WIN32
+    ::SetLastError(0);
+    const DWORD attrA = ::GetFileAttributesA(path.c_str());
+    const DWORD errA = ::GetLastError();
+    std::snprintf(buf, sizeof(buf), "        GetFileAttributesA: 0x%08lx, last error %lu\n",
+                  (unsigned long)attrA, (unsigned long)errA);
+    r += buf;
+
+    const int wn = ::MultiByteToWideChar(CP_ACP, 0, path.c_str(), -1, nullptr, 0);
+    if (wn > 0)
+    {
+        std::vector<wchar_t> wide(size_t(wn), L'\0');
+        ::MultiByteToWideChar(CP_ACP, 0, path.c_str(), -1, wide.data(), wn);
+        ::SetLastError(0);
+        const DWORD attrW = ::GetFileAttributesW(wide.data());
+        const DWORD errW = ::GetLastError();
+        std::snprintf(buf, sizeof(buf), "        GetFileAttributesW: 0x%08lx, last error %lu\n",
+                      (unsigned long)attrW, (unsigned long)errW);
+        r += buf;
+    }
+    std::snprintf(buf, sizeof(buf), "        ANSI code page %u, OEM code page %u, file APIs %s\n",
+                  unsigned(::GetACP()), unsigned(::GetOEMCP()),
+                  ::AreFileApisANSI() ? "ANSI" : "OEM");
+    r += buf;
+   #endif
+
+    for (size_t i = 0; i < path.size(); i ++)
+    {
+        const unsigned char c = static_cast<unsigned char>(path[i]);
+        if (c < 0x20 || c >= 0x7f)
+        {
+            std::snprintf(buf, sizeof(buf), "        unusual byte 0x%02x at position %u\n",
+                          unsigned(c), unsigned(i));
+            r += buf;
+        }
+    }
+    return r;
 }
 
 std::vector<uint8_t> findRom(const char *const *names, size_t count, size_t wantSize,
@@ -2958,10 +3029,11 @@ private:
                           ++ nth, d.path.c_str(), why.c_str());
             r += buf;
 
+            errno = 0;
             DIR *dir = ::opendir(d.path.c_str());
             if (dir == nullptr)
             {
-                r += "     -- there is no such directory\n";
+                r += whyNoDirectory(d.path, errno);
                 continue;
             }
             unsigned shown = 0, total = 0;

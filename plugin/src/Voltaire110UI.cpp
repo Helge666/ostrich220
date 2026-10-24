@@ -266,6 +266,8 @@ protected:
         // LCD to act on; the rest is the text a person reads.
         if (std::strcmp(key, "diag") == 0)
         {
+            m_diagText = value;
+            m_diagCopied = false;
             m_diagLines.clear();
             m_diagStatus.clear();
             for (const char *p = value; *p != '\0'; )
@@ -659,6 +661,18 @@ protected:
         {
             if (ev.press)
             {
+                // COPY is the one thing in the report to press: the text is too long to
+                // read off a screenshot, and pasting it is how it reaches anybody.
+                const float px = float(ev.pos.getX()), py = float(ev.pos.getY());
+                const HeaderRect &c = m_diagCopyRect;
+                if (m_menu == Menu::Diag && c.w > 0.0f && !m_diagText.empty()
+                        && px >= c.x && px < c.x + c.w && py >= c.y && py < c.y + c.h)
+                {
+                    m_diagCopied = setClipboard("text/plain", m_diagText.c_str(),
+                                                m_diagText.size());
+                    repaint();
+                    return true;
+                }
                 m_menu = Menu::None;
                 repaint();
             }
@@ -1869,6 +1883,29 @@ private:
         drawCloseButton(x, y, w, rowH);
 
         fontFace(m_font);
+
+        // COPY, left of the close box: the whole report onto the clipboard.
+        m_diagCopyRect = HeaderRect();
+        if (!m_diagText.empty())
+        {
+            HeaderRect &c = m_diagCopyRect;
+            c.h = m_closeRect.h;
+            c.w = c.h * 4.2f;
+            c.x = m_closeRect.x - c.w - rowH * 0.4f;
+            c.y = m_closeRect.y;
+            beginPath();
+            roundedRect(c.x, c.y, c.w, c.h, c.h * 0.3f);
+            fillColor(m_diagCopied ? Color(40, 90, 48) : Color(44, 46, 52));
+            fill();
+            strokeColor(m_diagCopied ? Color(150, 230, 150) : Color(96, 102, 112));
+            strokeWidth(1.0f);
+            stroke();
+            fontSize(c.h * 0.62f);
+            textAlign(ALIGN_CENTER | ALIGN_MIDDLE);
+            fillColor(m_diagCopied ? Color(200, 255, 200) : Color(214, 216, 220));
+            text(c.x + c.w * 0.5f, c.y + c.h * 0.5f, m_diagCopied ? "COPIED" : "COPY", nullptr);
+        }
+
         fontSize(rowH * 0.95f);
         textAlign(ALIGN_LEFT | ALIGN_MIDDLE);
         fillColor(m_diagStatus == "ok" ? Color(150, 255, 150) : Color(255, 180, 90));
@@ -5943,6 +5980,9 @@ private:
     /// slow to start is not accused of anything.
     static constexpr int kDiagWaitIdles = 120;
     std::vector<std::string> m_diagLines;
+    std::string m_diagText;             // the report as it came, for COPY
+    HeaderRect m_diagCopyRect { 0.0f, 0.0f, 0.0f, 0.0f };
+    bool m_diagCopied = false;
     std::string m_diagStatus;
     bool m_panelSeen = false;
     bool m_diagAsked = false;
