@@ -312,11 +312,8 @@ ausgetauscht (Schritt 4).
    **Plugin „Ostrich“ (24.10.2026, v0.1):** `plugin/ostrich/` (DPF, teilt `plugin/dpf` samt
    Patches und `plugin/compat` mit Voltaire). `make` (Linux) bzw. `make win` (mingw:
    VST3, CLAP, Standalone in `plugin/ostrich/bin-win/`). ROMs werden per SHA-1 erkannt,
-   Dateinamen egal; gesucht in `%PROGRAMDATA%\Ostrich
-oms` (zuerst, wegen MSIX),
-   `%LOCALAPPDATA%\Ostrich
-oms`, `Dokumente\Ostrich
-oms`, Linux
+   Dateinamen egal; gesucht in `%PROGRAMDATA%\Ostrich\roms` (zuerst, wegen MSIX),
+   `%LOCALAPPDATA%\Ostrich\roms`, `Dokumente\Ostrich\roms`, Linux
    `~/.local/share/Ostrich/roms`, oder `OSTRICH_ROMS`. Liegt `U220Factory*.syx` daneben (oder
    in `../sysex/`), bootet eine neue Instanz wie ab Werk: „Memory Initialize“ mit ENTER, dann
    der Dump (20 ms Pause pro Paket), dann P-01 — alles in emulierter Zeit in ~0,5 s. IC10
