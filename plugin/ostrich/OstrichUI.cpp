@@ -16,7 +16,7 @@ namespace {
 
 using namespace ostrich;
 
-constexpr float kW = 1120.0f, kH = 250.0f;          // design units
+constexpr float kW = 1150.0f, kH = 250.0f;          // design units
 
 struct Rect { float x, y, w, h; bool contains(float px, float py) const
 	{ return px >= x && px < x + w && py >= y && py < y + h; } };
@@ -24,7 +24,7 @@ struct Rect { float x, y, w, h; bool contains(float px, float py) const
 // The keys, in parameter order (OstrichShared.hpp).  Block 1 is 2 x 2, block 2 is 2 x 4,
 // top row first -- as on the unit.
 constexpr float kKeyW = 62.0f, kKeyH = 28.0f;
-constexpr float kB1x = 640.0f, kB2x = 812.0f, kRow0 = 96.0f, kRow1 = 168.0f, kGap = 72.0f;
+constexpr float kB1x = 668.0f, kB2x = 840.0f, kRow0 = 96.0f, kRow1 = 168.0f, kGap = 72.0f;
 const Rect kKeyRects[kNumKeys] = {
 	{ kB1x,            kRow0, kKeyW, kKeyH },   // EDIT
 	{ kB1x + kGap,     kRow0, kKeyW, kKeyH },   // DATA
@@ -44,7 +44,8 @@ const char *const kKeyLabels[kNumKeys] = {
 	"\xe2\x97\x80", "\xe2\x96\xb6", "\xe2\x96\xbc", "\xe2\x96\xb2"
 };
 
-const Rect kLcd    { 180.0f, 80.0f, 400.0f, 110.0f };
+const Rect kLcd    { 176.0f, 76.0f, 448.0f, 118.0f };     // the glass
+constexpr float kLcdPadX = 18.0f, kLcdPadY = 8.0f;          // glass around the dots
 const Rect kKnob   { 62.0f, 104.0f, 64.0f, 64.0f };
 
 } // anonymous namespace
@@ -249,7 +250,8 @@ private:
 		fillColor(Color(150, 190, 60));            // the yellow-green backlight
 		fill();
 
-		const float cw = kLcd.w / 24.0f, ch = kLcd.h / 2.0f;
+		const float gx = kLcd.x + kLcdPadX, gy = kLcd.y + kLcdPadY;
+		const float cw = (kLcd.w - 2 * kLcdPadX) / 24.0f, ch = (kLcd.h - 2 * kLcdPadY) / 2.0f;
 		const Color ink(30, 45, 20);
 		fontSize(ch * 0.62f);
 		textAlign(ALIGN_CENTER | ALIGN_MIDDLE);
@@ -257,7 +259,7 @@ private:
 			for (int col = 0; col < 24; col ++)
 			{
 				const uint8_t c = m_panel.lcd[row * 24 + col];
-				const float x = kLcd.x + col * cw, y = kLcd.y + row * ch;
+				const float x = gx + col * cw, y = gy + row * ch;
 				if (c < 0x10)
 				{
 					drawGlyph(c & 7, x, y, cw, ch, ink);
@@ -279,6 +281,41 @@ private:
 				fillColor(ink);
 				text(x + cw / 2, y + ch / 2 + 1, str, nullptr);
 			}
+
+		// The controller's cursor: an underline in the 8th dot row, and/or the whole cell
+		// blinking.  The firmware uses the underline to mark the selected part.
+		const uint8_t cp = m_panel.cursor_pos;
+		if (cp < 48 && m_panel.cursor_flags)
+		{
+			const float x = gx + (cp % 24) * cw, y = gy + (cp / 24) * ch;
+			const float dw = cw * 0.8f / 5.0f, dh = ch * 0.62f / 8.0f;
+			const float ox = x + cw * 0.1f, oy = y + ch * 0.19f;
+			fillColor(ink);
+			if (m_panel.cursor_flags & 2)
+			{
+				beginPath();
+				rect(ox, oy + 7 * dh + dh * 0.5f, 5 * dw - dw * 0.12f, dh * 0.88f);
+				fill();
+			}
+			if ((m_panel.cursor_flags & 1) && blinkPhase())
+			{
+				beginPath();
+				rect(ox, oy, 5 * dw, 8 * dh);
+				fill();
+			}
+		}
+	}
+
+	// The HD44780 blinks its block cursor at about 1.9 Hz.
+	bool blinkPhase() const
+	{
+		return (getApp().getTime() * 1.9 - std::floor(getApp().getTime() * 1.9)) < 0.5;
+	}
+
+	void uiIdle() override
+	{
+		if (m_panel.cursor_flags & 1)
+			repaint();
 	}
 
 	// A CGRAM glyph as the 5 x 8 dots the firmware defined.

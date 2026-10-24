@@ -65,6 +65,8 @@ struct PanelBlob
 {
 	uint8_t lcd[48];            ///< 24 x 2 character codes
 	uint8_t cgram[64];          ///< the 8 custom glyphs
+	uint8_t cursor_pos;         ///< 0..47 into lcd[], 0xFF = none
+	uint8_t cursor_flags;       ///< bit 1 underline, bit 0 blinking block
 	uint8_t flags;              ///< bit 0: machine running (ROMs found)
 };
 

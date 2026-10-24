@@ -129,6 +129,12 @@ struct U220Core::Impl
 	// cursor is.  Kept apart from lcd_addr so nothing the CPU reads back can change.
 	u8   display_ctrl = 0;
 	u8   cursor_addr = 0;
+	// The firmware switches the cursor off around every refresh of the text and back on
+	// after it, so a snapshot taken at a random moment would flicker.  The last place the
+	// cursor was SHOWN, and when, lets the snapshot ride over those gaps as the glass does.
+	u8   shown_addr = 0, shown_flags = 0;
+	attotime shown_at = attotime::never();
+	void note_cursor();
 
 	emu_timer *lcd_timer = nullptr;
 	emu_timer *stream_timer = nullptr;
@@ -426,6 +432,17 @@ void U220Core::Impl::lcd_cmd(u8 data)
 	}
 	if (data == 0x01 || (data & 0xfe) == 0x02 || (data & 0x80))
 		cursor_addr = lcd_addr;
+	note_cursor();
+}
+
+void U220Core::Impl::note_cursor()
+{
+	if ((display_ctrl & 0x04) && (display_ctrl & 0x03))
+	{
+		shown_addr = cursor_addr;
+		shown_flags = display_ctrl & 0x03;
+		shown_at = machine.time();
+	}
 }
 
 void U220Core::Impl::lcd_data(u8 data)
@@ -440,6 +457,7 @@ void U220Core::Impl::lcd_data(u8 data)
 	ddram[lcd_addr & 0x7f] = data;
 	lcd_addr = (lcd_addr + 1) & 0x7f;
 	cursor_addr = lcd_addr;
+	note_cursor();
 }
 
 attotime U220Core::Impl::midi_due() const
@@ -662,9 +680,12 @@ void U220Core::snapshot(PanelState &out) const
 	std::memcpy(out.cgram, m.cgram, sizeof(out.cgram));
 	out.cgram_dirty = m.cgram_dirty;
 	// DDRAM 0x00-0x17 is row 0, 0x40-0x57 row 1; anywhere else the cursor is off screen.
-	const u8 a = m.cursor_addr;
+	// Shown now, or shown within the last 150 ms: see shown_at.
+	const bool recent = !m.shown_at.is_never()
+			&& (m.machine.time() - m.shown_at) < attotime::from_msec(150);
+	const u8 a = m.shown_addr;
 	out.cursor_pos = (a < kLcdColumns) ? a : (a >= 0x40 && a < 0x40 + kLcdColumns) ? u8(a - 0x40 + kLcdColumns) : 0xff;
-	out.cursor_flags = (m.display_ctrl & 0x04) ? (m.display_ctrl & 0x03) : 0;
+	out.cursor_flags = recent ? m.shown_flags : 0;
 }
 
 uint8_t U220Core::readMem(uint16_t addr) const

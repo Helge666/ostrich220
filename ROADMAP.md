@@ -322,6 +322,20 @@ ausgetauscht (Schritt 4).
    Headless-Test `plugin/tools/ostrich_clap_render.c`: C4 bei 48 und 44,1 kHz, Tonhöhe
    262,8 Hz stabil bis −73 dB im Release (Gerät 262,5, gleiches Messverfahren), Zustand
    gespeichert (66 KB, enthält `nvram`).
+
+   **Erster Test in Cubase 15 (Helge, 24.10.2026):** lädt, klingt, Tasten gehen (nach dem
+   Umbau auf Zustandsnachrichten: Parameter-Edits aus der UI erreichen unter VST3 den
+   DSP nur über die Automation des Hosts). 10 Sounds quer durch die Presets „zwischen HW
+   und Ostrich nahezu identisch“. LCD-Cursor ergänzt: die Firmware markiert den gewählten
+   Part mit dem Unterstrich-Cursor des Controllers (Befehle 0C/0E um jedes Neuschreiben).
+
+   **Später untersuchen (Klang):** Ostrich klingt Helge etwas **heller** (gefällt ihm,
+   vorerst so lassen), der U-220 hat etwas **mehr Gewicht** (Bässe/untere Mitten). Beides
+   deutet auf die Ausgangsstufe: die U-110-Werte (Sallen-Key/RC) sind nur Platzhalter. Messen
+   mit Rauschen/Sweep über einen Timbre mit breitem Spektrum, Gerät gegen Emulation, und
+   die Kurve als Filter des U-220 nachbilden (Schaltplan der Ausgangsstufe aus den Service
+   Notes, falls vorhanden). Hinweis: Helges Gerät hat einen getauschten OpAmp und ~35 Jahre
+   Alterung; im Zweifel der Emulation trauen (Helge).
 2. **Eigenes Panel:** U-220-Bedienfeld mit 24×2-LCD. Die U-110-Grafik und alle Roland-Logos
    müssen raus, die Artwork ist neu zu zeichnen. Schrift: nur OFL-lizenzierte Fonts
    (Barlow Semi Condensed ist schon im Repo; der Stil aus `tools/restyle_panel.py` ist

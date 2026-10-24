@@ -467,6 +467,8 @@ private:
 			m_core.snapshot(st);
 			std::memcpy(blob.lcd, st.lcd, sizeof(blob.lcd));
 			std::memcpy(blob.cgram, st.cgram, sizeof(blob.cgram));
+			blob.cursor_pos = st.cursor_pos;
+			blob.cursor_flags = st.cursor_flags;
 			blob.flags = 1;
 		}
 		else
@@ -475,6 +477,7 @@ private:
 			const char *l1 = "  see status line below ";
 			std::memcpy(blob.lcd, l0, 24);
 			std::memcpy(blob.lcd + 24, l1, 24);
+			blob.cursor_pos = 0xff;
 		}
 		if (std::memcmp(&blob, &m_lastBlob, sizeof(blob)) != 0)
 		{
