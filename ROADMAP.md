@@ -191,6 +191,9 @@ Klang-Befund 24.10.2026 (Helge: „Piano erkennbar, aber phaser-/kammfilterartig
   `set_unaligned_ext_words(true)` im MCS-96-Kern, nur vom U-220-Treiber eingeschaltet.
   Geprüft gegen die Hardware: Tonhöhe bis zur Stille stabil (Akkord-Ausklang 522–525 Hz wie
   Hardware 523–525 Hz), Release-Pegel ±1–3 dB.
+- **Stand 24.10.2026: T-001 „A.Piano 2“ klingt laut Helge wie sein U-220** (A/B mit
+  `renders/emu3_*.wav` gegen `renders/hw_*.wav`). Bekannte Restunterschiede: Emulation
+  ~4 dB lauter und etwas heller (Ausgangsfilter/Analogstufe noch nicht nachgebildet).
 - **Prüfregel:** Vor jeder Hörprobe Tonhöhe pro 50 ms über die ganze Note *einschließlich
   Release bis zur Stille* messen und mit der Hardware vergleichen.
 - Hardware-Referenzen liegen in `renders/hw_*.wav` (Helges U-220, XR18 Kanal 9/10 per ASIO,
