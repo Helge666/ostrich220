@@ -305,6 +305,12 @@ globale Schalter in `Edit → Setup → Efct` (Chorus On/Off, Reverb On/Off).
 - Werkspatch-Beispiele: P-01 Hall2 Time 4 + Chorus2 (Pre Rev, Level 19, Delay 15, Rate 16);
   P-02 Room3 Time 4 + Chorus2 (Pre Rev, Level 31, Delay 18, Rate 4).
 - Testmodus der Firmware hat einen Punkt „.10. Effect Test“.
+- **Lage im Patch** (Temp-Bulk-Dumps der Emulation verglichen, je ein Parameter geändert;
+  `tools/make_reverb_probe.py` hat die Tabelle): Bytes 12–19 als 64-Bit-Wort,
+  Chorus Rate 0–4, Level 6–10, Depth 11–15, Feedback 23–28 (+32 versetzt), Type 29–31,
+  Delay 32–36, Out 63; Reverb Time 16–20, Delay FB 43–47, Level 48–52, Type 60–62.
+  Ein DT1 an 00 06 00 (erstes Paket des Temp-Dumps) setzt sie am laufenden Gerät.
+- Emulation erzeugt Bulk-Dumps selbst (`Data → Bulk → Temp`, `u220_render --midi-out`).
 
 **Vorgehen (Entscheidung Helge, 24.10.2026):** Phase 4 kommt vor Phase 3. Der Effektteil wird
 als eigenes, austauschbares Modul gebaut (klare Schnittstelle: Effekt-Typ und -Parameter rein,
