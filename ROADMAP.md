@@ -176,8 +176,15 @@ Klang-Befund 24.10.2026 (Helge: „Piano erkennbar, aber phaser-/kammfilterartig
 - Tonhöhen der Demo-Töne: alle innerhalb ±3 Cent vom Soll (F4 schwebt ±6 Cent).
 - Eine „Tonhöhenrampe am Ende“ war ein Artefakt des Stummschalt-Experiments `U220_MUTE`,
   nicht des normalen Betriebs.
-- Nächster Schritt: **Referenzaufnahme vom echten U-220** mit `renders/u220_demo.mid`
-  (Kanal 1, P-01 „Acoust Piano“) und A/B gegen die Emulation.
+- **Ursache gefunden und behoben (24.10.2026):** Die U-220-Firmware schreibt ein
+  Hüllkurven-Segment als `07` (Ziel) **dann** `06` (Rate); der U-110 schreibt `06` dann `07`
+  in einem 16-Bit-Zugriff, und das Chip-Modell startet das Segment bei `07`. Beim U-220 lief
+  daher jedes Segment mit der Rate des vorherigen: Releases dauerten Sekunden statt ~60 ms,
+  und die Velocity-Ebenen lagen falsch zueinander. Der U-220-Treiber hält `07` jetzt bis
+  zum folgenden `06` zurück. Ergebnis gegen die Hardware-Aufnahme (T-001 A.Piano 2,
+  Velocity-Reihe): Release deckungsgleich, Spektral-Ähnlichkeit 0,90–0,92 statt 0,60–0,79.
+- Hardware-Referenzen liegen in `renders/hw_*.wav` (Helges U-220, XR18 Kanal 9/10 per ASIO,
+  MIDI über `MIDIOUT2 (MIDIFACE 2x2)`), aufgenommen mit `tools/hwcapture/hwcapture_asio.py`.
 - Diagnose-Schalter im Treiber: `U220_TGTRACE` (jeder Chip-Schreibzugriff mit PC),
   `U220_MUTE=maske` (Stimmen stumm, verfälscht die Firmware-Logik!), `U220_WATCHPC=pc`.
 

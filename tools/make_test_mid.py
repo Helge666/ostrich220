@@ -6,6 +6,9 @@ Write a small Standard MIDI File for headless tests of the U-220 driver.
     tools/make_test_mid.py OUT.mid            the protocol test below
     tools/make_test_mid.py --demo OUT.mid     a C major scale and a chord on channel 1,
                                               for listening
+    tools/make_test_mid.py --velocity OUT.mid C4 held 1 s at velocity 10, 40, 70, 100 and
+                                              127, two seconds apart
+    tools/make_test_mid.py --single OUT.mid   one C4, velocity 100, held 1 s
 
 Played into MIDI IN by MAME's midiin image device (-min OUT.mid).  It holds playback
 back until emulated time 10 s, so file time 0 is machine time 10 s -- comfortably after
@@ -58,10 +61,17 @@ def demo_events():
     return sorted(events, key=lambda e: e[0])
 
 
+def velocity_events():
+    events = []
+    for i, vel in enumerate((10, 40, 70, 100, 127)):
+        events += [(2.0 * i, bytes([0x90, 60, vel])), (2.0 * i + 1.0, bytes([0x80, 60, 0]))]
+    return events
+
+
 def main():
-    demo = sys.argv[1] == '--demo'
+    mode = sys.argv[1] if len(sys.argv) > 2 else ''
     out = sys.argv[-1]
-    events = demo_events() if demo else [
+    events = demo_events() if mode == '--demo' else velocity_events() if mode == '--velocity'         else [(0.0, bytes([0x90, 60, 100])), (1.0, bytes([0x80, 60, 0]))] if mode == '--single' else [
         (0.0, bytes([0x90, 60, 100])),
         (1.0, bytes([0x80, 60, 0])),
         (2.0, bytes([0xc0, 5])),
