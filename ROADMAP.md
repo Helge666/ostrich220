@@ -42,9 +42,12 @@ dass die Toolchain funktioniert, bevor wir etwas ändern.
 - [x] **Build-Host kellerkind2** (Ubuntu 24.04, per SSH), siehe „Arbeitsweise“ unten
 - [x] Emulator-Kern gebaut (`make core`), Smoke-Test grün; U-110 bootet mit deiner
       Firmware v2.03 und rendert eine Testnote offline (`build/u110_render`)
-- [ ] Build-Pakete auf kellerkind2 installieren (braucht `sudo`, macht Helge selbst)
-- [ ] Voltaire 110 bauen (`cd plugin && make`, `make win`) und die Windows-CLAP hier in
-      der DAW testen
+- [x] Build-Pakete auf kellerkind2 installiert (45 neu, 0 Upgrades; Sunshine lief durch)
+- [x] Voltaire 110 gebaut: Linux LV2/VST3/CLAP/JACK und Windows-CLAP (`make`, `make win`),
+      je unter 30 s; `make selftest` offline grün (CLAP-UI-Test mangels Display übersprungen)
+- [ ] Windows-CLAP hier in der DAW testen. Installiert für den Benutzer unter
+      `%LOCALAPPDATA%\Programs\Common\CLAP\Voltaire110.clap`, ROMs unter
+      `%LOCALAPPDATA%\Voltaire110\roms\`
 - [ ] **Vollständiges MAME** aus `mame/` bauen, nur mit den Roland-Treibern
       (`make SUBTARGET=roland SOURCES=src/mame/roland/roland_u110.cpp,src/mame/roland/roland_u20.cpp`).
       Der MAME-Debugger ist das wichtigste Werkzeug für Phase 1.
