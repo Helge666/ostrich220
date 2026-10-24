@@ -37,6 +37,6 @@ nice -n 19 "$mame/u220" u220 -rompath "$HOME/dev/mameroms" -video none -sound no
 		echo "u220 exited with $?"; tail -5 run.out; }
 
 echo "== LCD"
-grep '^LCD' error.log | head -40 || true
-echo "== bank register writes: $(grep -c '^B ' error.log || true) distinct"
+grep '] LCD' error.log | head -40 || true
+echo "== bank register writes: $(grep -c '] B ' error.log || true) distinct"
 echo "== log lines: $(wc -l < error.log)"
