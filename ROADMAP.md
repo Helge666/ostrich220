@@ -156,6 +156,22 @@ Firmware auf Anwesenheit getestet (Muster `7F`/`01`/`FF`), vermutlich eine Karte
 
 **Meilenstein 2:** Alle 128 Tones und 64 Patches klingen tonhöhenrichtig, ohne Hall.
 
+**Stand 24.10.2026 — erster Ton.** Der PCM-Chip aus dem emu110-Fork ist angeschlossen
+(Bank `60`, Register n = Fensteradresse n, 32,768 MHz ÷ 1024, `PCM_FLOAT8_DELTA`, Hüllkurven
+der Firmware über EXTINT). Die Wave-ROMs werden wie beim U-110 entschlüsselt (A–D intern,
+E/F auf den Positionen der ersten beiden U-110-Kartenslots); der ROM-Lesekanal über Stimme 0
+liefert korrekt „A.PIANO 1“ usw. Eine Tonleiter mit Akkord auf P-01 „Acoust Piano“ klingt:
+`renders/u220_demo.wav` (gerendert mit `-wavwrite`, ohne Audiogerät).
+
+Erkenntnis zu den Patches: Im ROM steht nur der Startpatch „Acoust Piano“. Die 64 Werkspatches
+lädt der echte U-220 von einer **Factory-Preset-Karte** (Testmodus 11, „Insert Fact. Preset
+Card“). Nach „Memory Initialize“ sind P-02 bis P-64 leer. Die Werkspatches holen wir uns
+später per **Bulk Dump von Helges U-220** (DATA → Bulk, SysEx) und spielen sie ein.
+
+Offen in dieser Phase: Tonhöhe gegen die Hardware messen (Punkt 2), Lage von E/F gegen
+Tones mit Karten-Samples prüfen (Punkt 3), die zwei echten Kartenslots (Punkt 4),
+Ausgänge MIX/DIRECT 1/2, Abgleich mit Aufnahmen des echten Geräts (Punkt 6).
+
 ## Phase 3 — Effekte (das Forschungsprojekt)
 
 IC25 (Roland 15239126, Toshiba TC23SC140AF-007) mit zwei M5M4464 (je 64K×4 DRAM, zusammen
