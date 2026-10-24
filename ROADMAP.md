@@ -288,6 +288,24 @@ Geräten, und ein Austausch mit ValleyBell (MAME, CM-32P) lohnt sich.
 4. **LLE später, falls möglich:** den Chip als programmierbaren DSP verstehen (Programm
    und Koeffizienten kommen vermutlich von der CPU). Das hängt vom Trace aus Schritt 1 ab.
 
+**Was der U-220 an Effekten hat** (aus den Texten der Firmware v1.02 und den emulierten
+Menüs `Edit → Patch → Efct`, 24.10.2026). Die Effekte gehören zum **Patch**; dazu kommen zwei
+globale Schalter in `Edit → Setup → Efct` (Chorus On/Off, Reverb On/Off).
+
+| Block | Typen | Parameter (Bereich) |
+|---|---|---|
+| Reverb/Delay | Room1, Room2, Room3, Hall1, Hall2, Gate, Delay, CrossDelay | Type, Time 0–31, Level 0–31, Delay FB 0–31 |
+| Chorus | Chorus1, Chorus2, FB-Chorus, Flanger, Short Delay | Type, Out = Pre Rev / Post Rev, Level 0–31, Delay Time 0–31, Rate 0–31, Depth 0–31, Feedback ±31 (gesehen −14…+31) |
+
+- „Out = Pre Rev“: der Chorus läuft in den Hall; „Post Rev“: hinter ihm, parallel zum Ausgang.
+- Per MIDI-Controller steuerbar (Controller-Zuweisung im Patch): Chrs Level, Chrs Rate,
+  Chrs Feedback, Rev Level, Delay Feedback.
+- Vermutlich je Part/Rhythmus-Instrument ein Ausgangsweg; die Firmware kennt die Texte
+  „Dry / Rev / Cho“ und „Dir1 / Dir2“ (Direktausgänge). Noch im Menü bestätigen.
+- Werkspatch-Beispiele: P-01 Hall2 Time 4 + Chorus2 (Pre Rev, Level 19, Delay 15, Rate 16);
+  P-02 Room3 Time 4 + Chorus2 (Pre Rev, Level 31, Delay 18, Rate 4).
+- Testmodus der Firmware hat einen Punkt „.10. Effect Test“.
+
 **Vorgehen (Entscheidung Helge, 24.10.2026):** Phase 4 kommt vor Phase 3. Der Effektteil wird
 als eigenes, austauschbares Modul gebaut (klare Schnittstelle: Effekt-Typ und -Parameter rein,
 Stereo-Audio rein/raus) und zunächst **nach Gehör angenähert**, nicht emuliert (Schritt 3).
