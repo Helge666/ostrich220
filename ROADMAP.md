@@ -52,6 +52,10 @@ dass die Toolchain funktioniert, bevor wir etwas ändern.
       Plugin unter `%LOCALAPPDATA%\Programs\Common\VST3\Voltaire110.vst3`, ROMs unter
       `C:\ProgramData\Voltaire110\roms\`
 - [x] Selbsttest nennt Fehlercodes je Ordner und hat einen COPY-Knopf
+- [x] Oberfläche vorab im U-220-Hardware-Look (`tools/restyle_all.sh`): Anthrazit-Platte
+      statt Weltraumfoto, Barlow Semi Condensed (OFL, im Repo) statt der nicht
+      weitergebbaren Earth-Mod, Beschriftungen zentriert, dunkle Tasten, Reiter weiß/amber.
+      Das eigentliche U-220-Panel (24×2-LCD, zwei Kartenslots) bleibt Phase 4.
 - [ ] Standalone `Voltaire110.exe` unter Windows testen (Audio- und MIDI-Geräteauswahl)
 - [ ] `AGENTS.md` ist noch der Text von emu110 (U-110, dessen Rechner); für Ostrich anpassen
 - [ ] **Vollständiges MAME** aus `mame/` bauen, nur mit den Roland-Treibern
