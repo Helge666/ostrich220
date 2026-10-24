@@ -10,6 +10,7 @@
     (default 48000), then saves the plugin state and prints its size.
 */
 
+#define _GNU_SOURCE
 #include <dlfcn.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -95,7 +96,9 @@ int main(int argc, char **argv)
 	{
 		buf_t b = { 0 };
 		clap_ostream_t os = { &b, ostream_write };
-		printf("state: %s, %zu bytes\n", st->save(p, &os) ? "saved" : "FAILED", b.n);
+		const bool ok = st->save(p, &os);
+		printf("state: %s, %zu bytes, nvram %s\n", ok ? "saved" : "FAILED", b.n,
+		       memmem(b.p, b.n, "nvram", 5) ? "present" : "MISSING");
 		free(b.p);
 	}
 	p->stop_processing(p);
