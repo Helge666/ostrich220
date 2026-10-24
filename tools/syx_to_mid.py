@@ -54,6 +54,24 @@ def split(data):
     return msgs
 
 
+def split_dt1(msg, max_data=64):
+    """Cut a Roland DT1 into several with at most `max_data` data bytes each, addresses
+    advanced to match (three 7-bit bytes, one unit per data byte, i.e. per nibble here).
+    For interfaces that truncate long SysEx -- Helge's MIDIFACE drops everything after
+    about 128 bytes."""
+    if len(msg) - 10 <= max_data or msg[4] != 0x12:
+        return [msg]
+    head, addr, data = msg[:5], msg[5:8], msg[8:-2]
+    a = (addr[0] << 14) | (addr[1] << 7) | addr[2]
+    out = []
+    for i in range(0, len(data), max_data):
+        chunk = data[i:i + max_data]
+        b = bytes([(a + i) >> 14 & 0x7F, (a + i) >> 7 & 0x7F, (a + i) & 0x7F])
+        cs = (128 - (sum(b) + sum(chunk)) % 128) % 128
+        out.append(bytes(head) + b + bytes(chunk) + bytes([cs, 0xF7]))
+    return out
+
+
 def load_dump(path):
     """The complete, checksum-correct messages of a .syx file, each address once."""
     good, seen = [], set()

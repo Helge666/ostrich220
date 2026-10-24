@@ -52,10 +52,13 @@ def load_patch(path):
 
 
 def packet(data):
+    """A DT1 for the eight effect bytes alone (nibble address 00 06 18 = patch byte 12).
+    Short on purpose: Helge's MIDIFACE cuts SysEx off after about 128 bytes, and a
+    packet without its F7 is thrown away -- the first probe run changed nothing."""
     nib = bytearray()
-    for b in data:
+    for b in data[12:20]:
         nib += bytes([b & 15, b >> 4])
-    addr = bytes([0x00, 0x06, 0x00])
+    addr = bytes([0x00, 0x06, 0x18])
     csum = (128 - (sum(addr) + sum(nib)) % 128) % 128
     return b'\xf0\x41\x10\x2b\x12' + addr + bytes(nib) + bytes([csum]) + b'\xf7'
 
