@@ -5038,14 +5038,16 @@ private:
                 // headroom left to read as "selected" from across a mix window.  The glow
                 // is the same path stroked twice at low alpha under the fill -- no filter,
                 // which nanosvg has no notion of anyway.
+                // Ostrich: white with the slider taps' amber as the glow, on the
+                // U-220-style plate (tools/restyle_panel.py).
                 shapePath(sh, px);
-                strokeColor(Color(120, 220, 255, 0.20f));
+                strokeColor(Color(255, 162, 40, 0.18f));
                 strokeWidth(2.6f);
                 stroke();
-                strokeColor(Color(120, 220, 255, 0.28f));
+                strokeColor(Color(255, 162, 40, 0.26f));
                 strokeWidth(1.2f);
                 stroke();
-                fillColor(Color(190, 240, 255));
+                fillColor(Color(255, 255, 255));
                 fill();
                 continue;
             }
