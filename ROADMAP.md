@@ -165,9 +165,21 @@ Geräten, und ein Austausch mit ValleyBell (MAME, CM-32P) lohnt sich.
    Testmodus genannt u. a. PART ◀ ▶, EDIT, EXIT, ENTER, JUMP, MARK, CURSOR, VALUE/DATA),
    **eine grüne MIDI-LED**, **VOLUME-Knopf**, **PHONES**, **zwei Kartenslots**, **24×2-LCD
    mit Beleuchtung**. Kein FILT-Knopf: der ist eine emu110-Zutat (Höhenkorrektur) und wandert
-   in ein Einstellungsmenü. Die genauen Tastennamen und ihre Lage nehmen wir vom Foto der
-   Frontplatte von Helges U-220 (nur als Vorlage, kommt nicht ins Repo). Welche Taste welche
-   Leitung der Schaltmatrix ist, ergibt sich in Phase 1 aus der Firmware.
+   in ein Einstellungsmenü. Welche Taste welche Leitung der Schaltmatrix ist, ergibt sich in
+   Phase 1 aus der Firmware.
+
+   Anordnung laut Foto (Helge, 24.10.2026; Foto nur Vorlage, nicht im Repo), von links:
+
+   | Bereich | Inhalt |
+   |---|---|
+   | Logo | „Roland U-220 RS-PCM SOUND MODULE“ (für uns: eigener Schriftzug) |
+   | links | PHONES-Buchse, VOLUME-Drehknopf mit Skala |
+   | Mitte | grünes 24×2-LCD, z. B. `T-020 Strings 1  [020]` / `R: \|01\|03\|02\|04\|05\|06\|…` |
+   | Tastenblock 1 (2×2) | oben EDIT, *(unleserlich)*; unten MARK, JUMP; dazwischen der Aufdruck CHORUS / REVERB (Tastenkombination) |
+   | Tastenblock 2 (2×4) | oben EXIT, ENTER, PART*(/…)* ◀ ▶; unten CURSOR ◀ ▶, VALUE ▼ ▲ |
+   | rechts | zwei PCM-CARD-Slots übereinander, MIDI-MESSAGE-LED, POWER |
+
+   Offen: die Beschriftung oben rechts in Block 1 und der Zusatz hinter „PART“.
 3. **ROM-Suche:** Dateien per SHA1 erkennen und alle bekannten Namen akzeptieren
    (`roms/README.md`); verständliche Meldung, wenn etwas fehlt.
    **Geführtes ROM-Setup für Erstbenutzer** (Wunsch von Helge): Fehlt eine Firmware- oder
