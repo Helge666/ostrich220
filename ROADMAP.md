@@ -243,6 +243,15 @@ mit Werksdaten auf beiden Seiten, Effekte am Gerät aus:
   Charakter stimmt. Kandidat: Pegel/Velocity-Kurve eines Tones oder Hüllkurve des zweiten.
   Auf „später“ gesetzt (Helge).
 - Pitch-Markierungen bei Geräuschklängen sind Messartefakte.
+- **Drum-A/B** (`make_timbre_ab.py --rhythm`, 4 Sets × Tasten 35–98, 3¼ min): belegt sind in
+  allen Sets dieselben Tasten (35–58, 69, 79, 81, 84–93, F.X. mehr), auf beiden Seiten gleich.
+  Hüllkurven und Tom-Tonhöhenverläufe gleich. Auffällig: (a) Drums in der Emulation gesamt
+  **4 dB leiser**, die Timbres dagegen 2 dB lauter, also ~6 dB Unterschied zwischen
+  Rhythmus- und Melodieteil (Rhythmus-Teilpegel, Panorama-Gesetz bei den einzeln gepannten
+  Drums?); (b) Hi-Hats/Tamburin/Becken (42, 44, 54, 59, 94) relativ +3…5 dB in der
+  Emulation, passend zur fehlenden Höhendämpfung der Ausgangsstufe; (c) einzelne F.X.-Tasten
+  (35, 44, 69, 86) und Dry 35 mit anderem Spektrum, Hörprobe ausstehend. Hardware-Aufnahme
+  clippte nur bei F.X. 90.
 - **Vorsicht bei Drum-Vergleichen:** Laut Helge klingen einige Drums schon zwischen echten
   Geräten leicht verschieden (Aufnahmen seines ersten U-220 von Ende der 80er/Anfang der
   90er gegen das heutige Gerät; Firmware des ersten unbekannt, Alterung der Analogstufe
