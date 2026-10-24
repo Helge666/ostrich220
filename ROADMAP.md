@@ -329,6 +329,17 @@ ausgetauscht (Schritt 4).
    und Ostrich nahezu identisch“. LCD-Cursor ergänzt: die Firmware markiert den gewählten
    Part mit dem Unterstrich-Cursor des Controllers (Befehle 0C/0E um jedes Neuschreiben).
 
+   **Ausgangsstufe gemessen (24.10.2026):** Helges Pro-Q-3-EQ-Match (`eq/Real_U220.ffp`,
+   nicht im Repo) machte Ostrich hörbar gleich, hob aber über 6 kHz bis +30 dB an. Grund:
+   die geliehenen U-110-Werte (Sallen-Key ~6,7 und ~11,7 kHz) schneiden viel zu steil ab;
+   das Gerät hat echtes Signal bis über 16 kHz (40 dB über der Stille, oberhalb von 16 kHz
+   Spiegelfrequenzen des 32-kHz-DACs). Gegen den ungefilterten Kern bleibt nur ein sanftes
+   High-Shelf: RBJ 5,2 kHz, −3,3 dB, Q 0,5. Damit 63 Hz–14 kHz innerhalb ±0,8 dB, Helligkeit
+   1,00. Im Plugin als Schalter **HW-EQ** (Standard an); aus = roher Kern wie MAME.
+   Das .ffp-Format von Pro-Q 3 („FQ3p“, Version 4): 24 Bänder × 13 float (Used, Enabled,
+   Frequenz als log2 Hz, Gain dB, Dyn. Range, Dyn. an, Threshold, Q normiert mit
+   Q = 0,025·1600^x, Shape 0 = Bell / 1 = Low Shelf, Slope, Stereo, Speakers, Solo).
+
    **Später untersuchen (Klang):** Ostrich klingt Helge etwas **heller** (gefällt ihm,
    vorerst so lassen), der U-220 hat etwas **mehr Gewicht** (Bässe/untere Mitten). Beides
    deutet auf die Ausgangsstufe: die U-110-Werte (Sallen-Key/RC) sind nur Platzhalter. Messen
