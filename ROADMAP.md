@@ -332,6 +332,18 @@ Leerlauf ~4000 Werte/s an 000/001/002/004/006/00A (Koeffizienten, LFO?). Folge: 
 von IC25 (pro Stimme L/R-Gain und Sends) muss vor dem Hall nachgebildet werden; der
 PCM-Chip braucht dafür Einzelstimmen- statt Summenausgang.
 
+**IC25-Mischer umgesetzt (24.10.2026)**, `mame/src/mame/roland/roland_u220_ic25.h` (Treiber
+und Kern teilen ihn): IC25 ist ein DSP mit 256 Programmworten à 24 Bit (geladen aus EPROM
+0x1A000 von Routine 0xBB10); jede der 32 Stimmen hat einen Block von Programmworten
+(Adressen: Tabelle EPROM 0x1803E, 6 Bytes pro Stimme). Bei jedem Anschlag schreibt die
+Firmware Gain L/R ins Low-Byte und das Ziel in Bits 1–5 des Mittelbytes: 0x1E/1F Dry,
+0x12/13 Rev, 0x14/15 Cho, 0x18–1B Direct (Menü „Output Asgn“/„Pan“ pro Part bestätigt).
+Gains linear, 0x1A = Eins. Der PCM-Chip gibt dafür sechs Busse über eine Gain-Matrix aus
+(`roland_lp`: `set_gain_matrix`, `set_voice_gain`). Ergebnis: Stereo; Drum-Panorama
+innerhalb ~0,8 dB am Gerät (Hi-Hat +2,9 / Gerät +3,7 dB, High Tom +7,5 / +7,8 dB);
+Drums und Melodie jetzt beide +2 dB gegen das Gerät (vorher −4,2 / +2,0). Nulltest
+MAME ↔ Kern in Stereo weiter ±1 LSB. Hall und Chorus bekommen die Send-Busse.
+
 **Vorgehen (Entscheidung Helge, 24.10.2026):** Phase 4 kommt vor Phase 3. Der Effektteil wird
 als eigenes, austauschbares Modul gebaut (klare Schnittstelle: Effekt-Typ und -Parameter rein,
 Stereo-Audio rein/raus) und zunächst **nach Gehör angenähert**, nicht emuliert (Schritt 3).
