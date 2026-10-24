@@ -3,7 +3,9 @@
 """
 Write a small Standard MIDI File for headless tests of the U-220 driver.
 
-    tools/make_test_mid.py OUT.mid
+    tools/make_test_mid.py OUT.mid            the protocol test below
+    tools/make_test_mid.py --demo OUT.mid     a C major scale and a chord on channel 1,
+                                              for listening
 
 Played into MIDI IN by MAME's midiin image device (-min OUT.mid).  It holds playback
 back until emulated time 10 s, so file time 0 is machine time 10 s -- comfortably after
@@ -43,8 +45,23 @@ def roland_rq1(device, model, addr, size):
     return bytes([0xf0, 0x41, device, model, 0x11]) + body + bytes([checksum, 0xf7])
 
 
+def demo_events():
+    events = []
+    t = 0.0
+    for note in (60, 62, 64, 65, 67, 69, 71, 72):
+        events += [(t, bytes([0x90, note, 100])), (t + 0.4, bytes([0x80, note, 0]))]
+        t += 0.5
+    for note in (48, 60, 64, 67, 72):
+        events.append((t + 0.2, bytes([0x90, note, 90])))
+    for note in (48, 60, 64, 67, 72):
+        events.append((t + 3.0, bytes([0x80, note, 0])))
+    return sorted(events, key=lambda e: e[0])
+
+
 def main():
-    events = [
+    demo = sys.argv[1] == '--demo'
+    out = sys.argv[-1]
+    events = demo_events() if demo else [
         (0.0, bytes([0x90, 60, 100])),
         (1.0, bytes([0x80, 60, 0])),
         (2.0, bytes([0xc0, 5])),
@@ -64,7 +81,7 @@ def main():
             track += msg
     track += vlq(ticks(1.0)) + bytes([0xff, 0x2f, 0])
 
-    with open(sys.argv[1], 'wb') as f:
+    with open(out, 'wb') as f:
         f.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, PPQN))
         f.write(b'MTrk' + struct.pack('>I', len(track)) + track)
 
