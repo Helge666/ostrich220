@@ -1,0 +1,722 @@
+// license:BSD-3-Clause
+// copyright-holders:Helge Thorsten Kautz
+/***************************************************************************************
+
+    U220Core -- the machine, assembled from MAME's devices with no MAME around them
+
+    The machine wiring of roland_u220.cpp, written a second time on purpose (u110_core.cpp
+    says why).  Everything that touches the emulation must behave exactly like the driver
+    -- the null test against MAME renders proves it -- so where a line looks arbitrary,
+    check the driver before changing it.  The scheduling (run_block, the MIDI queue, the
+    50 Hz stream flush) is U110Core's, which is already null-tested.
+
+***************************************************************************************/
+
+#include "u220_core.h"
+#include "u220_effects.h"
+
+#include "emu.h"
+
+#include "sound/roland_lp.h"
+#include "cpu/mcs96/i8x9x.h"
+#include "sound/flt_biquad.h"
+#include "sound/flt_rc.h"
+
+#include "roland_u110_data.h"
+
+#include <algorithm>
+#include <cstring>
+#include <cstdio>
+#include <cstdlib>
+
+namespace ostrich {
+
+using roland_u110::CARD_SIZE;
+using roland_u110::PCM_READ_PREFETCH;
+using roland_u110::descramble_pcm;
+
+namespace {
+
+#define TRACE_FLAG(NAME, ENV) \
+    inline bool NAME() { static const bool on = std::getenv(ENV) != nullptr; return on; }
+TRACE_FLAG(trace_tg,   "U220_TGTRACE")
+TRACE_FLAG(trace_midi, "U220_MIDITRACE")
+#undef TRACE_FLAG
+
+constexpr u32 CPU_CLOCK = 12000000;         // 12 MHz XTAL
+constexpr u32 PCM_CLOCK = 32768000;         // X2, the tone generator's own crystal
+constexpr u32 PCM_DIV   = 1024;             // 32.768 MHz / 1024 = 32000 Hz exactly
+
+constexpr size_t PCM_SPACE_SIZE = 0x400000;
+constexpr size_t LOW_SIZE       = 0x800;    // 0x0100-0x07FF; the driver keeps it as RAM
+
+// Where each dumped wave ROM sits in the chip's 4 MB space: A-D on the U-110's internal
+// banks, E and F (the SN-U110-08/09 contents) on its first two card slots.  The driver's
+// PLACE[] table; the timbre and drum A/B against the hardware found nothing misplaced.
+constexpr u32 PLACE[kNumWaveRoms] = { 0x000000, 0x100000, 0x200000, 0x300000, 0x080000, 0x180000 };
+
+// The analogue output stage is not measured on the U-220 yet.  Until it is, the U-110's
+// Sallen-Key cascade and RC from roland_u110_data.h stand in -- same family of board, and
+// the A/B says the emulation is a little bright without any.  The U-110's HF correction
+// bell is NOT used: it is a fit to U-110 captures.
+using roland_u110::SK1_R1; using roland_u110::SK1_R2; using roland_u110::SK1_C1; using roland_u110::SK1_C2;
+using roland_u110::SK2_R1; using roland_u110::SK2_R2; using roland_u110::SK2_C1; using roland_u110::SK2_C2;
+using roland_u110::SK_R3;  using roland_u110::SK_R4;  using roland_u110::RC_R;   using roland_u110::RC_C;
+using roland_u110::MIDI_BAUD;
+
+} // anonymous namespace
+
+
+/***************************************************************************************
+    Impl
+***************************************************************************************/
+
+struct U220Core::Impl
+{
+	Impl()
+		: mconfig(machine)
+		, cpu(mconfig, "maincpu", nullptr, CPU_CLOCK)
+		, pcm(mconfig, "pcm", nullptr, PCM_CLOCK)
+		, sk1{ { mconfig, "sk1l", nullptr, 0 }, { mconfig, "sk1r", nullptr, 0 } }
+		, sk2{ { mconfig, "sk2l", nullptr, 0 }, { mconfig, "sk2r", nullptr, 0 } }
+		, rc { { mconfig, "rcl",  nullptr, 0 }, { mconfig, "rcr",  nullptr, 0 } }
+		, program(0x10000, 8)
+	{ }
+
+	// --- the machine ---------------------------------------------------------------
+	running_machine machine;
+	machine_config mconfig;
+
+	p8098_device              cpu;
+	mb87419_mb87420_device    pcm;
+	filter_biquad_device      sk1[2], sk2[2];
+	filter_rc_device          rc[2];
+
+	address_space program;
+	std::unique_ptr<address_map> regs_map;
+	std::unique_ptr<address_space> regs;
+
+	// --- memory --------------------------------------------------------------------
+	std::vector<u8> progrom = std::vector<u8>(kProgramRomBytes, 0xff);
+	std::vector<u8> pcmrom  = std::vector<u8>(PCM_SPACE_SIZE, 0xff);
+	std::vector<u8> ram     = std::vector<u8>(kNvramBytes, 0);     // IC10
+	std::vector<u8> low     = std::vector<u8>(LOW_SIZE, 0);
+	bool have_program = false;
+
+	// --- driver state, mirroring roland_u220.cpp ------------------------------------
+	u8   bank = 0;                  // IC12 0x1000: what the window at 0x0800 shows
+	u8   reg1001 = 0;
+	u8   pcmreg[0x20] = {};         // what the CPU last wrote to each chip register
+	u8   pend07 = 0;                // envelope target held back until its rate
+	bool pend07_valid = false;
+	u16  keys = 0xffff;             // active low
+	u8   port2 = 0;
+
+	BypassEffects bypass;
+	EffectsModule *fx = &bypass;
+	bool output_filter = true;
+
+	// --- LCD: the driver's text shadow, plus the CGRAM the UI needs -----------------
+	u8   ddram[0x80] = {};
+	u8   lcd_addr = 0;
+	bool lcd_to_cgram = false;
+	u8   cgram[64] = {};
+	u8   cgram_addr = 0;
+	bool cgram_dirty = false;
+
+	emu_timer *lcd_timer = nullptr;
+	emu_timer *stream_timer = nullptr;
+	emu_timer *slice_timer = nullptr;
+
+	// --- MIDI, U110Core's queue ----------------------------------------------------
+	static constexpr double MIDI_BYTE_SECONDS = 10.0 / double(MIDI_BAUD);
+	std::vector<u8> midi_in_queue;
+	std::vector<attotime> midi_in_at;
+	size_t midi_in_pos = 0;
+	attotime midi_next_deliverable;
+	std::vector<u8> midi_out_bytes;
+	std::vector<u32> midi_out_at;
+
+	// --- rendering -------------------------------------------------------------------
+	u64 frames_done = 0;
+	attotime block_start;
+	bool started = false;
+
+	void build();
+	void wire_audio();
+	void install_map();
+	void run_block(u32 frames);
+
+	u8   window_r(offs_t offset);
+	void window_w(offs_t offset, u8 data);
+	u8   pcm_r(offs_t offset);
+	void pcm_w(offs_t offset, u8 data);
+	void pcm_flush();
+	void lcd_cmd(u8 data);
+	void lcd_data(u8 data);
+
+	attotime midi_due() const;
+	void midi_deliver_due();
+	void midi_tx_w(u8 data);
+	void stream_tick(s32);
+};
+
+
+/***************************************************************************************
+    Construction
+***************************************************************************************/
+
+void U220Core::Impl::build()
+{
+	if (started)
+		return;
+
+	device_sound_interface::s_default_rate = kCoreSampleRate;
+
+	// The tone generator, set up exactly as the driver does.
+	pcm.set_rate_divider(PCM_DIV);
+	pcm.set_pcm_mode(mb87419_mb87420_device::PCM_FLOAT8_DELTA);
+	pcm.set_delta_dc_hz(0.0);
+	pcm.set_env_engine(true);
+	pcm.set_env_max_int_hz(kCoreSampleRate);
+	pcm.set_rom(pcmrom.data(), pcmrom.size());
+	pcm.int_callback().set([this](int state) {
+		cpu.set_input_line(i8x9x_device::EXTINT_LINE, state);
+	});
+
+	// The firmware reads word-sized per-voice state at odd addresses; see mcs96.h.
+	cpu.set_unaligned_ext_words(true);
+	cpu.ach7_cb().set([]() -> u16 { return 0x2a0; });      // battery sense
+	cpu.serial_tx_cb().set([this](u8 data) { midi_tx_w(data); });
+	cpu.out_p2_cb().set([this](u8 data) { port2 = data; });
+
+	for (int ch = 0; ch < 2; ch ++)
+	{
+		sk1[ch].opamp_sk_lowpass_setup(SK1_R1, SK1_R2, SK_R3, SK_R4, SK1_C1, SK1_C2);
+		sk2[ch].opamp_sk_lowpass_setup(SK2_R1, SK2_R2, SK_R3, SK_R4, SK2_C1, SK2_C2);
+		rc[ch].set_lowpass(RC_R, RC_C);
+	}
+
+	install_map();
+
+	{
+		const auto configs = cpu.space_configs();
+		cpu.set_space(AS_PROGRAM, &program);
+		for (const auto &c : configs)
+		{
+			if (c.first != AS_DATA || !c.second->m_internal_map)
+				continue;
+			regs_map.reset(new address_map(cpu, nullptr));
+			c.second->m_internal_map(*regs_map);
+			regs_map->allocate();
+			regs.reset(new address_space(0x100, c.second->m_databus_width));
+			regs->install_map(0x00, 0xff, regs_map.get());
+			cpu.set_space(AS_DATA, regs.get());
+		}
+		cpu.set_share_provider([this](const char *tag) -> std::pair<void *, size_t> {
+			auto found = regs_map ? regs_map->find_share(tag)
+								  : std::pair<u8 *, size_t>{ nullptr, 0 };
+			return { found.first, found.second };
+		});
+	}
+
+	(void)trace_tg(); (void)trace_midi();
+
+	midi_in_queue.reserve(1024);
+	midi_in_at.reserve(1024);
+	midi_out_bytes.reserve(1024);
+	midi_out_at.reserve(1024);
+
+	lcd_timer = machine.scheduler().alloc([this](s32) {
+		// IC12's INT, the LCD-ready pulse on HSI0: the firmware's 0x2130 feeds the next byte.
+		cpu.set_input_line(i8x9x_device::HSI0_LINE, ASSERT_LINE);
+		cpu.set_input_line(i8x9x_device::HSI0_LINE, CLEAR_LINE);
+	});
+	stream_timer = machine.scheduler().alloc([this](s32 p) { stream_tick(p); });
+	// The driver's 100 ms LCD logger does nothing to the machine, but it is a timer, so it
+	// ends CPU slices where MAME's does.  Kept as a no-op for the same slicing.
+	slice_timer = machine.scheduler().alloc([](s32) { });
+
+	std::fill(std::begin(ddram), std::end(ddram), u8(' '));
+
+	pcm.start();
+	cpu.start();
+	for (int ch = 0; ch < 2; ch ++)
+	{
+		sk1[ch].start(); sk2[ch].start(); rc[ch].start();
+	}
+	wire_audio();
+
+	const attotime streams_update = attotime::from_hz(u32(50));
+	stream_timer->adjust(streams_update, 0, streams_update);
+	slice_timer->adjust(attotime::from_msec(100), 0, attotime::from_msec(100));
+
+	started = true;
+}
+
+void U220Core::Impl::wire_audio()
+{
+	for (int ch = 0; ch < 2; ch ++)
+	{
+		sk1[ch].stream()->connect(0, pcm.stream(), ch, 1.0f);
+		sk2[ch].stream()->connect(0, sk1[ch].stream(), 0, 1.0f);
+		rc[ch].stream()->connect(0, sk2[ch].stream(), 0, 1.0f);
+	}
+}
+
+void U220Core::Impl::install_map()
+{
+	// The driver's mem_map.  0x0000-0x00FF is the CPU's own register file.
+	program.install_ram(0x0100, 0x07ff, low.data());
+	program.install_handler(0x0800, 0x0fff,
+			[this](offs_t o) -> u8 { return window_r(o); },
+			[this](offs_t o, u8 d) { window_w(o, d); });
+	program.install_handler(0x1000, 0x1001,
+			[this](offs_t o) -> u8 { return o ? reg1001 : bank; },
+			[this](offs_t o, u8 d) { if (o) reg1001 = d; else bank = d; });
+	// IC10's last 4 KB, fixed (pages 0E/0F), under IC12's two registers.
+	program.install_ram(0x1002, 0x1fff, ram.data() + 0x7002);
+	program.install_rom(0x2000, 0xffff, progrom.data() + 0x2000);
+}
+
+
+/***************************************************************************************
+    Handlers
+***************************************************************************************/
+
+u8 U220Core::Impl::window_r(offs_t offset)
+{
+	switch (bank >> 4)
+	{
+	case 0x0:                                           // SRAM pages
+		return ram[((bank & 0x0f) << 11) | offset];
+	case 0x1:                                           // LCD
+		return (offset & 1) ? ddram[lcd_addr & 0x7f] : (lcd_addr & 0x7f);
+	case 0x3:                                           // key matrix, active low
+		if (offset == 0x0e) return u8(keys & 0xff);
+		if (offset == 0x0d) return u8(keys >> 8) | 0xc0;
+		return 0xff;
+	case 0x4:                                           // effect processor
+		return fx->read(u16(offset));
+	case 0x6:                                           // tone generator
+		return pcm_r(offset & 0x1f);
+	case 0x8: case 0x9:                                 // EPROM upper half
+		return progrom[0x10000 | ((bank & 0x1f) << 11) | offset];
+	default:
+		return 0xff;
+	}
+}
+
+void U220Core::Impl::window_w(offs_t offset, u8 data)
+{
+	switch (bank >> 4)
+	{
+	case 0x0:
+		ram[((bank & 0x0f) << 11) | offset] = data;
+		break;
+	case 0x1:
+		if (offset == 0)      lcd_cmd(data);
+		else if (offset == 1) lcd_data(data);
+		lcd_timer->adjust(attotime::from_usec(40));
+		break;
+	case 0x4:
+		fx->write(u16(offset), data, machine.time().as_double());
+		break;
+	case 0x6:
+		pcm_w(offset & 0x1f, data);
+		break;
+	default:
+		break;
+	}
+}
+
+u8 U220Core::Impl::pcm_r(offs_t offset)
+{
+	pcm_flush();
+	switch (offset)
+	{
+	case 0x00:
+	case 0x02:
+	case 0x03:
+		return pcm.read(offset);
+	case 0x01:
+	{
+		// The CPU's wave-ROM read port: voice 0's phase accumulator is the address.
+		const u32 phase = pcmreg[0x08] | (pcmreg[0x09] << 8)
+				| (pcmreg[0x0a] << 16) | (u32(pcmreg[0x0b]) << 24);
+		const u16 bnk = pcmreg[0x02] | (pcmreg[0x03] << 8);
+		const offs_t addr = (((phase >> 14) + PCM_READ_PREFETCH) & 0x3ffff) | ((bnk & 0x3c00) << 8);
+		return pcmrom[addr & 0x3fffff];
+	}
+	default:
+		return pcmreg[offset];
+	}
+}
+
+void U220Core::Impl::pcm_flush()
+{
+	if (pend07_valid)
+	{
+		pend07_valid = false;
+		pcm.write(0x07, pend07);
+	}
+}
+
+// The firmware writes an envelope segment as 07 (target) THEN 06 (rate); the device
+// starts the segment on 07.  Hold 07 back until its 06 -- the driver explains.
+void U220Core::Impl::pcm_w(offs_t offset, u8 data)
+{
+	pcmreg[offset] = data;
+	if (offset == 0x07)
+	{
+		pend07 = data;
+		pend07_valid = true;
+		return;
+	}
+	if (offset == 0x06)
+	{
+		pcm.write(0x06, data);
+		pcm_flush();
+		return;
+	}
+	pcm_flush();
+	pcm.write(offset, data);
+	if (trace_tg())
+		std::fprintf(stderr, "TG %f v%02X reg %02X = %02X  pc=%04X\n", machine.time().as_double(),
+				pcmreg[0x1f] & 0x1f, unsigned(offset), data, unsigned(cpu.pc()));
+}
+
+// DDRAM exactly as the driver's shadow tracks it (the CPU reads it back through the
+// window, so it must agree).  CGRAM is tracked separately, for the UI only.
+void U220Core::Impl::lcd_cmd(u8 data)
+{
+	if (data == 0x01)
+	{
+		std::fill(std::begin(ddram), std::end(ddram), u8(' '));
+		lcd_addr = 0;
+		lcd_to_cgram = false;
+	}
+	else if ((data & 0xfe) == 0x02)
+	{
+		lcd_addr = 0;
+		lcd_to_cgram = false;
+	}
+	else if (data & 0x80)
+	{
+		lcd_addr = data & 0x7f;
+		lcd_to_cgram = false;
+	}
+	else if (data & 0x40)
+	{
+		lcd_to_cgram = true;
+		cgram_addr = data & 0x3f;
+	}
+}
+
+void U220Core::Impl::lcd_data(u8 data)
+{
+	if (lcd_to_cgram)
+	{
+		cgram[cgram_addr] = data;
+		cgram_addr = (cgram_addr + 1) & 0x3f;
+		cgram_dirty = true;
+		return;
+	}
+	ddram[lcd_addr & 0x7f] = data;
+	lcd_addr = (lcd_addr + 1) & 0x7f;
+}
+
+attotime U220Core::Impl::midi_due() const
+{
+	if (midi_in_pos >= midi_in_queue.size())
+		return attotime::never();
+	attotime const arrival = midi_in_at[midi_in_pos] + attotime::from_double(MIDI_BYTE_SECONDS);
+	return (midi_next_deliverable > arrival) ? midi_next_deliverable : arrival;
+}
+
+void U220Core::Impl::midi_deliver_due()
+{
+	while (midi_in_pos < midi_in_queue.size() && machine.time() >= midi_due())
+	{
+		const attotime due = midi_due();
+		const u8 byte = midi_in_queue[midi_in_pos ++];
+		if (trace_midi())
+			std::fprintf(stderr, "MIDI IN %f %02X   (due %f)\n",
+					machine.time().as_double(), byte, due.as_double());
+		cpu.serial_w(byte);
+		midi_next_deliverable = due + attotime::from_double(MIDI_BYTE_SECONDS);
+	}
+}
+
+void U220Core::Impl::midi_tx_w(u8 data)
+{
+	midi_out_bytes.push_back(data);
+	const double into_block = (machine.time() - block_start).as_double();
+	midi_out_at.push_back(u32(into_block > 0.0 ? into_block * kCoreSampleRate : 0.0));
+}
+
+
+/***************************************************************************************
+    Rendering -- U110Core::Impl::run_block, which explains every line
+***************************************************************************************/
+
+void U220Core::Impl::stream_tick(s32)
+{
+	pcm.stream()->update();
+	for (int ch = 0; ch < 2; ch ++)
+	{
+		sk1[ch].stream()->update();
+		sk2[ch].stream()->update();
+		rc[ch].stream()->update();
+	}
+}
+
+void U220Core::Impl::run_block(u32 frames)
+{
+	block_start = attotime::from_ticks(frames_done, kCoreSampleRate);
+	const attotime block_end = attotime::from_ticks(frames_done + frames, kCoreSampleRate);
+
+	sound_stream *streams[] = { pcm.stream(),
+			sk1[0].stream(), sk1[1].stream(), sk2[0].stream(), sk2[1].stream(),
+			rc[0].stream(), rc[1].stream() };
+	for (sound_stream *s : streams)
+		s->begin_block(frames, block_start);
+
+	while (machine.time() < block_end)
+	{
+		midi_deliver_due();
+		const attotime now = machine.time();
+
+		attotime target = machine.scheduler().next_event();
+		const attotime midi = midi_due();
+		if (midi < target)
+			target = midi;
+		if (block_end < target)
+			target = block_end;
+		if (target <= now)
+		{
+			machine.scheduler().advance_to(target);
+			continue;
+		}
+
+		u64 want = cpu.attotime_to_cycles(target - now);
+		if (want == 0)
+			want = 1;
+		const int used = cpu.run_cycles(int(want));
+		machine.scheduler().advance_to(now + cpu.cycles_to_attotime(used > 0 ? u64(used) : 0));
+	}
+	midi_deliver_due();
+	frames_done += frames;
+
+	if (midi_in_pos)
+	{
+		midi_in_queue.erase(midi_in_queue.begin(), midi_in_queue.begin() + midi_in_pos);
+		midi_in_at.erase(midi_in_at.begin(), midi_in_at.begin() + midi_in_pos);
+		midi_in_pos = 0;
+	}
+
+	for (sound_stream *s : streams)
+		s->finish_block();
+}
+
+
+/***************************************************************************************
+    Public interface
+***************************************************************************************/
+
+U220Core::U220Core() : m_impl(new Impl) { }
+U220Core::~U220Core() = default;
+
+LoadResult U220Core::loadProgramRom(const uint8_t *data, size_t len)
+{
+	if (!data || len != kProgramRomBytes)
+		return LoadResult::WrongSize;
+	std::memcpy(m_impl->progrom.data(), data, len);
+	m_impl->have_program = true;
+	m_impl->build();
+	return LoadResult::Ok;
+}
+
+LoadResult U220Core::loadWaveRom(unsigned index, const uint8_t *data, size_t len)
+{
+	if (index >= kNumWaveRoms)
+		return LoadResult::NoSuchSlot;
+	if (!data || len != kWaveRomBytes)
+		return LoadResult::WrongSize;
+	descramble_pcm(&m_impl->pcmrom[PLACE[index]], data, CARD_SIZE);
+	return LoadResult::Ok;
+}
+
+void U220Core::reset()
+{
+	Impl &m = *m_impl;
+	if (!m.started)
+		return;
+	m.bank = 0;
+	m.reg1001 = 0;
+	m.pend07_valid = false;
+	std::fill(std::begin(m.pcmreg), std::end(m.pcmreg), u8(0));
+	m.fx->reset();
+	m.pcm.reset();
+	m.cpu.reset();
+}
+
+void U220Core::runUntilIdle(uint32_t timeoutMs)
+{
+	std::vector<float> l(1024), r(1024);
+	const uint32_t blocks = (timeoutMs * kCoreSampleRate / 1000) / 1024;
+	for (uint32_t i = 0; i < blocks; i ++)
+		renderStereo(l.data(), r.data(), 1024);
+}
+
+void U220Core::setEffects(EffectsModule *fx)
+{
+	m_impl->fx = fx ? fx : &m_impl->bypass;
+}
+
+void U220Core::setOutputFilter(bool on)
+{
+	m_impl->output_filter = on;
+}
+
+void U220Core::midiIn(const uint8_t *bytes, size_t n, uint32_t sampleOffset)
+{
+	const attotime when = attotime::from_ticks(m_impl->frames_done + sampleOffset, kCoreSampleRate);
+	for (size_t i = 0; i < n; i ++)
+	{
+		m_impl->midi_in_queue.push_back(bytes[i]);
+		m_impl->midi_in_at.push_back(when);
+	}
+}
+
+void U220Core::midiInAtTime(const uint8_t *bytes, size_t n, double seconds)
+{
+	const attotime when = attotime::from_double(seconds);
+	for (size_t i = 0; i < n; i ++)
+	{
+		m_impl->midi_in_queue.push_back(bytes[i]);
+		m_impl->midi_in_at.push_back(when);
+	}
+}
+
+size_t U220Core::midiOut(uint8_t *buf, size_t cap, uint32_t *offsets)
+{
+	Impl &m = *m_impl;
+	const size_t n = std::min(cap, m.midi_out_bytes.size());
+	std::copy_n(m.midi_out_bytes.begin(), n, buf);
+	if (offsets)
+		std::copy_n(m.midi_out_at.begin(), n, offsets);
+	m.midi_out_bytes.erase(m.midi_out_bytes.begin(), m.midi_out_bytes.begin() + n);
+	m.midi_out_at.erase(m.midi_out_at.begin(), m.midi_out_at.begin() + n);
+	return n;
+}
+
+void U220Core::renderStereo(float *left, float *right, uint32_t nframes)
+{
+	Impl &m = *m_impl;
+	if (!m.started || !m.have_program || nframes == 0)
+	{
+		std::fill_n(left, nframes, 0.0f);
+		std::fill_n(right, nframes, 0.0f);
+		return;
+	}
+	m.run_block(nframes);
+	const auto &l = m.output_filter ? m.rc[0].stream()->output(0) : m.pcm.stream()->output(0);
+	const auto &r = m.output_filter ? m.rc[1].stream()->output(0) : m.pcm.stream()->output(1);
+	std::copy(l.begin(), l.begin() + nframes, left);
+	std::copy(r.begin(), r.begin() + nframes, right);
+	m.fx->process(left, right, nframes);
+}
+
+void U220Core::setButton(Button sw, bool down)
+{
+	if (sw < 0 || sw >= kButtonCount)
+		return;
+	if (down) m_impl->keys &= u16(~(1u << sw));
+	else      m_impl->keys |=  u16(1u << sw);
+}
+
+void U220Core::snapshot(PanelState &out) const
+{
+	const Impl &m = *m_impl;
+	std::memset(&out, 0, sizeof(out));
+	out.version = PanelState::kVersion;
+	std::memcpy(out.lcd, m.ddram, kLcdColumns);
+	std::memcpy(out.lcd + kLcdColumns, m.ddram + 0x40, kLcdColumns);
+	std::memcpy(out.cgram, m.cgram, sizeof(out.cgram));
+	out.cgram_dirty = m.cgram_dirty;
+}
+
+uint8_t U220Core::readMem(uint16_t addr) const
+{ return m_impl->program.read_byte(addr); }
+
+void U220Core::writeMem(uint16_t addr, uint8_t value)
+{ m_impl->program.write_byte(addr, value); }
+
+uint8_t U220Core::readNvram(uint32_t addr) const
+{ return addr < kNvramBytes ? m_impl->ram[addr] : 0xff; }
+
+void U220Core::lcdText(char *row0, char *row1) const
+{
+	char *rows[2] = { row0, row1 };
+	for (unsigned r = 0; r < kLcdRows; r ++)
+	{
+		for (unsigned c = 0; c < kLcdColumns; c ++)
+		{
+			const u8 ch = m_impl->ddram[r * 0x40 + c];
+			rows[r][c] = (ch >= 0x20 && ch < 0x7f) ? char(ch) : (ch < 0x10 ? '#' : '.');
+		}
+		rows[r][kLcdColumns] = 0;
+	}
+}
+
+namespace {
+constexpr u32 kStateMagic = 0x55323230;      // "U220"
+constexpr u32 kStateVersion = 1;
+struct StateHeader { u32 magic, version, nvram_size; };
+}
+
+size_t U220Core::saveState(uint8_t *buf, size_t cap) const
+{
+	const size_t need = sizeof(StateHeader) + kNvramBytes;
+	if (buf == nullptr || cap < need)
+		return need;
+	StateHeader h { kStateMagic, kStateVersion, u32(kNvramBytes) };
+	std::memcpy(buf, &h, sizeof(h));
+	std::memcpy(buf + sizeof(h), m_impl->ram.data(), kNvramBytes);
+	return need;
+}
+
+bool U220Core::loadState(const uint8_t *buf, size_t n)
+{
+	if (buf == nullptr || n < sizeof(StateHeader))
+		return false;
+	StateHeader h;
+	std::memcpy(&h, buf, sizeof(h));
+	if (h.magic != kStateMagic || h.version != kStateVersion || h.nvram_size != kNvramBytes)
+		return false;
+	if (n < sizeof(h) + kNvramBytes)
+		return false;
+	std::memcpy(m_impl->ram.data(), buf + sizeof(h), kNvramBytes);
+	if (m_impl->started)
+	{
+		reset();
+		runUntilIdle(3000);
+	}
+	return true;
+}
+
+bool U220Core::setNvram(const uint8_t *data, size_t len)
+{
+	if (data == nullptr || len != kNvramBytes)
+		return false;
+	std::memcpy(m_impl->ram.data(), data, kNvramBytes);
+	return true;
+}
+
+bool U220Core::nvramBlank() const
+{
+	return std::all_of(m_impl->ram.begin(), m_impl->ram.end(), [](u8 b) { return b == 0; });
+}
+
+} // namespace ostrich
