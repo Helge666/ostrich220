@@ -250,7 +250,15 @@ mit Werksdaten auf beiden Seiten, Effekte am Gerät aus:
   Rhythmus- und Melodieteil (Rhythmus-Teilpegel, Panorama-Gesetz bei den einzeln gepannten
   Drums?); (b) Hi-Hats/Tamburin/Becken (42, 44, 54, 59, 94) relativ +3…5 dB in der
   Emulation, passend zur fehlenden Höhendämpfung der Ausgangsstufe; (c) einzelne F.X.-Tasten
-  (35, 44, 69, 86) und Dry 35 mit anderem Spektrum, Hörprobe ausstehend. Hardware-Aufnahme
+  (35, 44, 69, 86) und Dry 35 mit anderem Spektrum. Hörprobe (Helge): nur F.X. 35/69/86
+  weichen ab, um 4–8 Halbtöne. **Aufgeklärt:** F.X. 69 und 86 haben eine Zufalls-Tonhöhe
+  (Firmware-PRNG `0x1084/0x1085`, Start 02/00 beim Einschalten, Routine `0x93B3`); je 4 Schläge
+  streuen auf Gerät und Emulation gleich weit (F.X. 69 über ~10, F.X. 86 über ~3 Halbtöne).
+  F.X. 35 ist bei Wiederholung auf beiden Seiten identisch; im A/B war es der erste Schlag
+  0,25 s nach dem Set-Wechsel. Vermutung: das echte Gerät braucht länger zum Laden des Sets
+  (Wave-ROM-Lesezugriffe über Stimme 0) und spielte noch mit altem Datensatz, die Emulation
+  rechnet schneller (keine Wartezyklen für externe Zugriffe). Kein Klangfehler, aber ein
+  Hinweis auf zu schnelle CPU-Zeiten; für Tests Set-Wechsel ≥ 0,5 s vor der ersten Note. Hardware-Aufnahme
   clippte nur bei F.X. 91 (dort daher −3,5 dB).
 - **Vorsicht bei Drum-Vergleichen:** Laut Helge klingen einige Drums schon zwischen echten
   Geräten leicht verschieden (Aufnahmen seines ersten U-220 von Ende der 80er/Anfang der
