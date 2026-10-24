@@ -308,6 +308,20 @@ ausgetauscht (Schritt 4).
    ein Sample früher; Blockgröße 37 statt 512 bitgleich. Rendert ~39× Echtzeit.
    Ausgangsstufe vorerst mit den Sallen-Key/RC-Werten des U-110 (ohne dessen HF-Korrektur):
    Helligkeit gegen Helges Gerät damit 1,01 statt 1,07 (Median über alle Timbres).
+
+   **Plugin „Ostrich“ (24.10.2026, v0.1):** `plugin/ostrich/` (DPF, teilt `plugin/dpf` samt
+   Patches und `plugin/compat` mit Voltaire). `make` (Linux) bzw. `make win` (mingw:
+   VST3, CLAP, Standalone in `plugin/ostrich/bin-win/`). ROMs werden per SHA-1 erkannt,
+   Dateinamen egal; gesucht in `%PROGRAMDATA%\Ostrichoms` (zuerst, wegen MSIX),
+   `%LOCALAPPDATA%\Ostrichoms`, `Dokumente\Ostrichoms`, Linux
+   `~/.local/share/Ostrich/roms`, oder `OSTRICH_ROMS`. Liegt `U220Factory*.syx` daneben (oder
+   in `../sysex/`), bootet eine neue Instanz wie ab Werk: „Memory Initialize“ mit ENTER, dann
+   der Dump (20 ms Pause pro Paket), dann P-01 — alles in emulierter Zeit in ~0,5 s. IC10
+   wird im Projekt gespeichert (Zustand `nvram`). Panel v0.1: LCD 24×2 mit CGRAM-Zeichen,
+   die 12 Tasten (als Parameter, also auch automatisierbar), Volume, Statuszeile.
+   Headless-Test `plugin/tools/ostrich_clap_render.c`: C4 bei 48 und 44,1 kHz, Tonhöhe
+   262,8 Hz stabil bis −73 dB im Release (Gerät 262,5, gleiches Messverfahren), Zustand
+   gespeichert (66 KB, enthält `nvram`).
 2. **Eigenes Panel:** U-220-Bedienfeld mit 24×2-LCD. Die U-110-Grafik und alle Roland-Logos
    müssen raus, die Artwork ist neu zu zeichnen. Schrift: nur OFL-lizenzierte Fonts
    (Barlow Semi Condensed ist schon im Repo; der Stil aus `tools/restyle_panel.py` ist
