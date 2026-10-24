@@ -215,6 +215,17 @@ protected:
 			p.ranges.max = 12.0f;
 			return;
 		}
+		if (index == kParamOutputStage)
+		{
+			p.hints = kParameterIsBoolean | kParameterIsAutomatable;
+			p.name = "U-220 output stage";
+			p.shortName = "HW-EQ";
+			p.symbol = "output_stage";
+			p.ranges.def = 1.0f;
+			p.ranges.min = 0.0f;
+			p.ranges.max = 1.0f;
+			return;
+		}
 		const uint32_t k = index - kParamKeyFirst;
 		p.hints = kParameterIsBoolean | kParameterIsAutomatable;
 		p.name = kKeyNames[k];
@@ -228,6 +239,8 @@ protected:
 	{
 		if (index == kParamVolume)
 			return m_volumeDb;
+		if (index == kParamOutputStage)
+			return m_outputStage ? 1.0f : 0.0f;
 		return m_keyDown[index - kParamKeyFirst].load() ? 1.0f : 0.0f;
 	}
 
@@ -240,6 +253,13 @@ protected:
 		{
 			m_volumeDb = value;
 			m_gainTarget = std::pow(10.0f, value / 20.0f);
+			return;
+		}
+		if (index == kParamOutputStage)
+		{
+			// A flag the core reads per block; no lock needed for a bool.
+			m_outputStage = value > 0.5f;
+			m_core.setOutputFilter(m_outputStage);
 			return;
 		}
 		const uint32_t k = index - kParamKeyFirst;
@@ -615,6 +635,7 @@ private:
 	std::vector<float> m_coreL, m_coreR;
 
 	float m_volumeDb = 0.0f, m_gainTarget = 1.0f, m_gain = 1.0f;
+	bool m_outputStage = true;
 
 	std::atomic<bool> m_keyDown[kNumKeys] {};
 	std::atomic<uint32_t> m_keySeq[kNumKeys];

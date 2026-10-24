@@ -19,8 +19,7 @@
 
 #include "sound/roland_lp.h"
 #include "cpu/mcs96/i8x9x.h"
-#include "sound/flt_biquad.h"
-#include "sound/flt_rc.h"
+#include <cmath>
 
 #include "roland_u110_data.h"
 
@@ -56,14 +55,15 @@ constexpr size_t LOW_SIZE       = 0x800;    // 0x0100-0x07FF; the driver keeps i
 // PLACE[] table; the timbre and drum A/B against the hardware found nothing misplaced.
 constexpr u32 PLACE[kNumWaveRoms] = { 0x000000, 0x100000, 0x200000, 0x300000, 0x080000, 0x180000 };
 
-// The analogue output stage is not measured on the U-220 yet.  Until it is, the U-110's
-// Sallen-Key cascade and RC from roland_u110_data.h stand in -- same family of board, and
-// the A/B says the emulation is a little bright without any.  The U-110's HF correction
-// bell is NOT used: it is a fit to U-110 captures.
-using roland_u110::SK1_R1; using roland_u110::SK1_R2; using roland_u110::SK1_C1; using roland_u110::SK1_C2;
-using roland_u110::SK2_R1; using roland_u110::SK2_R2; using roland_u110::SK2_C1; using roland_u110::SK2_C2;
-using roland_u110::SK_R3;  using roland_u110::SK_R4;  using roland_u110::RC_R;   using roland_u110::RC_C;
 using roland_u110::MIDI_BAUD;
+
+// The output stage, MEASURED rather than taken from a schematic: Helge's U-220 against the
+// unfiltered core, all 127 sounding timbres averaged (ROADMAP.md, Phase 4).  What separates
+// them below 15 kHz is a gentle high shelf, about -3 dB above 5 kHz; an RBJ shelf at
+// 5.2 kHz, -3.3 dB, Q 0.5 fits it within 0.8 dB from 1 to 14 kHz.  The U-110's Sallen-Key
+// values that stood here first cut far too steeply: the hardware has real content up to
+// 16 kHz and beyond (DAC images, which no filter here can add back).
+constexpr double SHELF_HZ = 5200.0, SHELF_DB = -3.3, SHELF_Q = 0.5;
 
 } // anonymous namespace
 
@@ -78,9 +78,6 @@ struct U220Core::Impl
 		: mconfig(machine)
 		, cpu(mconfig, "maincpu", nullptr, CPU_CLOCK)
 		, pcm(mconfig, "pcm", nullptr, PCM_CLOCK)
-		, sk1{ { mconfig, "sk1l", nullptr, 0 }, { mconfig, "sk1r", nullptr, 0 } }
-		, sk2{ { mconfig, "sk2l", nullptr, 0 }, { mconfig, "sk2r", nullptr, 0 } }
-		, rc { { mconfig, "rcl",  nullptr, 0 }, { mconfig, "rcr",  nullptr, 0 } }
 		, program(0x10000, 8)
 	{ }
 
@@ -90,8 +87,11 @@ struct U220Core::Impl
 
 	p8098_device              cpu;
 	mb87419_mb87420_device    pcm;
-	filter_biquad_device      sk1[2], sk2[2];
-	filter_rc_device          rc[2];
+	// The output stage: one biquad per channel, direct form I.
+	double shelf_b[3] = {}, shelf_a[3] = {};
+	double shelf_x[2][2] = {}, shelf_y[2][2] = {};
+	void shelf_setup();
+	void shelf_process(float *buf, int ch, uint32_t n);
 
 	address_space program;
 	std::unique_ptr<address_map> regs_map;
@@ -155,7 +155,6 @@ struct U220Core::Impl
 	bool started = false;
 
 	void build();
-	void wire_audio();
 	void install_map();
 	void run_block(u32 frames);
 
@@ -202,12 +201,7 @@ void U220Core::Impl::build()
 	cpu.serial_tx_cb().set([this](u8 data) { midi_tx_w(data); });
 	cpu.out_p2_cb().set([this](u8 data) { port2 = data; });
 
-	for (int ch = 0; ch < 2; ch ++)
-	{
-		sk1[ch].opamp_sk_lowpass_setup(SK1_R1, SK1_R2, SK_R3, SK_R4, SK1_C1, SK1_C2);
-		sk2[ch].opamp_sk_lowpass_setup(SK2_R1, SK2_R2, SK_R3, SK_R4, SK2_C1, SK2_C2);
-		rc[ch].set_lowpass(RC_R, RC_C);
-	}
+	shelf_setup();
 
 	install_map();
 
@@ -253,11 +247,6 @@ void U220Core::Impl::build()
 
 	pcm.start();
 	cpu.start();
-	for (int ch = 0; ch < 2; ch ++)
-	{
-		sk1[ch].start(); sk2[ch].start(); rc[ch].start();
-	}
-	wire_audio();
 
 	const attotime streams_update = attotime::from_hz(u32(50));
 	stream_timer->adjust(streams_update, 0, streams_update);
@@ -266,13 +255,31 @@ void U220Core::Impl::build()
 	started = true;
 }
 
-void U220Core::Impl::wire_audio()
+// RBJ high shelf (Audio EQ Cookbook) at the core's own rate.
+void U220Core::Impl::shelf_setup()
 {
-	for (int ch = 0; ch < 2; ch ++)
+	const double A = std::pow(10.0, SHELF_DB / 40.0);
+	const double w0 = 2.0 * M_PI * SHELF_HZ / kCoreSampleRate;
+	const double c = std::cos(w0), al = std::sin(w0) / (2.0 * SHELF_Q), sa = 2.0 * std::sqrt(A) * al;
+	const double a0 = (A + 1) - (A - 1) * c + sa;
+	shelf_b[0] = A * ((A + 1) + (A - 1) * c + sa) / a0;
+	shelf_b[1] = -2 * A * ((A - 1) + (A + 1) * c) / a0;
+	shelf_b[2] = A * ((A + 1) + (A - 1) * c - sa) / a0;
+	shelf_a[1] = 2 * ((A - 1) - (A + 1) * c) / a0;
+	shelf_a[2] = ((A + 1) - (A - 1) * c - sa) / a0;
+}
+
+void U220Core::Impl::shelf_process(float *buf, int ch, uint32_t n)
+{
+	double *x = shelf_x[ch], *y = shelf_y[ch];
+	for (uint32_t i = 0; i < n; i ++)
 	{
-		sk1[ch].stream()->connect(0, pcm.stream(), ch, 1.0f);
-		sk2[ch].stream()->connect(0, sk1[ch].stream(), 0, 1.0f);
-		rc[ch].stream()->connect(0, sk2[ch].stream(), 0, 1.0f);
+		const double in = buf[i];
+		const double out = shelf_b[0] * in + shelf_b[1] * x[0] + shelf_b[2] * x[1]
+				- shelf_a[1] * y[0] - shelf_a[2] * y[1];
+		x[1] = x[0]; x[0] = in;
+		y[1] = y[0]; y[0] = out;
+		buf[i] = float(out);
 	}
 }
 
@@ -497,12 +504,6 @@ void U220Core::Impl::midi_tx_w(u8 data)
 void U220Core::Impl::stream_tick(s32)
 {
 	pcm.stream()->update();
-	for (int ch = 0; ch < 2; ch ++)
-	{
-		sk1[ch].stream()->update();
-		sk2[ch].stream()->update();
-		rc[ch].stream()->update();
-	}
 }
 
 void U220Core::Impl::run_block(u32 frames)
@@ -510,9 +511,7 @@ void U220Core::Impl::run_block(u32 frames)
 	block_start = attotime::from_ticks(frames_done, kCoreSampleRate);
 	const attotime block_end = attotime::from_ticks(frames_done + frames, kCoreSampleRate);
 
-	sound_stream *streams[] = { pcm.stream(),
-			sk1[0].stream(), sk1[1].stream(), sk2[0].stream(), sk2[1].stream(),
-			rc[0].stream(), rc[1].stream() };
+	sound_stream *streams[] = { pcm.stream() };
 	for (sound_stream *s : streams)
 		s->begin_block(frames, block_start);
 
@@ -655,10 +654,15 @@ void U220Core::renderStereo(float *left, float *right, uint32_t nframes)
 		return;
 	}
 	m.run_block(nframes);
-	const auto &l = m.output_filter ? m.rc[0].stream()->output(0) : m.pcm.stream()->output(0);
-	const auto &r = m.output_filter ? m.rc[1].stream()->output(0) : m.pcm.stream()->output(1);
+	const auto &l = m.pcm.stream()->output(0);
+	const auto &r = m.pcm.stream()->output(1);
 	std::copy(l.begin(), l.begin() + nframes, left);
 	std::copy(r.begin(), r.begin() + nframes, right);
+	if (m.output_filter)
+	{
+		m.shelf_process(left, 0, nframes);
+		m.shelf_process(right, 1, nframes);
+	}
 	m.fx->process(left, right, nframes);
 }
 

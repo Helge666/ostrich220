@@ -47,7 +47,8 @@ const char *const kKeyLabels[kNumKeys] = {
 
 const Rect kLcd    { 176.0f, 76.0f, 448.0f, 118.0f };     // the glass
 constexpr float kLcdPadX = 18.0f, kLcdPadY = 8.0f;          // glass around the dots
-const Rect kKnob   { 62.0f, 104.0f, 64.0f, 64.0f };
+const Rect kKnob   { 62.0f, 96.0f, 64.0f, 64.0f };
+const Rect kHwEq   { 60.0f, 192.0f, 68.0f, 20.0f };
 
 } // anonymous namespace
 
@@ -69,6 +70,8 @@ protected:
 	{
 		if (index == kParamVolume)
 			m_volumeDb = value;
+		else if (index == kParamOutputStage)
+			m_hwEq = value > 0.5f;
 		else if (index >= kParamKeyFirst && index < kParamKeyEnd)
 			m_keyLit[index - kParamKeyFirst] = value > 0.5f;
 		repaint();
@@ -117,6 +120,7 @@ protected:
 		text(140, 44, "RS-PCM SOUND MODULE  \xc2\xb7  U-220 EMULATION", nullptr);
 
 		drawKnob();
+		drawHwEq();
 		drawLcd();
 		drawKeys();
 
@@ -145,6 +149,17 @@ protected:
 					repaint();
 					return true;
 				}
+			if (kHwEq.contains(x, y))
+			{
+				// A host parameter on purpose: it is a setting, saved with the project
+				// and automatable, and a lost click here costs nothing.
+				m_hwEq = !m_hwEq;
+				editParameter(kParamOutputStage, true);
+				setParameterValue(kParamOutputStage, m_hwEq ? 1.0f : 0.0f);
+				editParameter(kParamOutputStage, false);
+				repaint();
+				return true;
+			}
 			if (kKnob.contains(x, y))
 			{
 				m_dragKnob = true;
@@ -209,6 +224,18 @@ private:
 		char msg[16];
 		std::snprintf(msg, sizeof(msg), "%u %u", unsigned(k), down ? 1u : 0u);
 		setState("key", msg);
+	}
+
+	void drawHwEq()
+	{
+		beginPath();
+		roundedRect(kHwEq.x, kHwEq.y, kHwEq.w, kHwEq.h, 3);
+		fillColor(m_hwEq ? Color(150, 190, 60) : Color(60, 60, 64));
+		fill();
+		fontSize(10);
+		textAlign(ALIGN_CENTER | ALIGN_MIDDLE);
+		fillColor(m_hwEq ? Color(30, 45, 20) : Color(170, 170, 170));
+		text(kHwEq.x + kHwEq.w / 2, kHwEq.y + kHwEq.h / 2 + 1, "HW-EQ", nullptr);
 	}
 
 	void drawKnob()
@@ -383,6 +410,7 @@ private:
 	PanelBlob m_panel;
 	std::string m_status;
 	float m_volumeDb = 0.0f;
+	bool m_hwEq = true;
 	bool m_keyLit[kNumKeys] = {};
 	int m_pressed = -1;
 	bool m_dragKnob = false;

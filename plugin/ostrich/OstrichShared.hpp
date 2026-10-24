@@ -33,7 +33,11 @@ enum Params : uint32_t
 	kParamKeyValueUp,
 	kParamKeyEnd,
 
-	kParamCount = kParamKeyEnd
+	/// The U-220's analogue output stage (a measured high shelf), on by default.  Off
+	/// is the raw core, as MAME's driver produces it.
+	kParamOutputStage = kParamKeyEnd,
+
+	kParamCount
 };
 
 constexpr unsigned kNumKeys = kParamKeyEnd - kParamKeyFirst;
