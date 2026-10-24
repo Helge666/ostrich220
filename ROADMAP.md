@@ -224,6 +224,22 @@ schreibt eine MIDI-Datei mit 20 ms Pause zwischen den Paketen für MAMEs `-min`.
   `Data` = Write/Bulk/Init/Util; `Bulk` und `Init` = All/Setup/Temp/(Memory bzw. Jump Page);
   `Util` = ROM Play/MIDI Monitor.
 
+### Timbre-A/B (24.10.2026)
+
+`tools/make_timbre_ab.py` spielt alle 128 Timbres je einmal (C4, Vel. 100, 3½ min),
+`tools/ab_compare.py` vergleicht Hardware-Aufnahme und Emulation Platz für Platz. Ergebnis
+mit Werksdaten auf beiden Seiten, Effekte am Gerät aus:
+- Pegel je Timbre bis auf ±0,5 dB gleich (nach dem gemeinsamen Versatz: Emulation +2 dB),
+  Hüllkurven gleich, Tonhöhenverläufe einschließlich Vibrato und Release gleich. Die
+  Werksdaten im echten Gerät sind also vollständig angekommen.
+- Grundsätzlich etwas heller (Median 1,08), wie schon bei A.Piano 2 gemessen.
+- **Deutlich anderes Spektrum** bei einigen Geräusch- und Effekt-Timbres: Soundtrack 1–3,
+  Pomona 2, Native 4/5, Emergency 3–5 (Emulation viel dunkler), Deep 1 (viel heller),
+  Lunar 2, Emergency 1/2, Catastrophe 1/3. Verdacht: falsche Wellenform oder falsche
+  Lage von Wave-ROM E/F (siehe Punkt 3), oder Rauschen/Interpolation im Chip.
+- Pitch-Markierungen bei Geräuschklängen sind Messartefakte. T-128 „Drums“ schweigt auf
+  beiden Seiten bei C4.
+
 Offen in dieser Phase: Tonhöhe gegen die Hardware messen (Punkt 2), Lage von E/F gegen
 Tones mit Karten-Samples prüfen (Punkt 3), die zwei echten Kartenslots (Punkt 4),
 Ausgänge MIX/DIRECT 1/2, Abgleich mit Aufnahmen des echten Geräts (Punkt 6).
