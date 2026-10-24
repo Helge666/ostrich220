@@ -360,6 +360,18 @@ Gerät nahe 0 (Gerät −0,03…+0,05; Ostrich Room1 −0,29, sonst −0,09…+0
 Gerät 0,74). Nach dem Abgriff-Umbau Pegel neu angepasst: alle Typen ±1 dB.
 Chorus fehlt noch; bei „Pre Rev“ geht der Chorus-Bus trocken in den Hall.
 
+**TODO (Stand 24.10.2026, Helges Cubase-Test):** Hall und Delay klingen nah am Original,
+sind am U-220 aber **generell etwas lauter beigemischt**. Kandidaten, in dieser Reihenfolge:
+1. Pegelgesetz zu steil: kalibriert wurde bei Rev Level 31; die Werkspatches nutzen kleinere
+   Werte (P-01: 10?), und Level 10 lag in der Messung nahe am Grundrauschen (Exponent 1,9 aus
+   nur zwei brauchbaren Punkten). Neu messen bei Level 5/10/15/20/25/31 mit mehr Abstand.
+2. Chorus-Weg: am Gerät stand Chorus Off; Parts mit „Asgn = Cho“ gehen bei Ostrich nur bei
+   „Pre Rev“ in den Hall. Klären, was das Gerät mit Cho-Parts tut, wenn der Chorus aus ist.
+3. Einstellung, die nur am Gerät anders ist: Temp-Patch/Patch-Daten am Gerät (alte Edits,
+   die Werksdaten kamen per SysEx nur teilweise an) gegen Ostrich vergleichen; das neu und
+   in kurzen Paketen eingespielte Werks-Set würde das ausschließen.
+4. Room1-Stereobild (−0,29 statt ~0), Gate etwas zu lang.
+
 **Vorgehen (Entscheidung Helge, 24.10.2026):** Phase 4 kommt vor Phase 3. Der Effektteil wird
 als eigenes, austauschbares Modul gebaut (klare Schnittstelle: Effekt-Typ und -Parameter rein,
 Stereo-Audio rein/raus) und zunächst **nach Gehör angenähert**, nicht emuliert (Schritt 3).
