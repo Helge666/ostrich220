@@ -237,6 +237,10 @@ mit Werksdaten auf beiden Seiten, Effekte am Gerät aus:
   Pomona 2, Native 4/5, Emergency 3–5 (Emulation viel dunkler), Deep 1 (viel heller),
   Lunar 2, Emergency 1/2, Catastrophe 1/3. Verdacht: falsche Wellenform oder falsche
   Lage von Wave-ROM E/F (siehe Punkt 3), oder Rauschen/Interpolation im Chip.
+- Hörvergleich (Helge): fast alle markierten Paare praktisch identisch, auch Soundtrack 2
+  und Native 5; die Spektralmaße überzeichnen bei Geräuschklängen. Einzig **T-114 Deep 1**
+  ist hörbar anders: das Mischungsverhältnis der beiden Tones (Sample 1/2) weicht ab, der
+  Charakter stimmt. Kandidat: Pegel/Velocity-Kurve eines Tones oder Hüllkurve des zweiten.
 - Pitch-Markierungen bei Geräuschklängen sind Messartefakte. T-128 „Drums“ schweigt auf
   beiden Seiten bei C4.
 
