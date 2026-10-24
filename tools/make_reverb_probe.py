@@ -115,6 +115,9 @@ def main():
             ev.append((hit + 0.15, bytes([0x80, key, 0])))
         labels.append((hit, label))
         t += a.slot
+    # Put the unit back: re-selecting P-01 reloads its stored effects into the temp patch
+    # (the last setting, CrossDelay at full feedback, would otherwise ring on for ever).
+    ev.append((t, bytes([0xCF, 0x00])))
     end = t + 1.0
 
     track = bytearray(vlq(0) + bytes([0xFF, 0x51, 3]) + TEMPO.to_bytes(3, 'big'))
