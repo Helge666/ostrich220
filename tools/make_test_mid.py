@@ -5,15 +5,15 @@ Write a small Standard MIDI File for headless tests of the U-220 driver.
 
     tools/make_test_mid.py OUT.mid
 
-Played into MIDI IN by MAME's midiin image device (-midiin OUT.mid), from emulated time
-zero.  The firmware needs about 5 s to boot and initialise memory (ENTER at 4 s, see
-tools/u220_keys.lua), so everything here starts at 8 s:
+Played into MIDI IN by MAME's midiin image device (-min OUT.mid).  It holds playback
+back until emulated time 10 s, so file time 0 is machine time 10 s -- comfortably after
+the boot and the memory initialise (ENTER at 4 s, see tools/u220_keys.lua):
 
-     8.0 s   note on, channel 1, C4          the firmware should start a voice
-     9.0 s   note off
-    10.0 s   program change 5, channel 1     a part's tone, or nothing
-    11.0 s   program change 5, channel 16    the U-220's patch change channel?
-    12.0 s   Roland RQ1, device 10h, model 2Bh, address 00 00 00, size 00 00 10:
+     0.0 s   note on, channel 1, C4          the firmware should start a voice
+     1.0 s   note off
+     2.0 s   program change 5, channel 1     a part's tone, or nothing
+     3.0 s   program change 5, channel 16    the U-220's patch change channel?
+     4.0 s   Roland RQ1, device 10h, model 2Bh, address 00 00 00, size 00 00 10:
              an answer on MIDI OUT proves the transmit side too
 """
 
@@ -45,11 +45,11 @@ def roland_rq1(device, model, addr, size):
 
 def main():
     events = [
-        (8.0,  bytes([0x90, 60, 100])),
-        (9.0,  bytes([0x80, 60, 0])),
-        (10.0, bytes([0xc0, 5])),
-        (11.0, bytes([0xcf, 5])),
-        (12.0, roland_rq1(0x10, 0x2b, (0, 0, 0), (0, 0, 0x10))),
+        (0.0, bytes([0x90, 60, 100])),
+        (1.0, bytes([0x80, 60, 0])),
+        (2.0, bytes([0xc0, 5])),
+        (3.0, bytes([0xcf, 5])),
+        (4.0, roland_rq1(0x10, 0x2b, (0, 0, 0), (0, 0, 0x10))),
     ]
     track = bytearray()
     track += vlq(0) + bytes([0xff, 0x51, 3]) + TEMPO.to_bytes(3, 'big')
