@@ -240,8 +240,10 @@ mit Werksdaten auf beiden Seiten, Effekte am Gerät aus:
 - Hörvergleich (Helge): fast alle markierten Paare praktisch identisch, auch Soundtrack 2
   und Native 5; die Spektralmaße überzeichnen bei Geräuschklängen. Einzig **T-114 Deep 1**
   ist hörbar anders: das Mischungsverhältnis der beiden Tones (Sample 1/2) weicht ab, der
-  Charakter stimmt. Kandidat: Pegel/Velocity-Kurve eines Tones oder Hüllkurve des zweiten.
-  Auf „später“ gesetzt (Helge).
+  Charakter stimmt. **Vermutlich erklärt** (Helges Idee): Deep 1 spielt dasselbe Sample auf
+  zwei Stimmen, eine fest (Schritt `1BC1`), die andere mit Zufalls-Tonhöhe (`3435`…`3DB2`,
+  ~2,4 Halbtöne Streuung bei 4 Anschlägen). Das hörbare „Verhältnis“ der beiden ändert sich
+  also von Anschlag zu Anschlag. Bei Gelegenheit mit 4 Hardware-Anschlägen bestätigen.
 - Pitch-Markierungen bei Geräuschklängen sind Messartefakte.
 - **Drum-A/B** (`make_timbre_ab.py --rhythm`, 4 Sets × Tasten 35–98, 3¼ min): belegt sind in
   allen Sets dieselben Tasten (35–58, 69, 79, 81, 84–93, F.X. mehr), auf beiden Seiten gleich.
@@ -285,6 +287,12 @@ Geräten, und ein Austausch mit ValleyBell (MAME, CM-32P) lohnt sich.
    algorithmischen Hall/Delay daran anpassen. Klingt ähnlich, ist aber nicht bitgenau.
 4. **LLE später, falls möglich:** den Chip als programmierbaren DSP verstehen (Programm
    und Koeffizienten kommen vermutlich von der CPU). Das hängt vom Trace aus Schritt 1 ab.
+
+**Vorgehen (Entscheidung Helge, 24.10.2026):** Phase 4 kommt vor Phase 3. Der Effektteil wird
+als eigenes, austauschbares Modul gebaut (klare Schnittstelle: Effekt-Typ und -Parameter rein,
+Stereo-Audio rein/raus) und zunächst **nach Gehör angenähert**, nicht emuliert (Schritt 3).
+Liegt eines Tages eine Analyse des Chips und seines Programms vor, wird nur das Modul
+ausgetauscht (Schritt 4).
 
 **Meilenstein 3:** Alle Effekttypen vorhanden, im Blindvergleich nah an der Hardware.
 
