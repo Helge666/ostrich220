@@ -175,11 +175,11 @@ Geräten, und ein Austausch mit ValleyBell (MAME, CM-32P) lohnt sich.
    | Logo | „Roland U-220 RS-PCM SOUND MODULE“ (für uns: eigener Schriftzug) |
    | links | PHONES-Buchse, VOLUME-Drehknopf mit Skala |
    | Mitte | grünes 24×2-LCD, z. B. `T-020 Strings 1  [020]` / `R: \|01\|03\|02\|04\|05\|06\|…` |
-   | Tastenblock 1 (2×2) | oben EDIT, *(unleserlich)*; unten MARK, JUMP; dazwischen der Aufdruck CHORUS / REVERB (Tastenkombination) |
-   | Tastenblock 2 (2×4) | oben EXIT, ENTER, PART*(/…)* ◀ ▶; unten CURSOR ◀ ▶, VALUE ▼ ▲ |
+   | Tastenblock 1 (2×2) | oben EDIT, DATA; unten MARK, JUMP; dazwischen der Aufdruck CHORUS / REVERB (Tastenkombination) |
+   | Tastenblock 2 (2×4) | oben EXIT, ENTER, PART/INST ◀◀ ▶▶; unten CURSOR ◀ ▶, VALUE ▼ ▲ |
    | rechts | zwei PCM-CARD-Slots übereinander, MIDI-MESSAGE-LED, POWER |
 
-   Offen: die Beschriftung oben rechts in Block 1 und der Zusatz hinter „PART“.
+   Beschriftungen von Helge am Gerät bestätigt.
 3. **ROM-Suche:** Dateien per SHA1 erkennen und alle bekannten Namen akzeptieren
    (`roms/README.md`); verständliche Meldung, wenn etwas fehlt.
    **Geführtes ROM-Setup für Erstbenutzer** (Wunsch von Helge): Fehlt eine Firmware- oder
