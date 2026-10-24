@@ -340,13 +340,9 @@ ausgetauscht (Schritt 4).
    Frequenz als log2 Hz, Gain dB, Dyn. Range, Dyn. an, Threshold, Q normiert mit
    Q = 0,025·1600^x, Shape 0 = Bell / 1 = Low Shelf, Slope, Stereo, Speakers, Solo).
 
-   **Später untersuchen (Klang):** Ostrich klingt Helge etwas **heller** (gefällt ihm,
-   vorerst so lassen), der U-220 hat etwas **mehr Gewicht** (Bässe/untere Mitten). Beides
-   deutet auf die Ausgangsstufe: die U-110-Werte (Sallen-Key/RC) sind nur Platzhalter. Messen
-   mit Rauschen/Sweep über einen Timbre mit breitem Spektrum, Gerät gegen Emulation, und
-   die Kurve als Filter des U-220 nachbilden (Schaltplan der Ausgangsstufe aus den Service
-   Notes, falls vorhanden). Hinweis: Helges Gerät hat einen getauschten OpAmp und ~35 Jahre
-   Alterung; im Zweifel der Emulation trauen (Helge).
+   **Erledigt (Helge, 24.10.2026):** „heller“ und „weniger Gewicht“ waren die geliehene
+   U-110-Filterung. Mit der gemessenen Ausgangsstufe klingt Ostrich ohne Pro-Q „nahezu
+   identisch“ zum Gerät; beide Punkte gestrichen.
 2. **Eigenes Panel:** U-220-Bedienfeld mit 24×2-LCD. Die U-110-Grafik und alle Roland-Logos
    müssen raus, die Artwork ist neu zu zeichnen. Schrift: nur OFL-lizenzierte Fonts
    (Barlow Semi Condensed ist schon im Repo; der Stil aus `tools/restyle_panel.py` ist
