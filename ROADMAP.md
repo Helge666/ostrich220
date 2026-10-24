@@ -48,9 +48,10 @@ dass die Toolchain funktioniert, bevor wir etwas ändern.
 - [x] Windows-VST3 für Cubase 15 (kann kein CLAP): `patches/0005` gibt DPFs VST3 den
       fehlenden Rückkanal DSP → Oberfläche (LCD), `make win` baut CLAP, VST3 und das
       Standalone-Programm (RtAudio statt JACK)
-- [ ] **VST3 in Cubase testen**: lädt, klingt, LCD aktualisiert sich. Installiert für den
-      Benutzer unter `%LOCALAPPDATA%\Programs\Common\VST3\Voltaire110.vst3`, ROMs unter
-      `%LOCALAPPDATA%\Voltaire110\roms\`
+- [x] **VST3 in Cubase 15**: lädt, bootet, klingt, LCD aktualisiert sich (24.10.2026).
+      Plugin unter `%LOCALAPPDATA%\Programs\Common\VST3\Voltaire110.vst3`, ROMs unter
+      `C:\ProgramData\Voltaire110\roms\`
+- [x] Selbsttest nennt Fehlercodes je Ordner und hat einen COPY-Knopf
 - [ ] Standalone `Voltaire110.exe` unter Windows testen (Audio- und MIDI-Geräteauswahl)
 - [ ] `AGENTS.md` ist noch der Text von emu110 (U-110, dessen Rechner); für Ostrich anpassen
 - [ ] **Vollständiges MAME** aus `mame/` bauen, nur mit den Roland-Treibern
@@ -62,7 +63,7 @@ dass die Toolchain funktioniert, bevor wir etwas ändern.
       `eliggett/mame` anlegen, den Branch `u220` dorthin pushen und die URL in
       `.gitmodules` umstellen.
 
-**Meilenstein 0:** Voltaire 110 läuft als CLAP in deiner DAW.
+**Meilenstein 0:** Voltaire 110 läuft als VST3 in Cubase 15. **Erreicht am 24.10.2026.**
 
 ### Arbeitsweise
 
