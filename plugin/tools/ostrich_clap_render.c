@@ -52,6 +52,7 @@ int main(int argc, char **argv)
 	const int note = argc > 3 ? atoi(argv[3]) : 60;
 	const double rate = argc > 4 ? atof(argv[4]) : 48000.0;
 	const int press_param = argc > 5 ? atoi(argv[5]) : -1;
+	const int channel = argc > 6 ? atoi(argv[6]) - 1 : 0;    // 1-based on the command line
 
 	void *lib = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
 	if (!lib) { fprintf(stderr, "%s\n", dlerror()); return 1; }
@@ -81,7 +82,7 @@ int main(int argc, char **argv)
 				e->header.time = at - pos;
 				e->header.space_id = CLAP_CORE_EVENT_SPACE_ID;
 				e->header.type = k ? CLAP_EVENT_NOTE_OFF : CLAP_EVENT_NOTE_ON;
-				e->note_id = -1; e->port_index = 0; e->channel = 0; e->key = (int16_t)note;
+				e->note_id = -1; e->port_index = 0; e->channel = (int16_t)channel; e->key = (int16_t)note;
 				e->velocity = 100.0 / 127.0;
 			}
 		}
