@@ -168,6 +168,19 @@ lädt der echte U-220 von einer **Factory-Preset-Karte** (Testmodus 11, „Inser
 Card“). Nach „Memory Initialize“ sind P-02 bis P-64 leer. Die Werkspatches holen wir uns
 später per **Bulk Dump von Helges U-220** (DATA → Bulk, SysEx) und spielen sie ein.
 
+Klang-Befund 24.10.2026 (Helge: „Piano erkennbar, aber phaser-/kammfilterartig“):
+- Jede Piano-Note spielt **zwei Samples, leise und laut, per Velocity überblendet**
+  (Velocity 10: nur das leise; 127: das laute überwiegt). Bei mittlerer Velocity laufen
+  beide fast gleich laut, ~0,5 ms gegeneinander versetzt und minimal verstimmt (0,4 Cent).
+  Das ergibt rechnerisch einen leicht wandernden Kammfilter.
+- Tonhöhen der Demo-Töne: alle innerhalb ±3 Cent vom Soll (F4 schwebt ±6 Cent).
+- Eine „Tonhöhenrampe am Ende“ war ein Artefakt des Stummschalt-Experiments `U220_MUTE`,
+  nicht des normalen Betriebs.
+- Nächster Schritt: **Referenzaufnahme vom echten U-220** mit `renders/u220_demo.mid`
+  (Kanal 1, P-01 „Acoust Piano“) und A/B gegen die Emulation.
+- Diagnose-Schalter im Treiber: `U220_TGTRACE` (jeder Chip-Schreibzugriff mit PC),
+  `U220_MUTE=maske` (Stimmen stumm, verfälscht die Firmware-Logik!), `U220_WATCHPC=pc`.
+
 Offen in dieser Phase: Tonhöhe gegen die Hardware messen (Punkt 2), Lage von E/F gegen
 Tones mit Karten-Samples prüfen (Punkt 3), die zwei echten Kartenslots (Punkt 4),
 Ausgänge MIX/DIRECT 1/2, Abgleich mit Aufnahmen des echten Geräts (Punkt 6).
