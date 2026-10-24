@@ -183,6 +183,16 @@ Klang-Befund 24.10.2026 (Helge: „Piano erkennbar, aber phaser-/kammfilterartig
   und die Velocity-Ebenen lagen falsch zueinander. Der U-220-Treiber hält `07` jetzt bis
   zum folgenden `06` zurück. Ergebnis gegen die Hardware-Aufnahme (T-001 A.Piano 2,
   Velocity-Reihe): Release deckungsgleich, Spektral-Ähnlichkeit 0,90–0,92 statt 0,60–0,79.
+- **Zweiter Fehler (24.10.2026): Tonhöhe stieg im Release.** Die Firmware liest den Zustand
+  einer Stimme als 16-Bit-Wort bei `0x0980[Stimme]`, auch für ungerade Stimmen. MAMEs MCS-96
+  richtete solche Wortzugriffe auf gerade Adressen aus; die Firmware las so den Zustand der
+  Partnerstimme und addierte nach deren Freigabe bei jedem Durchlauf erneut die
+  Loop-Feinstimmung. Der echte U-220 tut das nicht. Fix: Geräteoption
+  `set_unaligned_ext_words(true)` im MCS-96-Kern, nur vom U-220-Treiber eingeschaltet.
+  Geprüft gegen die Hardware: Tonhöhe bis zur Stille stabil (Akkord-Ausklang 522–525 Hz wie
+  Hardware 523–525 Hz), Release-Pegel ±1–3 dB.
+- **Prüfregel:** Vor jeder Hörprobe Tonhöhe pro 50 ms über die ganze Note *einschließlich
+  Release bis zur Stille* messen und mit der Hardware vergleichen.
 - Hardware-Referenzen liegen in `renders/hw_*.wav` (Helges U-220, XR18 Kanal 9/10 per ASIO,
   MIDI über `MIDIOUT2 (MIDIFACE 2x2)`), aufgenommen mit `tools/hwcapture/hwcapture_asio.py`.
 - Diagnose-Schalter im Treiber: `U220_TGTRACE` (jeder Chip-Schreibzugriff mit PC),
