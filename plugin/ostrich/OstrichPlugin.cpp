@@ -31,6 +31,13 @@ namespace {
 namespace fs = std::filesystem;
 using namespace ostrich;
 
+/// A path as UTF-8 in a std::string (C++20's u8string() is a different type).
+std::string pstr(const fs::path &p)
+{
+	const auto u = p.u8string();
+	return std::string(u.begin(), u.end());
+}
+
 // ---- SHA-1, to recognise the ROM images whatever they are called -----------------
 
 std::string sha1(const std::vector<uint8_t> &data)
@@ -472,7 +479,7 @@ private:
 					{
 						images[k.slot] = std::move(d);
 						if (where.empty())
-							where = dir.u8string();
+							where = pstr(dir);
 						break;
 					}
 			}
@@ -480,10 +487,10 @@ private:
 			for (const fs::path &sd : { dir, dir.parent_path() / "sysex" })
 				for (const auto &e : fs::directory_iterator(sd, ec))
 				{
-					std::string n = e.path().filename().u8string();
+					std::string n = pstr(e.path().filename());
 					for (char &c : n) c = char(std::tolower(static_cast<unsigned char>(c)));
 					if (m_factoryPath.empty() && n.rfind("u220factory", 0) == 0
-					    && e.path().extension().u8string().size() == 4
+					    && pstr(e.path().extension()).size() == 4
 					    && (n.size() > 4 && n.compare(n.size() - 4, 4, ".syx") == 0))
 						m_factoryPath = e.path();
 				}
@@ -497,7 +504,7 @@ private:
 		{
 			std::string dirs;
 			for (const fs::path &d : romDirs())
-				dirs += (dirs.empty() ? "" : "  |  ") + d.u8string();
+				dirs += (dirs.empty() ? "" : "  |  ") + pstr(d);
 			setStatus("Missing: " + missing + ".  Put the U-220 ROM images (any file names) into: " + dirs);
 			return;
 		}
@@ -509,7 +516,7 @@ private:
 		m_romsLoaded = true;
 		setStatus("ROMs from " + where + (m_factoryPath.empty()
 				? ".  No U220Factory.syx found: a new instance starts with empty memory."
-				: ".  Factory data: " + m_factoryPath.u8string()));
+				: ".  Factory data: " + pstr(m_factoryPath)));
 	}
 
 	/// Power on a machine with no memory, as the factory would have: answer "Memory
@@ -537,7 +544,7 @@ private:
 		const auto msgs = parseDump(readFile(m_factoryPath, 0x100000));
 		if (msgs.empty())
 		{
-			setStatus("Factory data not loaded: " + m_factoryPath.u8string() + " holds no valid U-220 SysEx.");
+			setStatus("Factory data not loaded: " + pstr(m_factoryPath) + " holds no valid U-220 SysEx.");
 			return;
 		}
 		double t = m_core.emulatedSeconds() + 0.2;
@@ -550,7 +557,7 @@ private:
 		m_core.midiInAtTime(selectP01, 2, t + 1.0);
 		const double until = t + 2.5 - m_core.emulatedSeconds();
 		m_core.runUntilIdle(uint32_t(until * 1000.0));
-		setStatus("Factory data loaded (" + std::to_string(msgs.size()) + " packets) from " + m_factoryPath.u8string());
+		setStatus("Factory data loaded (" + std::to_string(msgs.size()) + " packets) from " + pstr(m_factoryPath));
 	}
 
 	// ---- members ---------------------------------------------------------------------
