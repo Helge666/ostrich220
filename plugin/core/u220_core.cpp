@@ -397,8 +397,7 @@ void U220Core::Impl::pcm_w(offs_t offset, u8 data)
 void U220Core::Impl::lcd_cmd(u8 data)
 {
 	if (trace_lcd())
-		std::fprintf(stderr, "LCD %f cmd %02X
-", machine.time().as_double(), data);
+		std::fprintf(stderr, "LCD %f cmd %02X\n", machine.time().as_double(), data);
 	if ((data & 0xf8) == 0x08)
 		display_ctrl = data & 0x07;
 	else if ((data & 0xf8) == 0x10)                 // cursor move, S/C = 0
