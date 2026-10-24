@@ -31,7 +31,8 @@ static const clap_host_t host = {
 	host_get_extension, host_noop, host_noop, host_noop
 };
 
-typedef struct { clap_event_note_t ev[2]; uint32_t n; } events_t;
+typedef union { clap_event_header_t header; clap_event_note_t note; clap_event_param_value_t param; } any_event_t;
+typedef struct { any_event_t ev[4]; uint32_t n; } events_t;
 static uint32_t in_size(const clap_input_events_t *l) { return ((const events_t *)l->ctx)->n; }
 static const clap_event_header_t *in_get(const clap_input_events_t *l, uint32_t i)
 { return &((const events_t *)l->ctx)->ev[i].header; }
@@ -50,6 +51,7 @@ int main(int argc, char **argv)
 	if (argc < 3) { fprintf(stderr, "usage: %s plugin.clap out.wav [note] [rate]\n", argv[0]); return 2; }
 	const int note = argc > 3 ? atoi(argv[3]) : 60;
 	const double rate = argc > 4 ? atof(argv[4]) : 48000.0;
+	const int press_param = argc > 5 ? atoi(argv[5]) : -1;
 
 	void *lib = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
 	if (!lib) { fprintf(stderr, "%s\n", dlerror()); return 1; }
@@ -74,7 +76,7 @@ int main(int argc, char **argv)
 			const uint32_t at = k ? off : on;
 			if (at >= pos && at < pos + FRAMES)
 			{
-				clap_event_note_t *e = &evs.ev[evs.n ++];
+				clap_event_note_t *e = &evs.ev[evs.n ++].note;
 				e->header.size = sizeof(*e);
 				e->header.time = at - pos;
 				e->header.space_id = CLAP_CORE_EVENT_SPACE_ID;
@@ -83,6 +85,24 @@ int main(int argc, char **argv)
 				e->velocity = 100.0 / 127.0;
 			}
 		}
+		// argv[5]: a parameter to press at 2.0 s and release at 2.1 s (a panel key)
+		if (press_param >= 0)
+			for (int k = 0; k < 2; k ++)
+			{
+				const uint32_t at = (uint32_t)(rate * (k ? 2.1 : 2.0));
+				if (at >= pos && at < pos + FRAMES)
+				{
+					clap_event_param_value_t *e = &evs.ev[evs.n ++].param;
+					memset(e, 0, sizeof(*e));
+					e->header.size = sizeof(*e);
+					e->header.time = at - pos;
+					e->header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+					e->header.type = CLAP_EVENT_PARAM_VALUE;
+					e->param_id = (clap_id)press_param;
+					e->note_id = -1; e->port_index = -1; e->channel = -1; e->key = -1;
+					e->value = k ? 0.0 : 1.0;
+				}
+			}
 		clap_input_events_t in = { &evs, in_size, in_get };
 		clap_output_events_t out = { NULL, out_push };
 		float *chans[2] = { L + pos, R + pos };

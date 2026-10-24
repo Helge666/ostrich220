@@ -56,6 +56,7 @@ enum States : uint32_t
 	kStatePanel = 0,            ///< DSP -> UI, the LCD
 	kStateStatus,               ///< DSP -> UI, one line of text: ROMs, factory data
 	kStateNvram,                ///< host session: IC10, hex
+	kStateKey,                  ///< UI -> DSP, "<key> <0|1>": a panel key, see below
 	kStateCount
 };
 

@@ -16,15 +16,15 @@ namespace {
 
 using namespace ostrich;
 
-constexpr float kW = 960.0f, kH = 240.0f;           // design units
+constexpr float kW = 1120.0f, kH = 250.0f;          // design units
 
 struct Rect { float x, y, w, h; bool contains(float px, float py) const
 	{ return px >= x && px < x + w && py >= y && py < y + h; } };
 
 // The keys, in parameter order (OstrichShared.hpp).  Block 1 is 2 x 2, block 2 is 2 x 4,
 // top row first -- as on the unit.
-constexpr float kKeyW = 62.0f, kKeyH = 26.0f;
-constexpr float kB1x = 548.0f, kB2x = 700.0f, kRow0 = 92.0f, kRow1 = 150.0f, kGap = 74.0f;
+constexpr float kKeyW = 62.0f, kKeyH = 28.0f;
+constexpr float kB1x = 640.0f, kB2x = 812.0f, kRow0 = 96.0f, kRow1 = 168.0f, kGap = 72.0f;
 const Rect kKeyRects[kNumKeys] = {
 	{ kB1x,            kRow0, kKeyW, kKeyH },   // EDIT
 	{ kB1x + kGap,     kRow0, kKeyW, kKeyH },   // DATA
@@ -44,8 +44,8 @@ const char *const kKeyLabels[kNumKeys] = {
 	"\xe2\x97\x80", "\xe2\x96\xb6", "\xe2\x96\xbc", "\xe2\x96\xb2"
 };
 
-const Rect kLcd    { 160.0f, 70.0f, 360.0f, 104.0f };
-const Rect kKnob   { 62.0f, 96.0f, 64.0f, 64.0f };
+const Rect kLcd    { 180.0f, 80.0f, 400.0f, 110.0f };
+const Rect kKnob   { 62.0f, 104.0f, 64.0f, 64.0f };
 
 } // anonymous namespace
 
@@ -54,14 +54,12 @@ class OstrichUI : public UI
 {
 public:
 	OstrichUI()
-		: UI(DISTRHO_UI_DEFAULT_WIDTH, DISTRHO_UI_DEFAULT_HEIGHT)
+		// DPF scales for the desktop itself and keeps the aspect ratio; everything below
+		// draws in design units scaled to whatever size the window has.
+		: UI(DISTRHO_UI_DEFAULT_WIDTH, DISTRHO_UI_DEFAULT_HEIGHT, true)
 	{
 		loadSharedResources();
 		std::memset(&m_panel, 0, sizeof(m_panel));
-		const double scale = getScaleFactor();
-		if (d_isNotEqual(scale, 1.0))
-			setSize(uint(DISTRHO_UI_DEFAULT_WIDTH * scale), uint(DISTRHO_UI_DEFAULT_HEIGHT * scale));
-		setGeometryConstraints(uint(kW / 2), uint(kH / 2), true);
 	}
 
 protected:
@@ -124,7 +122,7 @@ protected:
 		fontSize(11);
 		textAlign(ALIGN_LEFT | ALIGN_BASELINE);
 		fillColor(m_panel.flags & 1 ? Color(140, 140, 140) : Color(240, 170, 60));
-		textBox(24, 214, kW - 48, m_status.empty() ? " " : m_status.c_str(), nullptr);
+		textBox(24, 234, kW - 48, m_status.empty() ? " " : m_status.c_str(), nullptr);
 	}
 
 	bool onMouse(const MouseEvent &ev) override
@@ -141,8 +139,7 @@ protected:
 				{
 					m_pressed = int(k);
 					m_keyLit[k] = true;
-					editParameter(kParamKeyFirst + k, true);
-					setParameterValue(kParamKeyFirst + k, 1.0f);
+					sendKey(k, true);
 					repaint();
 					return true;
 				}
@@ -162,8 +159,7 @@ protected:
 			const uint32_t k = uint32_t(m_pressed);
 			m_pressed = -1;
 			m_keyLit[k] = false;
-			setParameterValue(kParamKeyFirst + k, 0.0f);
-			editParameter(kParamKeyFirst + k, false);
+			sendKey(k, false);
 			repaint();
 			return true;
 		}
@@ -205,6 +201,14 @@ protected:
 	}
 
 private:
+	// Straight to the DSP, not through the host: see kStateKey in OstrichPlugin.cpp.
+	void sendKey(uint32_t k, bool down)
+	{
+		char msg[16];
+		std::snprintf(msg, sizeof(msg), "%u %u", unsigned(k), down ? 1u : 0u);
+		setState("key", msg);
+	}
+
 	void drawKnob()
 	{
 		const float cx = kKnob.x + kKnob.w / 2, cy = kKnob.y + kKnob.h / 2, r = kKnob.w / 2;
@@ -298,32 +302,39 @@ private:
 
 	void drawKeys()
 	{
+		// Group prints, as on the unit: PART/INST over the two arrow keys top right,
+		// CURSOR and VALUE over the bottom pairs, CHORUS / REVERB between the rows of
+		// block 1 (EDIT + MARK and DATA + JUMP are the effect shortcuts).
 		fontSize(10);
 		textAlign(ALIGN_CENTER | ALIGN_BASELINE);
 		fillColor(Color(170, 170, 170));
-		text(kB1x + kGap / 2 + kKeyW / 2, kRow0 - 30, "\xe2\x80\x94 CHORUS / REVERB \xe2\x80\x94", nullptr);
-		text(kB2x + kGap * 2 + kKeyW / 2 + kGap / 2, kRow0 - 30, "PART / INST", nullptr);
-		text(kB2x + kGap / 2 + kKeyW / 2, kRow1 - 30, "CURSOR", nullptr);
-		text(kB2x + kGap * 2 + kKeyW / 2 + kGap / 2, kRow1 - 30, "VALUE", nullptr);
+		const float mid1 = kB1x + (kGap + kKeyW) / 2;
+		text(mid1, kRow0 + kKeyH + 24, "\xe2\x80\x94 CHORUS / REVERB \xe2\x80\x94", nullptr);
+		text(kB2x + kGap * 2 + (kGap + kKeyW) / 2, kRow0 - 8, "PART / INST", nullptr);
+		text(kB2x + (kGap + kKeyW) / 2, kRow1 - 8, "CURSOR", nullptr);
+		text(kB2x + kGap * 2 + (kGap + kKeyW) / 2, kRow1 - 8, "VALUE", nullptr);
 
 		for (unsigned k = 0; k < kNumKeys; k ++)
 		{
 			const Rect &r = kKeyRects[k];
 			beginPath();
 			roundedRect(r.x, r.y, r.w, r.h, 3);
-			fillColor(m_keyLit[k] ? Color(120, 120, 128) : Color(70, 70, 76));
+			fillColor(m_keyLit[k] ? Color(130, 130, 138) : Color(70, 70, 76));
 			fill();
 			strokeColor(Color(110, 110, 116));
 			strokeWidth(1);
 			stroke();
-			// Labels for the lettered keys sit above them, as printed on the unit.
-			fontSize(10);
-			fillColor(Color(220, 220, 220));
 			if (k < 6)
-				text(r.x + r.w / 2, r.y - 6, kKeyLabels[k], nullptr);
+			{
+				// The lettered keys carry their name above them.
+				fontSize(10);
+				fillColor(Color(220, 220, 220));
+				text(r.x + r.w / 2, r.y - 8, kKeyLabels[k], nullptr);
+			}
 			else
 			{
 				fontSize(13);
+				fillColor(Color(220, 220, 220));
 				text(r.x + r.w / 2, r.y + r.h / 2 + 5, kKeyLabels[k], nullptr);
 			}
 		}

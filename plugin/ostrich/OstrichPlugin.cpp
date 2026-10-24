@@ -243,9 +243,12 @@ protected:
 			return;
 		}
 		const uint32_t k = index - kParamKeyFirst;
-		if (k >= kNumKeys)
-			return;
-		const bool down = value > 0.5f;
+		if (k < kNumKeys)
+			setKey(k, value > 0.5f);
+	}
+
+	void setKey(uint32_t k, bool down)
+	{
 		if (down && !m_keyDown[k].load())
 			m_keySeq[k].fetch_add(1);
 		m_keyDown[k].store(down);
@@ -272,6 +275,16 @@ protected:
 			state.label = "Battery-backed memory";
 			state.hints = kStateIsHostReadable;
 			break;
+		case kStateKey:
+			// The panel's own keys come this way and not as parameter edits: under VST3 a
+			// parameter edit from the UI reaches the DSP only through the host's
+			// automation path, and in Cubase the clicks never arrived.  A state message
+			// goes from the UI to the DSP directly.  The key parameters stay, for
+			// automation and generic host UIs.
+			state.key = "key";
+			state.label = "Panel key";
+			state.hints = kStateIsOnlyForDSP;
+			break;
 		}
 		state.defaultValue = "";
 	}
@@ -292,7 +305,21 @@ protected:
 
 	void setState(const char *key, const char *value) override
 	{
-		if (value == nullptr || std::strcmp(key, "nvram") != 0 || value[0] == '\0')
+		if (value == nullptr)
+			return;
+		if (std::strcmp(key, "key") == 0)
+		{
+			// A restored session hands every key back, empty: ignore anything malformed.
+			unsigned k = 0, down = 0;
+			if (std::sscanf(value, "%u %u", &k, &down) == 2 && k < kNumKeys)
+			{
+				if (s_debug)
+					d_stdout("Ostrich: key %u %s (state)", k, down ? "down" : "up");
+				setKey(k, down != 0);
+			}
+			return;
+		}
+		if (std::strcmp(key, "nvram") != 0 || value[0] == '\0')
 			return;
 		std::vector<uint8_t> raw(std::strlen(value) / 2);
 		if (!decodeHex(value, raw.data(), raw.size()))
@@ -377,6 +404,7 @@ protected:
 
 private:
 	static constexpr double kCoreRate = double(kCoreSampleRate);
+	static inline const bool s_debug = std::getenv("OSTRICH_DEBUG") != nullptr;
 	static constexpr double kPanelRefreshHz = 25.0;
 	static constexpr uint32_t kKeyHoldFrames = kCoreSampleRate / 8;    // 125 ms emulated
 
@@ -403,6 +431,8 @@ private:
 				m_keyHeld[k] = true;
 				m_keyHeldFrames[k] = 0;
 				m_core.setButton(Button(kKeyBits[k]), true);
+				if (s_debug)
+					d_stdout("Ostrich: machine key %u pressed", k);
 				continue;
 			}
 			if (m_keyHeld[k])
@@ -412,6 +442,12 @@ private:
 				{
 					m_keyHeld[k] = false;
 					m_core.setButton(Button(kKeyBits[k]), false);
+					if (s_debug)
+					{
+						char r0[kLcdColumns + 1], r1[kLcdColumns + 1];
+						m_core.lcdText(r0, r1);
+						d_stdout("Ostrich: machine key %u released, LCD [%s][%s]", k, r0, r1);
+					}
 				}
 			}
 		}
