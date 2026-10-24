@@ -300,6 +300,14 @@ ausgetauscht (Schritt 4).
 
 1. `plugin/core/u220_core.cpp/.h` analog zu `u110_core`: echtzeitfähig, ohne MAME-Framework,
    BSD-3-Clause, 32 kHz nativ. Das Resampling erledigt das Plugin.
+   **Stand 24.10.2026: fertig.** Bauen mit `plugin/tools/build_u220_core.sh` (→
+   `plugin/build-u220/libu220core.a` und `u220_render`). Effekte über die Schnittstelle
+   `core/u220_effects.h` (vorerst Bypass). Nulltest gegen MAME (`-samplerate 32000`, gleiche
+   MIDI-Ankunftszeiten aus dem `MIDI IN`-Log, `u220_render --no-filter`): alle 128 Timbres
+   (219 s) und alle 256 Drum-Tasten (206 s) bis auf 1 LSB Rundung gleich, MAMEs WAV beginnt
+   ein Sample früher; Blockgröße 37 statt 512 bitgleich. Rendert ~39× Echtzeit.
+   Ausgangsstufe vorerst mit den Sallen-Key/RC-Werten des U-110 (ohne dessen HF-Korrektur):
+   Helligkeit gegen Helges Gerät damit 1,01 statt 1,07 (Median über alle Timbres).
 2. **Eigenes Panel:** U-220-Bedienfeld mit 24×2-LCD. Die U-110-Grafik und alle Roland-Logos
    müssen raus, die Artwork ist neu zu zeichnen. Schrift: nur OFL-lizenzierte Fonts
    (Barlow Semi Condensed ist schon im Repo; der Stil aus `tools/restyle_panel.py` ist
