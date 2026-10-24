@@ -159,7 +159,15 @@ Geräten, und ein Austausch mit ValleyBell (MAME, CM-32P) lohnt sich.
    BSD-3-Clause, 32 kHz nativ. Das Resampling erledigt das Plugin.
 2. **Eigenes Panel:** U-220-Bedienfeld mit 24×2-LCD. Die U-110-Grafik und alle Roland-Logos
    müssen raus, die Artwork ist neu zu zeichnen. Schrift: nur OFL-lizenzierte Fonts
-   (emu110 hat hier ein Lizenzproblem mit `earth.ttf`, siehe `CLONING.md`).
+   (Barlow Semi Condensed ist schon im Repo; der Stil aus `tools/restyle_panel.py` ist
+   die Ausgangsbasis).
+   Laut Service Notes hat die Front: **12 Taster** (SW1–12 auf dem Switch Board; im
+   Testmodus genannt u. a. PART ◀ ▶, EDIT, EXIT, ENTER, JUMP, MARK, CURSOR, VALUE/DATA),
+   **eine grüne MIDI-LED**, **VOLUME-Knopf**, **PHONES**, **zwei Kartenslots**, **24×2-LCD
+   mit Beleuchtung**. Kein FILT-Knopf: der ist eine emu110-Zutat (Höhenkorrektur) und wandert
+   in ein Einstellungsmenü. Die genauen Tastennamen und ihre Lage nehmen wir vom Foto der
+   Frontplatte von Helges U-220 (nur als Vorlage, kommt nicht ins Repo). Welche Taste welche
+   Leitung der Schaltmatrix ist, ergibt sich in Phase 1 aus der Firmware.
 3. **ROM-Suche:** Dateien per SHA1 erkennen und alle bekannten Namen akzeptieren
    (`roms/README.md`); verständliche Meldung, wenn etwas fehlt.
    **Geführtes ROM-Setup für Erstbenutzer** (Wunsch von Helge): Fehlt eine Firmware- oder
