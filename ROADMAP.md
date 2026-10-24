@@ -355,8 +355,10 @@ Delay/CrossDelay = Echoleitung 10 + 12,9 ms × Time (CrossDelay rechts bei halbe
 Parameter liest der Kern aus dem RAM (Temp-Patch-Effektbytes 0x143C, Schalter 0x1401 Bit 4/5).
 Impulsantworten: Messung gegen trockene Emulation + Hall-Send entfaltet (`renders/
 u220_reverb_irs.npz`). Abgleich mit der Probe: Fahnenpegel pro Typ im Median ±1 dB,
-Nachhallzeit Room/Hall/Delay ±2–8 % (Gate +27 %). Chorus fehlt noch; bei „Pre Rev“ geht
-der Chorus-Bus trocken in den Hall.
+Nachhallzeit Room/Hall/Delay ±2–8 % (Gate +27 %), Stereo-Korrelation der Fahne wie am
+Gerät nahe 0 (Gerät −0,03…+0,05; Ostrich Room1 −0,29, sonst −0,09…+0,29; Gate 0,70 wie
+Gerät 0,74). Nach dem Abgriff-Umbau Pegel neu angepasst: alle Typen ±1 dB.
+Chorus fehlt noch; bei „Pre Rev“ geht der Chorus-Bus trocken in den Hall.
 
 **Vorgehen (Entscheidung Helge, 24.10.2026):** Phase 4 kommt vor Phase 3. Der Effektteil wird
 als eigenes, austauschbares Modul gebaut (klare Schnittstelle: Effekt-Typ und -Parameter rein,
