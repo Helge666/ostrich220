@@ -136,7 +136,7 @@ inline constexpr Rect kLcdInner = { 196.5165f, 62.7724f, 232.9907f, 51.1440f };
 
 // The logo, which is also the About box's button.  Zero if the artwork has no
 // element labelled logo_text_as_path.
-inline constexpr Rect kLogo = { 16.6940f, 12.1532f, 319.8896f, 31.4689f };
+inline constexpr Rect kLogo = { 0.0f, 0.0f, 0.0f, 0.0f };
 
 // The pointer shape "path39" is drawn by the SVG; rotate it about
 // (cx, cy).  zero_deg is where the artwork already points, so a value of
