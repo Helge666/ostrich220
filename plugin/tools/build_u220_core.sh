@@ -36,6 +36,7 @@ SOURCES=(
   "$MAME/src/devices/cpu/mcs96/i8x9xd.cpp"
   "$HERE/plugin/compat/emu_shim.cpp"
   "$HERE/plugin/core/u220_core.cpp"
+  "$HERE/plugin/core/u220_reverb.cpp"
   "$MAME/src/lib/util/strformat.cpp"
   "$MAME/src/lib/util/disasmintf.cpp"
 )
@@ -65,7 +66,7 @@ fail=0
 for src in "${SOURCES[@]}"; do
   obj="$OUT/$(basename "${src%.cpp}").o"
   printf '  %-24s ' "$(basename "$src")"
-  if [ -f "$obj" ] && [ "$obj" -nt "$src" ] && [ "$obj" -nt "$HERE/plugin/core/u220_core.h" ] \
+  if [ -f "$obj" ] && [ "$obj" -nt "$src" ] && [ "$obj" -nt "$HERE/plugin/core/u220_core.h" ] && [ "$obj" -nt "$HERE/plugin/core/u220_effects.h" ] \
      && [ "$obj" -nt "$HERE/plugin/compat/emu.h" ]; then
     echo "up to date"
     OBJS+=("$obj")

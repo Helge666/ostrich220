@@ -117,6 +117,7 @@ struct U220Core::Impl
 
 	roland_u220::ic25_mixer ic25;      // IC25's voice mixer: pan and effect sends per voice
 	void apply_voice_gains(int voice);
+	EffectParams effect_params() const;
 
 	BypassEffects bypass;
 	EffectsModule *fx = &bypass;
@@ -273,6 +274,33 @@ void U220Core::Impl::apply_voice_gains(int voice)
 	pcm.stream()->update();
 	for (int b = 0; b < roland_u220::NUM_BUSES; b ++)
 		pcm.set_voice_gain(u8(voice), b, g[b]);
+}
+
+// The effect fields of the temp patch, bytes 12-19 at 0x1430 (IC10 0x743C), read as one
+// little-endian word -- the layout tools/make_reverb_probe.py documents -- and the two
+// global switches in the setup byte at 0x1401 (bit 4 reverb, bit 5 chorus).
+EffectParams U220Core::Impl::effect_params() const
+{
+	u64 w = 0;
+	for (int i = 7; i >= 0; i --)
+		w = (w << 8) | ram[0x743c + i];
+	auto f = [w](int pos, int width) { return int((w >> pos) & ((u64(1) << width) - 1)); };
+	const u8 setup = ram[0x7401];
+	EffectParams p;
+	p.reverb_on = BIT(setup, 4);
+	p.chorus_on = BIT(setup, 5);
+	p.reverb_type = f(60, 3);
+	p.reverb_time = f(16, 5);
+	p.reverb_level = f(48, 5);
+	p.delay_feedback = f(43, 5);
+	p.chorus_type = f(29, 3);
+	p.chorus_post_reverb = f(63, 1) != 0;
+	p.chorus_level = f(6, 5);
+	p.chorus_delay = f(32, 5);
+	p.chorus_rate = f(0, 5);
+	p.chorus_depth = f(11, 5);
+	p.chorus_feedback = f(23, 6) - 32;
+	return p;
 }
 
 // RBJ high shelf (Audio EQ Cookbook) at the core's own rate.
@@ -694,6 +722,7 @@ void U220Core::renderStereo(float *left, float *right, uint32_t nframes)
 		left[i]  = dl[i] + rl[i] + cl[i];
 		right[i] = dr[i] + rr[i] + cr[i];
 	}
+	m.fx->setParams(m.effect_params());
 	m.fx->process(&rl[0], &rr[0], &cl[0], &cr[0], left, right, nframes);
 	if (m.output_filter)
 	{

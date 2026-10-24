@@ -28,10 +28,38 @@
 
 namespace ostrich {
 
+/// The effect settings of the current (temp) patch and the two global switches, decoded
+/// by the core from firmware RAM once per block -- the same fields the firmware reads,
+/// so a module needs no knowledge of the CPU.  Ranges as in the U-220's menus.
+struct EffectParams
+{
+	enum ReverbType : int { Room1 = 0, Room2, Room3, Hall1, Hall2, Gate, Delay, CrossDelay };
+	enum ChorusType : int { Chorus1 = 0, Chorus2, FBChorus, Flanger, ShortDelay };
+
+	bool reverb_on = true;          ///< Edit/Setup/Efct
+	bool chorus_on = true;
+	int  reverb_type = Hall2;
+	int  reverb_time = 4;           ///< 0..31
+	int  reverb_level = 0;          ///< 0..31
+	int  delay_feedback = 0;        ///< 0..31
+	int  chorus_type = Chorus1;
+	bool chorus_post_reverb = false;
+	int  chorus_level = 0;          ///< 0..31
+	int  chorus_delay = 0;          ///< 0..31
+	int  chorus_rate = 0;           ///< 0..31
+	int  chorus_depth = 0;          ///< 0..31
+	int  chorus_feedback = 0;       ///< -31..+31
+
+	bool operator==(const EffectParams &o) const = default;
+};
+
 class EffectsModule
 {
 public:
 	virtual ~EffectsModule() = default;
+
+	/// Called before every process(); cheap to call with unchanged values.
+	virtual void setParams(const EffectParams &) { }
 
 	/// A CPU write to window offset `offset` (0..0x7FF) while bank 0x40 is selected.
 	/// `seconds` is emulated time, for modules that care when the write happened.
