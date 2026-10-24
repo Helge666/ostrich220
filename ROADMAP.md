@@ -241,7 +241,12 @@ mit Werksdaten auf beiden Seiten, Effekte am Gerät aus:
   und Native 5; die Spektralmaße überzeichnen bei Geräuschklängen. Einzig **T-114 Deep 1**
   ist hörbar anders: das Mischungsverhältnis der beiden Tones (Sample 1/2) weicht ab, der
   Charakter stimmt. Kandidat: Pegel/Velocity-Kurve eines Tones oder Hüllkurve des zweiten.
-- Pitch-Markierungen bei Geräuschklängen sind Messartefakte. T-128 „Drums“ schweigt auf
+  Auf „später“ gesetzt (Helge).
+- Pitch-Markierungen bei Geräuschklängen sind Messartefakte.
+- **Vorsicht bei Drum-Vergleichen:** Laut Helge klingen einige Drums schon zwischen echten
+  Geräten leicht verschieden (Aufnahmen seines ersten U-220 von Ende der 80er/Anfang der
+  90er gegen das heutige Gerät; Firmware des ersten unbekannt, Alterung der Analogstufe
+  möglich). Kleine Abweichungen gegen *ein* Gerät sind also kein sicherer Emulationsfehler. T-128 „Drums“ schweigt auf
   beiden Seiten bei C4.
 
 Offen in dieser Phase: Tonhöhe gegen die Hardware messen (Punkt 2), Lage von E/F gegen
