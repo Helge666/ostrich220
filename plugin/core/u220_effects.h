@@ -37,23 +37,21 @@ public:
 	/// `seconds` is emulated time, for modules that care when the write happened.
 	virtual void write(uint16_t offset, uint8_t data, double seconds) = 0;
 
-	/// What a CPU read from that window returns.
-	virtual uint8_t read(uint16_t offset) = 0;
-
-	/// Process one block in place, at kCoreSampleRate.
-	virtual void process(float *left, float *right, uint32_t nframes) = 0;
+	/// One block at kCoreSampleRate: the reverb and chorus SEND buses in (IC25's mixer has
+	/// already split the voices), the returns ADDED to out, which holds the dry mix.
+	virtual void process(const float *revL, const float *revR, const float *choL,
+			const float *choR, float *outL, float *outR, uint32_t nframes) = 0;
 
 	virtual void reset() = 0;
 };
 
-/// Passes the audio through untouched and remembers the register writes, which is what
-/// the MAME driver does today.
+/// No effect returns: the dry mix only.
 class BypassEffects final : public EffectsModule
 {
 public:
 	void write(uint16_t offset, uint8_t data, double) override { m_regs[offset & 0x7f] = data; }
-	uint8_t read(uint16_t offset) override { return m_regs[offset & 0x7f]; }
-	void process(float *, float *, uint32_t) override { }
+	void process(const float *, const float *, const float *, const float *,
+			float *, float *, uint32_t) override { }
 	void reset() override { }
 
 private:

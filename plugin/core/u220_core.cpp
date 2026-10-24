@@ -22,6 +22,7 @@
 #include <cmath>
 
 #include "roland_u110_data.h"
+#include "roland_u220_ic25.h"
 
 #include <algorithm>
 #include <cstring>
@@ -114,6 +115,9 @@ struct U220Core::Impl
 	u16  keys = 0xffff;             // active low
 	u8   port2 = 0;
 
+	roland_u220::ic25_mixer ic25;      // IC25's voice mixer: pan and effect sends per voice
+	void apply_voice_gains(int voice);
+
 	BypassEffects bypass;
 	EffectsModule *fx = &bypass;
 	bool output_filter = true;
@@ -192,6 +196,10 @@ void U220Core::Impl::build()
 	pcm.set_env_engine(true);
 	pcm.set_env_max_int_hz(kCoreSampleRate);
 	pcm.set_rom(pcmrom.data(), pcmrom.size());
+	// One output per mixer bus: dry, reverb and chorus, each L/R (roland_u220_ic25.h).
+	pcm.set_output_count(roland_u220::NUM_BUSES);
+	pcm.set_gain_matrix(true);
+	ic25.reset(progrom.data());
 	pcm.int_callback().set([this](int state) {
 		cpu.set_input_line(i8x9x_device::EXTINT_LINE, state);
 	});
@@ -256,6 +264,17 @@ void U220Core::Impl::build()
 	started = true;
 }
 
+// The firmware has rewritten a word in a voice's mixer block: hand the new gains to the
+// tone generator, from the current sample on.
+void U220Core::Impl::apply_voice_gains(int voice)
+{
+	float g[roland_u220::NUM_BUSES];
+	ic25.voice_gains(unsigned(voice), g);
+	pcm.stream()->update();
+	for (int b = 0; b < roland_u220::NUM_BUSES; b ++)
+		pcm.set_voice_gain(u8(voice), b, g[b]);
+}
+
 // RBJ high shelf (Audio EQ Cookbook) at the core's own rate.
 void U220Core::Impl::shelf_setup()
 {
@@ -317,7 +336,7 @@ u8 U220Core::Impl::window_r(offs_t offset)
 		if (offset == 0x0d) return u8(keys >> 8) | 0xc0;
 		return 0xff;
 	case 0x4:                                           // effect processor
-		return fx->read(u16(offset));
+		return ic25.read(offset);
 	case 0x6:                                           // tone generator
 		return pcm_r(offset & 0x1f);
 	case 0x8: case 0x9:                                 // EPROM upper half
@@ -343,6 +362,8 @@ void U220Core::Impl::window_w(offs_t offset, u8 data)
 		if (trace_fx())
 			std::fprintf(stderr, "FX %f %03X = %02X\n", machine.time().as_double(), unsigned(offset), data);
 		fx->write(u16(offset), data, machine.time().as_double());
+		if (const int v = ic25.write(offset, data); v >= 0)
+			apply_voice_gains(v);
 		break;
 	case 0x6:
 		pcm_w(offset & 0x1f, data);
@@ -593,6 +614,10 @@ void U220Core::reset()
 	m.pend07_valid = false;
 	std::fill(std::begin(m.pcmreg), std::end(m.pcmreg), u8(0));
 	m.fx->reset();
+	m.ic25.reset(m.progrom.data());
+	for (unsigned v = 0; v < roland_u220::IC25_NUM_VOICES; v ++)
+		for (int b = 0; b < roland_u220::NUM_BUSES; b ++)
+			m.pcm.set_voice_gain(u8(v), b, 0.0f);
 	m.pcm.reset();
 	m.cpu.reset();
 }
@@ -657,16 +682,24 @@ void U220Core::renderStereo(float *left, float *right, uint32_t nframes)
 		return;
 	}
 	m.run_block(nframes);
-	const auto &l = m.pcm.stream()->output(0);
-	const auto &r = m.pcm.stream()->output(1);
-	std::copy(l.begin(), l.begin() + nframes, left);
-	std::copy(r.begin(), r.begin() + nframes, right);
+	using namespace roland_u220;
+	sound_stream &st = *m.pcm.stream();
+	const auto &dl = st.output(BUS_DRY_L), &dr = st.output(BUS_DRY_R);
+	const auto &rl = st.output(BUS_REV_L), &rr = st.output(BUS_REV_R);
+	const auto &cl = st.output(BUS_CHO_L), &cr = st.output(BUS_CHO_R);
+	// Every bus reaches the output dry; the reverb and chorus buses also feed the effects,
+	// which add their returns.  Then the analogue stage, which follows the DAC.
+	for (uint32_t i = 0; i < nframes; i ++)
+	{
+		left[i]  = dl[i] + rl[i] + cl[i];
+		right[i] = dr[i] + rr[i] + cr[i];
+	}
+	m.fx->process(&rl[0], &rr[0], &cl[0], &cr[0], left, right, nframes);
 	if (m.output_filter)
 	{
 		m.shelf_process(left, 0, nframes);
 		m.shelf_process(right, 1, nframes);
 	}
-	m.fx->process(left, right, nframes);
 }
 
 void U220Core::setButton(Button sw, bool down)
