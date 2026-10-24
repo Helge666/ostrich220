@@ -135,11 +135,13 @@ Speicher „Memory Initialize“ an, initialisiert auf ENTER und zeigt den Spiel
 `P-01: Acoust Piano [001]`. EDIT-, DATA-, MARK- und JUMP-Menüs öffnen sich. MIDI läuft in
 beide Richtungen. **Meilenstein 1 erreicht.**
 
-Bekannt und nach Phase 2 verschoben: Ab P-02 zeigt das LCD statt des Namens `############`.
-Im Programm-ROM steht nur der Startpatch „Acoust Piano“; die 64 Werkspatches und 128
-Timbres liest „Memory Initialize“ wie beim U-110 über den Lesekanal des PCM-Chips aus den
-Wave-ROMs. Solange der Chip ein Platzhalter ist, kommen Nullen. Bank `0x70` wird von der
-Firmware auf Anwesenheit getestet (Muster `7F`/`01`/`FF`), vermutlich eine Karte; bleibt leer.
+Bekannt: Nach „Memory Initialize“ zeigt das LCD ab P-02 statt des Namens `############`.
+Das bleibt auch mit funktionierendem PCM-Chip (Phase 2) so: Im Programm-ROM stehen nur
+der Startpatch „Acoust Piano“ und das Starttimbre „A.Piano 2“, die Werksklänge stehen in
+keinem ROM. Sie kommen per SysEx-Bulk-Dump (siehe „Werksdaten“ unten). „Data → Init → All“
+am echten Gerät löscht also die Werksklänge, statt sie wiederherzustellen. Bank `0x70` wird
+von der Firmware auf Anwesenheit getestet (Muster `7F`/`01`/`FF`), vermutlich eine Karte;
+bleibt leer.
 
 ## Phase 2 — Erster Ton (ohne Effekte)
 
@@ -200,6 +202,27 @@ Klang-Befund 24.10.2026 (Helge: „Piano erkennbar, aber phaser-/kammfilterartig
   MIDI über `MIDIOUT2 (MIDIFACE 2x2)`), aufgenommen mit `tools/hwcapture/hwcapture_asio.py`.
 - Diagnose-Schalter im Treiber: `U220_TGTRACE` (jeder Chip-Schreibzugriff mit PC),
   `U220_MUTE=maske` (Stimmen stumm, verfälscht die Firmware-Logik!), `U220_WATCHPC=pc`.
+
+### Werksdaten (SysEx)
+
+Die 64 Patches, 128 Timbres und Rhythmus-Sets der Werksausstattung gibt es im Netz als
+Bulk-Dump `U220Factory.Syx` (33 883 Byte). Er ist urheberrechtlich nicht unsere Sache: nie ins
+Repo, der Benutzer legt ihn selbst ab. Die verbreitete Datei endet mit einer zweiten, unvollständigen
+Kopie der letzten Pakete (`00 26`–`00 29`, das letzte abgeschnitten); `tools/syx_to_mid.py`
+prüft Prüfsummen, wirft Doppeltes und Abgeschnittenes raus (247 Pakete, 33 398 Byte) und
+schreibt eine MIDI-Datei mit 20 ms Pause zwischen den Paketen für MAMEs `-min`.
+`tools/syx_send.py` schickt den geprüften Dump unter Windows an ein echtes Gerät.
+
+- Emulation: lädt den Dump im Spielmodus („Receiving SysEx.“), danach P-01 Acoust Piano …
+  P-64 Catastrophe, Namen wie im Werksheft. Das Temp-Patch des Dumps heißt „Future Pad“; die
+  Speicherplätze sind davon unberührt. Ein so gefülltes NVRAM liegt auf kellerkind2 unter
+  `~/dev/run/nvram_factory/` und soll Startzustand für Tests und später für das Plugin werden
+  (Plugin: SysEx-Import beim ersten Start, siehe Phase 4).
+- Empfang: `Edit → Setup → MIDI`: `Rx SysEx = On`, `SysEx Device ID = 17` (Werkseinstellung,
+  passt zum Dump, der an Gerät `10h` geht). Ein Speicherschutz existiert nicht.
+- Menübäume: `Edit` = Setup/Patch/Timbre/Rythm; `Setup` = M.Tune/Efct/LCD/MIDI/Map;
+  `Data` = Write/Bulk/Init/Util; `Bulk` und `Init` = All/Setup/Temp/(Memory bzw. Jump Page);
+  `Util` = ROM Play/MIDI Monitor.
 
 Offen in dieser Phase: Tonhöhe gegen die Hardware messen (Punkt 2), Lage von E/F gegen
 Tones mit Karten-Samples prüfen (Punkt 3), die zwei echten Kartenslots (Punkt 4),
