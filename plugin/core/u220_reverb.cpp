@@ -65,7 +65,7 @@ constexpr unsigned BASE_LEN[8] = { 1031, 1201, 1361, 1493, 1657, 1777, 1913, 205
 constexpr float TYPE_SIZE[6]   = { 0.55f, 0.75f, 0.65f, 1.15f, 1.0f, 0.6f };   // ..Hall2, Gate
 constexpr float TYPE_PRE_MS[6] = { 6.0f, 10.0f, 8.0f, 22.0f, 18.0f, 4.0f };
 // Output calibration per type (all 8 types), against the tail level of the hardware probe.
-constexpr float TYPE_GAIN[8]   = { 0.74f, 0.29f, 0.49f, 0.25f, 0.17f, 0.38f, 0.96f, 0.96f };
+constexpr float TYPE_GAIN[8]   = { 1.04f, 0.29f, 0.57f, 0.25f, 0.17f, 0.38f, 0.96f, 0.96f };
 // The network's own diffusion lengthens the decay it is set to; measured hw/emulation
 // ratios of the decay time, applied to the targets.
 constexpr float RT_SCALE[5]    = { 0.79f, 1.05f, 0.85f, 1.10f, 0.98f };
@@ -235,12 +235,12 @@ void U220Reverb::process(const float *revL, const float *revR, const float *choL
 			l = network(in, r);
 			if (type == EffectParams::Gate)
 			{
-				// Opened by an attack (a new peak), held ~180 ms whatever follows, closed in
+				// Opened by an attack (a new peak), held ~450 ms whatever follows, closed in
 				// ~15 ms: the hardware's gate is as short after a sustained note as after
 				// a drum hit.
 				const float a = std::fabs(in);
 				if (a > 1e-4f && a >= m_env)
-					m_hold = unsigned(0.18 * FS);
+					m_hold = unsigned(0.45 * FS);
 				else if (m_hold)
 					m_hold --;
 				m_env = std::max(a, m_env * 0.99995f);
