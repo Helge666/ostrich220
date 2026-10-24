@@ -12,6 +12,7 @@
 // --press uses the key bits of u220_core.h, like tools/u220_keys.lua.
 
 #include "u220_core.h"
+#include "u220_effects.h"
 
 #include <cmath>
 #include <cstdio>
@@ -72,11 +73,28 @@ const char *const kWaveNames[6][2] = {
 	{ "roland-f_r15179948_mb834000a-20_3a2-aa.bin",  "roland_u220_waverom5_(sn-u110-09).bin" },
 };
 
+// Keeps the reverb and chorus send buses, for measuring the effects against hardware.
+struct BusTap final : ostrich::EffectsModule
+{
+	std::vector<int16_t> rev, cho;
+	void write(uint16_t, uint8_t, double) override { }
+	void reset() override { }
+	void process(const float *rl, const float *rr, const float *cl, const float *cr,
+			float *, float *, uint32_t n) override
+	{
+		for (uint32_t i = 0; i < n; i ++)
+		{
+			rev.push_back(quantise(rl[i])); rev.push_back(quantise(rr[i]));
+			cho.push_back(quantise(cl[i])); cho.push_back(quantise(cr[i]));
+		}
+	}
+};
+
 } // namespace
 
 int main(int argc, char **argv)
 {
-	std::string roms = "roms", out, nvram, save_nvram, midi_events, presses, midi_out;
+	std::string roms = "roms", out, nvram, save_nvram, midi_events, presses, midi_out, send_out;
 	double seconds = 10.0;
 	bool show_lcd = false, filter = true;
 	uint32_t blocksize = 512;
@@ -96,6 +114,7 @@ int main(int argc, char **argv)
 		else if (a == "--no-filter")  filter = false;
 		else if (a == "--press")      presses = next();
 		else if (a == "--midi-out")   midi_out = next();     // raw bytes the machine sends
+		else if (a == "--send-out")   send_out = next();     // reverb send bus as WAV
 		else { std::fprintf(stderr, "unknown option %s\n", a.c_str()); return 2; }
 	}
 
@@ -134,6 +153,9 @@ int main(int argc, char **argv)
 		core.setNvram(d.data(), d.size());
 	}
 	core.setOutputFilter(filter);
+	BusTap tap;
+	if (!send_out.empty())
+		core.setEffects(&tap);
 	core.reset();
 
 	struct TimedByte { double t; uint8_t b; };
@@ -231,6 +253,12 @@ int main(int argc, char **argv)
 	{
 		write_wav(out, pcm, rate);
 		std::printf("wrote %s\n", out.c_str());
+	}
+	if (!send_out.empty())
+	{
+		write_wav(send_out, tap.rev, rate);
+		write_wav(send_out + ".cho.wav", tap.cho, rate);
+		std::printf("wrote %s (reverb send) and .cho.wav\n", send_out.c_str());
 	}
 	if (!save_nvram.empty())
 	{
