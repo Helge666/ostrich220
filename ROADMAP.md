@@ -39,11 +39,12 @@ dass die Toolchain funktioniert, bevor wir etwas ändern.
 - [x] Repo mit frischer Historie, emu110 als Basis, keine ROMs (`.gitignore`, `roms/README.md`)
 - [x] MAME-Fork als Submodul (shallow), lokaler Branch `u220`
 - [x] `tools/sync_upstream.sh` für spätere emu110-Updates ohne ROMs
-- [ ] **Toolchain unter Windows.** emu110 baut unter Ubuntu 24.04 und cross-kompiliert
-      die Windows-DLL mit mingw-w64. Empfehlung: **WSL2 mit Ubuntu 24.04** (ist auf diesem
-      Rechner noch nicht installiert). Danach die Pakete aus `CLONING.md` §1 installieren
-      und `g++-mingw-w64-x86-64` für `make win`.
-- [ ] Voltaire 110 bauen (`cd plugin && make`, `make win`) und mit den U-110-ROMs testen
+- [x] **Build-Host kellerkind2** (Ubuntu 24.04, per SSH), siehe „Arbeitsweise“ unten
+- [x] Emulator-Kern gebaut (`make core`), Smoke-Test grün; U-110 bootet mit deiner
+      Firmware v2.03 und rendert eine Testnote offline (`build/u110_render`)
+- [ ] Build-Pakete auf kellerkind2 installieren (braucht `sudo`, macht Helge selbst)
+- [ ] Voltaire 110 bauen (`cd plugin && make`, `make win`) und die Windows-CLAP hier in
+      der DAW testen
 - [ ] **Vollständiges MAME** aus `mame/` bauen, nur mit den Roland-Treibern
       (`make SUBTARGET=roland SOURCES=src/mame/roland/roland_u110.cpp,src/mame/roland/roland_u20.cpp`).
       Der MAME-Debugger ist das wichtigste Werkzeug für Phase 1.
@@ -54,6 +55,28 @@ dass die Toolchain funktioniert, bevor wir etwas ändern.
       `.gitmodules` umstellen.
 
 **Meilenstein 0:** Voltaire 110 läuft als CLAP in deiner DAW.
+
+### Arbeitsweise
+
+| Was | Wo |
+|---|---|
+| Quellcode bearbeiten, committen | Windows: `C:\Users\helge\Apps\U-220 Ostrich\ostrich` |
+| Bauen, Tests, Offline-Renders | kellerkind2: `~/dev/ostrich`, Renders in `~/dev/renders` |
+| Anhören, Plugin in der DAW | **nur Windows**, bis der Windows-Build den ersten erkennbaren Ton hat |
+
+- Übertragung übers LAN: `git push kk2 main` (Ostrich) und `git -C mame push kk2 u220` (MAME).
+  Auf kellerkind2 steht `receive.denyCurrentBranch=updateInstead`, der Push aktualisiert
+  also direkt die Arbeitskopie.
+- **Auf kellerkind2 keine Audio- oder Video-Einstellungen ändern** (Sunshine/Artemis
+  streamen von dort). Konkret: kein JACK-Standalone und nichts, das ein Audiogerät öffnet;
+  kein `xvfb` (würde den X-Server aktualisieren), der CLAP-UI-Test wird daher übersprungen;
+  Builds mit `nice -n 19`; vor jeder Paketinstallation `apt-get -s` und auf Upgrades oder
+  Entfernungen prüfen.
+- Pakete (am 24.10.2026 simuliert: 45 neu, keine Upgrades, keine Entfernungen, keine Dienste):
+
+  ```bash
+  sudo apt-get install --no-install-recommends build-essential lv2-dev libjack-jackd2-dev libgl1-mesa-dev libx11-dev libxext-dev libxcursor-dev libcairo2-dev libdbus-1-dev g++-mingw-w64-x86-64 libsdl2-dev libsdl2-ttf-dev libfontconfig-dev libpulse-dev qtbase5-dev qtbase5-dev-tools qtchooser qt5-qmake ccache
+  ```
 
 ## Phase 1 — Die U-220-Firmware bootet
 
