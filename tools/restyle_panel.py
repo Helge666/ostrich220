@@ -288,8 +288,10 @@ def centre_page(path, boxes):
             continue
         sx, sy, sw, sh = boxes[best[1].get('id')]
         x0 = float(t.get('x'))
-        # Start-anchored, so the text's x is (near enough) its box's left edge.
-        x_new = x0 + ((sx + sw / 2) - tx) / k
+        # The text's x is its box's left edge while start-anchored and its centre once a
+        # previous run has made it middle-anchored, so a re-run moves nothing.
+        anchored = 'text-anchor:middle' in (t.get('style') or '')
+        x_new = x0 + ((sx + sw / 2) - (tx + tw / 2 if anchored else tx)) / k
         for e in [t] + list(t.iter(f'{{{SVG}}}tspan')):
             set_style(e, text_anchor='middle', text_align='center',
                       font_size=SLIDER_LABEL_SIZE)

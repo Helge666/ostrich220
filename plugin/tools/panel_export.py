@@ -873,12 +873,23 @@ def check_fonts(root):
     answer that looks like a right one.
     """
     families = set()
-    for e in root.iter():
+
+    # Editing-aid layers are never exported, so the faces they use need not be
+    # installed (the LCD mock-up names Matrix Sans Screen, which ships as webfonts only).
+    def visit(e):
+        label = e.get(f'{{{INK}}}label') or ''
+        if (e.get(f'{{{INK}}}groupmode') == 'layer'
+                and (label in SKIP_LAYERS or label.endswith(SKIP_LAYER_SUFFIX))):
+            return
         for m in re.finditer(r'font-family:\s*([^;]+)', e.get('style') or ''):
             families.add(m.group(1).strip().strip('\'"'))
         attr = e.get('font-family')
         if attr:
             families.add(attr.strip().strip('\'"'))
+        for child in e:
+            visit(child)
+
+    visit(root)
 
     missing = {}
     for fam in sorted(families):
