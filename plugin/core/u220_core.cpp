@@ -383,7 +383,7 @@ void U220Core::Impl::pcm_w(offs_t offset, u8 data)
 	pcm.write(offset, data);
 	if (trace_tg())
 		std::fprintf(stderr, "TG %f v%02X reg %02X = %02X  pc=%04X\n", machine.time().as_double(),
-				pcmreg[0x1f] & 0x1f, unsigned(offset), data, unsigned(cpu.pc()));
+				pcmreg[0x1f] & 0x1f, unsigned(offset), data);
 }
 
 // DDRAM exactly as the driver's shadow tracks it (the CPU reads it back through the
