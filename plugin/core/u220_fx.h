@@ -25,13 +25,17 @@ class U220Fx final : public EffectsModule
 {
 public:
 	U220Reverb &reverb() { return m_rev; }
+	/// Leaves the reverb out whatever the patch says (A/B renders against a unit whose
+	/// Setup has Reverb Off).
+	void setReverbEnabled(bool on) { m_revOn = on; }
 
 	void setParams(const EffectParams &p) override { m_rev.setParams(p); m_cho.setParams(p); }
 	void write(uint16_t, uint8_t, double) override { }
 	void process(const float *revL, const float *revR, const float *choL, const float *choR,
 			float *outL, float *outR, uint32_t nframes) override
 	{
-		m_rev.process(revL, revR, choL, choR, outL, outR, nframes);
+		if (m_revOn)
+			m_rev.process(revL, revR, choL, choR, outL, outR, nframes);
 		m_cho.process(choL, choR, outL, outR, nframes);
 	}
 	void reset() override { m_rev.reset(); m_cho.reset(); }
@@ -39,6 +43,7 @@ public:
 private:
 	U220Reverb m_rev;
 	U220Chorus m_cho;
+	bool m_revOn = true;
 };
 
 } // namespace ostrich

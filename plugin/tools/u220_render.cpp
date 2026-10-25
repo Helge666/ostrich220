@@ -130,7 +130,7 @@ int main(int argc, char **argv)
 {
 	std::string roms = "roms", out, nvram, save_nvram, midi_events, presses, midi_out, send_out;
 	double seconds = 10.0;
-	bool show_lcd = false, filter = true, reverb = false;
+	bool show_lcd = false, filter = true, reverb = false, no_reverb = false;
 	uint32_t blocksize = 512;
 
 	for (int i = 1; i < argc; i ++)
@@ -150,6 +150,7 @@ int main(int argc, char **argv)
 		else if (a == "--midi-out")   midi_out = next();     // raw bytes the machine sends
 		else if (a == "--send-out")   send_out = next();     // reverb send bus as WAV
 		else if (a == "--reverb")     reverb = true;         // the effect module on
+		else if (a == "--no-reverb")  no_reverb = true;      // ...but the chorus only
 		else { std::fprintf(stderr, "unknown option %s\n", a.c_str()); return 2; }
 	}
 
@@ -193,7 +194,10 @@ int main(int argc, char **argv)
 	if (!send_out.empty())
 		core.setEffects(&tap);
 	else if (reverb)
+	{
+		rev.setReverbEnabled(!no_reverb);
 		core.setEffects(&rev);
+	}
 	core.reset();
 
 	struct TimedByte { double t; uint8_t b; };
