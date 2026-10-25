@@ -141,11 +141,13 @@ def analyse_side(y, i0, P, tpl, n_end):
         tw = lo + jj
         taus.append((tw - s0) / P)          # fraction of a period
         gs.append(win[j] * sign / h0)
-        # Second edge (feedback): largest after excluding +-6 samples of the first.
-        w2 = np.abs(win).copy()
-        w2[max(j - 6, 0):j + 7] = 0
-        j2 = int(np.argmax(w2))
-        fs.append((win[j2] * sign / h0, (j2 - j) / P))
+        # Feedback: the copy of the wet edge, another tau later.
+        k2 = int(round(tw + (tw - s0))) - lo
+        if 2 <= k2 < len(win) - 2:
+            seg2 = win[k2 - 2:k2 + 3]
+            fs.append((seg2[int(np.argmax(np.abs(seg2)))] * sign / h0, 0.0))
+        else:
+            fs.append((np.nan, 0.0))
         times.append((s0 + i0) / P)
         k += 1
     return t_first, np.array(taus), np.array(gs), fs, np.array(times)
@@ -174,7 +176,13 @@ def main():
     seg = x[s0['i'] + int(0.5 * sr):s0['i'] + int(1.5 * sr)].mean(1)
     f0 = fine_f0(seg, sr, 65.406)
     yd = np.diff(x[:, 0], prepend=0.0)[s0['i'] + int(0.2 * sr):s0['i'] + int((s0['hold'] - 0.05) * sr)]
-    f0 = fold_f0(yd, sr, f0)
+    # The sample's loop may hold more than one cycle (Saw Wave 1 repeats every second
+    # one: its two edges differ): fold at the true repeat, the sharper of f0 and f0/2.
+    cand = []
+    for f in (f0, f0 / 2):
+        ff = fold_f0(yd, sr, f, span=0.05 * f / f0)
+        cand.append((np.abs(fold(yd, sr / ff, 0)).max(), ff))
+    f0 = max(cand)[1]        # a P-periodic signal is 2P-periodic too: never worse
     P = sr / f0
     print(f'latency {latency * 1000:.1f} ms, f0 {f0:.3f} Hz (period {1000 / f0:.3f} ms)')
 
@@ -209,7 +217,7 @@ def main():
             gm = float(np.median(g[steady]))
             res[('L', 'R')[c]] = dict(tau_ms=float(np.median(tau[steady]) * 1000), pp_ms=pp * 1000,
                                       rate_hz=rate, h3_db=h3, g=gm,
-                                      f=float(np.median([v for v, _ in fb]) / gm) if gm else 0.0)
+                                      f=float(np.nanmedian([v for v, _ in fb]) / gm) if gm else 0.0)
             traces.append(tau[steady])
         n = min(len(traces[0]), len(traces[1]))
         cc = (np.corrcoef(traces[0][:n], traces[1][:n])[0, 1]
