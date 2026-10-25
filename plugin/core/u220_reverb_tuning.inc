@@ -3,6 +3,8 @@ R"TUNING(
 # Types 0..7 = Room1 Room2 Room3 Hall1 Hall2 Gate Delay CrossDelay; time index 0..4 =
 # Time 0 8 16 24 31.  rt T I = decay (s) low/mid/high; eq T I = dB at 125 Hz .. 8 kHz.
 # Fitted to hw_reverb_probe_v2.wav: rms error 6.21 -> 1.46 dB over 44 slots, 8 iterations.
+# By ear (Helge, 25.10.2026, Time 15 / Level 9 against the unit): Room2 and Hall2 gain +1 dB
+# on top of the fit.  A refit pulls that back through the EQ -- re-apply it afterwards.
 gain 0 0.9600
 size 0 0.550
 pre 0 6.0
@@ -16,7 +18,7 @@ eq 0 1 -7.36 -5.59 -4.88 -6.00 -12.42 -9.63 -30.00
 eq 0 2 -9.50 -5.45 -4.78 -5.95 -12.37 -9.66 -30.00
 eq 0 3 -10.74 -5.39 -4.89 -6.17 -12.58 -9.65 -30.00
 eq 0 4 -12.10 -5.31 -4.93 -6.31 -12.75 -9.60 -30.00
-gain 1 0.2200
+gain 1 0.2468
 size 1 0.750
 pre 1 10.0
 rt 1 0 1.900 1.899 1.482
@@ -55,7 +57,7 @@ eq 3 1 4.07 1.39 2.73 1.53 1.23 -1.65 -10.82
 eq 3 2 3.29 1.15 2.44 1.29 0.93 -1.82 -11.69
 eq 3 3 2.99 1.06 2.23 1.14 0.75 -1.91 -12.18
 eq 3 4 2.79 0.99 2.11 1.06 0.64 -1.97 -12.51
-gain 4 0.2700
+gain 4 0.3029
 size 4 1.000
 pre 4 18.0
 rt 4 0 2.382 3.124 1.669

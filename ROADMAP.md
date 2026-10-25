@@ -388,6 +388,11 @@ sind am U-220 aber **generell etwas lauter beigemischt**. Kandidaten, in dieser 
      sehr lang), Gate ~2,5, Delays < 0,6.
    - Gate am Gerät: kein harter Schnitt, flach ~100–200 ms (je nach Time), dann ~250 dB/s.
    - Room1 war bei Ostrich in den Höhen bis 15 dB zu laut, Room2 4–6 dB zu leise.
+   - Delay/CrossDelay bei FB 31: am Gerät fast verlustfrei (gefittet 0,97 pro Wiederholung).
+   - **Hörtest Helge** (Time 15, Level 9, FB 15; Delay Time 20; CrossDelay Time 30/FB 20):
+     Room1, Hall1, Gate, Delay identisch bzw. nahezu identisch; Room3 nahezu (gegen Ende
+     minimal mehr Höhen am Gerät, lohnt nicht); CrossDelay nahezu. Room2 und Hall2 am Gerät
+     etwas mehr Hall → beide +1 dB nach Gehör (in der Tuning-Datei vermerkt).
 2. Chorus-Weg: am Gerät stand Chorus Off; Parts mit „Asgn = Cho“ gehen bei Ostrich nur bei
    „Pre Rev“ in den Hall. Klären, was das Gerät mit Cho-Parts tut, wenn der Chorus aus ist.
 3. Einstellung, die nur am Gerät anders ist: Temp-Patch/Patch-Daten am Gerät (alte Edits,
