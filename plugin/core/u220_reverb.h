@@ -23,7 +23,8 @@
     writes out as u220_reverb_tuning.inc; plugin/tools/u220_reverb_run loads a tuning
     file at run time so the fit needs no rebuild.
 
-    The chorus is not here yet; with "Out = Pre Rev" the chorus bus is fed in dry.
+    With "Chorus Out = Pre Rev" whatever comes in on the chorus inputs is reverberated
+    too; U220Fx (u220_fx.h) hands it the chorused sound there.
 
 ***************************************************************************************/
 

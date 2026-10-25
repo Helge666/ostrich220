@@ -422,7 +422,10 @@ sind am U-220 aber **generell etwas lauter beigemischt**. Kandidaten, in dieser 
      vom rechten Abgriff – links liegt die Rezirkulation bei τL + τR (Flanger FB +31: 0,81).
      Ostrich jetzt ebenso (0,72–0,74 an derselben Stelle). Paare: `renders/chorus_ab3/`.
      Helge: „Intensität und LFO jetzt nahezu identisch“ → Chorus abgeschlossen bis auf
-     Chorus2-Growl und Pre-Rev-Routing.
+     Chorus2-Growl.
+   - **Pre/Post Rev** laut Owner's Manual S. 54/61: Pre Rev = Chorus → Hall (der Hall bekommt
+     den gechorusten Klang: Send + Kopien), Post Rev = kein Hall auf Cho-Parts. In `U220Fx`
+     so umgesetzt; nicht gegen das Gerät gemessen.
    - **Chorus2 „Growl“ bleibt** (Helge: vermutlich analog, z. B. mitschwingende OpAmps);
      im README unter „Bekannte Abweichungen“.
    - (Frühere Notiz) **Chorus2 „Growl“** (02, 25): am Gerät sind L und R bei Chorus2 viel weniger
