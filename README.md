@@ -9,10 +9,10 @@ kommt, steht in [ROADMAP.md](ROADMAP.md).
 
 ## Bekannte Abweichungen vom Gerät
 
-- **Chorus2 „Growl“:** Am U-220 klingt Chorus2 rauer, „growliger“ als in Ostrich (z. B. im
-  Werkspatch P-02). Messbar ist, dass linker und rechter Kanal dort am Gerät viel weniger
-  korreliert sind; Verzögerung, LFO, Pegel, Feedback und Klangfarbe der Chorus-Kopie stimmen.
-  Vermutlich ein analoger Effekt des Geräts. Bleibt vorerst so.
+- **Chorus2 „Growl“ (gelöst, 25.10.2026):** Chorus2 hat eine zweite, schneller modulierte
+  Kopie, und bei „Chorus Out = Pre Rev“ kommt der rechte Kanal der Chorus-Parts ein Sample
+  später. Beides ist jetzt nachgebaut; an einer Syn-Bass-Line nach Helges Urteil „nahezu
+  ununterscheidbar“.
 - **Effekte allgemein:** Hall, Delay und Chorus sind nach Messungen eines Geräts angenähert,
   nicht aus dem Effektchip (IC25) emuliert. Einzelgeräte können durch Alterung abweichen.
 

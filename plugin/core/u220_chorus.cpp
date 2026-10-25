@@ -32,7 +32,11 @@ constexpr float FB_STEP[5]  = { 0.0f, 0.0f, 0.0274f, 0.0270f, 0.0284f };
 // Chorus2's second copy: filter, gain, speed relative to the main LFO, offset under the
 // main shortest delay, span relative to the main span.  U220_CHO2="lp|hp|flat,Hz,gain,
 // speed,offset_ms,span" overrides them for fitting runs (tools, not the plugin).
-struct Copy2 { char type = 'l'; double hz = 220.0; float gain = 0.65f, speed = 3.3f, offset = 12.0f, span = 1.0f; };
+// Fitted against Helge's U-220 recording of a Syn Bass 4 line through P-02 (growl_fit.py,
+// 25.10.2026): unfiltered at 0.8 -- "nahezu ununterscheidbar".  The first model, a bass-
+// only copy low-passed at 220 Hz, came from a measurement whose upper bands timing errors
+// had spoiled.
+struct Copy2 { char type = 'f'; double hz = 0.0; float gain = 0.8f, speed = 3.3f, offset = 12.0f, span = 1.0f; };
 
 const Copy2 &copy2()
 {
@@ -124,10 +128,10 @@ void U220Chorus::setParams(const EffectParams &p)
 			? GAIN31[type] * std::pow(10.0f, table(LEVEL_DB, 5, float(level)) / 20.0f) : 0.0f;
 	m_fb = FB_STEP[type] * std::clamp(p.chorus_feedback, -31, 31);
 
-	// Chorus2's bass copy (its "growl", 25.10.2026): a second tap 12 ms under the main
+	// Chorus2's second copy (its "growl", 25.10.2026): a second tap 12 ms under the main
 	// one's shortest delay, swept over the same span 3.3 times as fast, the sides in
-	// antiphase, through a low-pass -- 0.63 of the dry below 250 Hz, little above.  Found
-	// as what dry + main copy leave unexplained in the held-sawtooth recording.
+	// antiphase, at 0.8.  Found as what dry + main copy leave unexplained in the held-
+	// sawtooth recording; its level and (lack of) filtering fitted on a real bass line.
 	m_bass = type == EffectParams::Chorus2;
 	const Copy2 &c2 = copy2();
 	m_min2 = std::max(m_min - c2.offset * ms, 1.0f);
