@@ -85,8 +85,11 @@ protected:
 			if (decodeHex(value, reinterpret_cast<uint8_t *>(&b), sizeof(b)))
 			{
 				m_panel = b;
+				m_dbgPanels ++;
 				repaint();
 			}
+			else
+				m_dbgPanelBad ++;
 		}
 		else if (std::strcmp(key, "status") == 0)
 		{
@@ -97,6 +100,7 @@ protected:
 
 	void onNanoDisplay() override
 	{
+		m_dbgDraws ++;
 		const float s = getWidth() / kW;
 		scale(s, s);
 
@@ -224,6 +228,7 @@ private:
 		char msg[16];
 		std::snprintf(msg, sizeof(msg), "%u %u", unsigned(k), down ? 1u : 0u);
 		setState("key", msg);
+		m_dbgKeys ++;
 	}
 
 	void drawHwEq()
@@ -344,6 +349,17 @@ private:
 
 	void uiIdle() override
 	{
+		m_dbgIdles ++;
+		const auto now = std::chrono::steady_clock::now();
+		if (now - m_dbgLast >= std::chrono::seconds(1))
+		{
+			m_dbgLast = now;
+			char line[300], lcd[56];
+			lcdText(m_panel.lcd, lcd);
+			std::snprintf(line, sizeof(line), "ui %p idles %lu panels %lu bad %lu draws %lu keys %lu lcd %s",
+					(void *)this, m_dbgIdles, m_dbgPanels, m_dbgPanelBad, m_dbgDraws, m_dbgKeys, lcd);
+			debugLog("ostrich-ui", line);
+		}
 		if (m_panel.cursor_flags & 1)
 			repaint();
 	}
@@ -409,6 +425,8 @@ private:
 
 	PanelBlob m_panel;
 	std::string m_status;
+	unsigned long m_dbgIdles = 0, m_dbgPanels = 0, m_dbgPanelBad = 0, m_dbgDraws = 0, m_dbgKeys = 0;
+	std::chrono::steady_clock::time_point m_dbgLast {};
 	float m_volumeDb = 0.0f;
 	bool m_hwEq = true;
 	bool m_keyLit[kNumKeys] = {};
