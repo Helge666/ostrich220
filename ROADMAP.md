@@ -447,7 +447,10 @@ sind am U-220 aber **generell etwas lauter beigemischt**. Kandidaten, in dieser 
      1 Sample bei 32 kHz später, bei Chorus1 und Chorus2; bei Post Rev oder Chorus aus nicht.
      In `U220Fx` nachgebaut; Bassline 8–16 kHz L/R −0,24 (Gerät −0,29, vorher +0,58).
      Paare: `renders/prepost_ab2/`, `renders/growl_ab/` (04 = neu).
-   - Offen: Bass-Kopie noch zu zahm (unter 4 kHz L/R 0,47–0,51 statt 0,38–0,43).
+   - **Zweite Kopie gefittet an Helges Bassline** (Syn Bass 4, P-02; `growl_fit.py`, Pegel/
+     L/R-Korrelation/Seite-Mitte/Modulation in 5 Bändern): breitbandig statt 220-Hz-Tiefpass
+     (die Bandmessung war oben durch Zeitfehler verfälscht). Helge wählte „ungefiltert, 0,8“:
+     „nahezu ununterscheidbar“, Pegel passt (08 in `renders/growl_ab/`). Growl damit gelöst.
    - (Frühere Notiz) **Chorus2 „Growl“** (02, 25): am Gerät sind L und R bei Chorus2 viel weniger
      korreliert (0,16/0,27 statt 0,57/0,63 bei Ostrich; Chorus1/FB/Flanger stimmen auf ±0,02).
      Verzögerung, Hub, LFO, Gain, Feedback und Klangfarbe der Kopie stimmen; das Fehlende
