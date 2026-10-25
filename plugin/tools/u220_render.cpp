@@ -74,10 +74,31 @@ const char *const kWaveNames[6][2] = {
 	{ "roland-f_r15179948_mb834000a-20_3a2-aa.bin",  "roland_u220_waverom5_(sn-u110-09).bin" },
 };
 
-// Keeps the reverb and chorus send buses, for measuring the effects against hardware.
+// Keeps the reverb and chorus send buses, for measuring the effects against hardware, and
+// every change of the effect settings with the frame it took effect at, so
+// u220_reverb_run can replay the effects alone (float, not quantised: the fit wants the
+// low tails).
 struct BusTap final : ostrich::EffectsModule
 {
 	std::vector<int16_t> rev, cho;
+	std::vector<float> revf, chof;
+	std::string params;
+	uint64_t frame = 0;
+	ostrich::EffectParams last;
+	bool any = false;
+	void setParams(const ostrich::EffectParams &p) override
+	{
+		if (any && p == last)
+			return;
+		any = true;
+		last = p;
+		char buf[160];
+		std::snprintf(buf, sizeof(buf), "%llu %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+				(unsigned long long)frame, p.reverb_on, p.chorus_on, p.reverb_type, p.reverb_time,
+				p.reverb_level, p.delay_feedback, p.chorus_type, p.chorus_post_reverb,
+				p.chorus_level, p.chorus_delay, p.chorus_rate, p.chorus_depth, p.chorus_feedback);
+		params += buf;
+	}
 	void write(uint16_t, uint8_t, double) override { }
 	void reset() override { }
 	void process(const float *rl, const float *rr, const float *cl, const float *cr,
@@ -87,9 +108,21 @@ struct BusTap final : ostrich::EffectsModule
 		{
 			rev.push_back(quantise(rl[i])); rev.push_back(quantise(rr[i]));
 			cho.push_back(quantise(cl[i])); cho.push_back(quantise(cr[i]));
+			revf.push_back(rl[i]); revf.push_back(rr[i]);
+			chof.push_back(cl[i]); chof.push_back(cr[i]);
 		}
+		frame += n;
 	}
 };
+
+void write_f32(const std::string &path, const std::vector<float> &v)
+{
+	if (FILE *f = std::fopen(path.c_str(), "wb"))
+	{
+		std::fwrite(v.data(), sizeof(float), v.size(), f);
+		std::fclose(f);
+	}
+}
 
 } // namespace
 
@@ -263,7 +296,14 @@ int main(int argc, char **argv)
 	{
 		write_wav(send_out, tap.rev, rate);
 		write_wav(send_out + ".cho.wav", tap.cho, rate);
-		std::printf("wrote %s (reverb send) and .cho.wav\n", send_out.c_str());
+		write_f32(send_out + ".rev.f32", tap.revf);
+		write_f32(send_out + ".cho.f32", tap.chof);
+		if (FILE *f = std::fopen((send_out + ".params.txt").c_str(), "w"))
+		{
+			std::fputs(tap.params.c_str(), f);
+			std::fclose(f);
+		}
+		std::printf("wrote %s (reverb send), .cho.wav, .rev.f32/.cho.f32 and .params.txt\n", send_out.c_str());
 	}
 	if (!save_nvram.empty())
 	{

@@ -11,6 +11,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <sstream>
 
 namespace ostrich {
 
@@ -18,96 +20,171 @@ namespace {
 
 constexpr double FS = kCoreSampleRate;
 
-// Reverberation time in seconds, measured on Helge's U-220: per type Room1..Hall2, at
-// Time 0, 8, 16, 24, 31, in octave bands 250, 500, 1k, 2k, 4k, 8k Hz.  Only the 250 Hz
-// and 8 kHz columns drive the network; the others document what the one-pole damping
-// interpolates between.
-constexpr float RT[5][5][6] = {
-	{ // Room1
-		{ 1.46f, 1.27f, 1.31f, 1.38f, 1.20f, 0.90f },   // time 0
-		{ 1.82f, 1.49f, 1.40f, 1.34f, 1.21f, 0.97f },   // time 8
-		{ 2.27f, 1.82f, 1.44f, 1.34f, 1.26f, 0.96f },   // time 16
-		{ 2.63f, 2.13f, 1.55f, 1.37f, 1.27f, 0.94f },   // time 24
-		{ 3.09f, 2.29f, 1.59f, 1.35f, 1.28f, 0.91f },   // time 31
-	},
-	{ // Room2
-		{ 1.51f, 1.64f, 1.63f, 1.68f, 1.53f, 1.29f },
-		{ 2.16f, 2.45f, 2.13f, 1.87f, 1.72f, 1.36f },
-		{ 2.98f, 3.21f, 2.78f, 2.53f, 2.05f, 1.43f },
-		{ 3.73f, 4.11f, 3.36f, 2.88f, 2.23f, 1.52f },
-		{ 4.52f, 4.90f, 4.01f, 3.43f, 2.32f, 1.57f },
-	},
-	{ // Room3
-		{ 1.62f, 1.53f, 1.27f, 1.50f, 1.31f, 1.23f },
-		{ 2.30f, 2.20f, 1.72f, 1.88f, 1.56f, 1.33f },
-		{ 2.95f, 2.84f, 2.40f, 2.45f, 1.82f, 1.42f },
-		{ 3.79f, 3.57f, 3.09f, 2.94f, 2.07f, 1.48f },
-		{ 4.50f, 4.13f, 3.46f, 2.93f, 2.23f, 1.60f },
-	},
-	{ // Hall1
-		{ 2.66f, 2.62f, 2.48f, 2.29f, 1.80f, 1.28f },
-		{ 3.72f, 3.52f, 3.40f, 2.98f, 2.22f, 1.36f },
-		{ 5.01f, 4.71f, 4.30f, 3.56f, 2.54f, 1.45f },
-		{ 5.99f, 5.59f, 5.23f, 4.29f, 2.79f, 1.56f },
-		{ 7.01f, 6.53f, 5.82f, 4.68f, 3.00f, 1.58f },
-	},
-	{ // Hall2
-		{ 2.59f, 2.57f, 2.48f, 2.23f, 1.97f, 1.70f },
-		{ 3.71f, 3.63f, 3.39f, 3.11f, 2.39f, 1.92f },
-		{ 4.97f, 4.62f, 4.32f, 3.83f, 2.80f, 2.09f },
-		{ 5.98f, 5.62f, 5.25f, 4.33f, 3.13f, 2.23f },
-		{ 6.94f, 6.58f, 6.09f, 5.17f, 3.34f, 2.35f },
-	},
-};
+// The fitted numbers, as text in ReverbTuning::parse's format.
+constexpr const char BUILTIN_TUNING[] =
+#include "u220_reverb_tuning.inc"
+;
 
 // Line lengths in samples at 32 kHz (mutually prime), scaled per type; rooms are smaller.
 constexpr unsigned BASE_LEN[8] = { 1031, 1201, 1361, 1493, 1657, 1777, 1913, 2053 };
-constexpr float TYPE_SIZE[6]   = { 0.55f, 0.75f, 0.65f, 1.15f, 1.0f, 0.6f };   // ..Hall2, Gate
-constexpr float TYPE_PRE_MS[6] = { 6.0f, 10.0f, 8.0f, 22.0f, 18.0f, 4.0f };
-// Output calibration per type (all 8 types), against the tail level of the hardware probe.
-constexpr float TYPE_GAIN[8]   = { 0.96f, 0.22f, 0.45f, 0.275f, 0.27f, 0.44f, 0.96f, 0.96f };
-// The network's own diffusion lengthens the decay it is set to; measured hw/emulation
-// ratios of the decay time, applied to the targets.
-constexpr float RT_SCALE[5]    = { 0.79f, 1.05f, 0.85f, 1.10f, 0.98f };
 constexpr unsigned DIFF_LEN[4] = { 142, 107, 379, 277 };
 constexpr float DIFF_G = 0.65f;
+// Where the absorption's low and high shelves turn over.
+constexpr double LOW_SHELF_HZ = 300.0, HIGH_SHELF_HZ = 3000.0;
+constexpr double EQ_Q = 1.41;           // one octave
 
-float rt_at(int type, int time, int band)
+// Linear interpolation over the measured Time points.
+void time_weights(int time, int &i, float &f)
 {
-	static constexpr int T[5] = { 0, 8, 16, 24, 31 };
-	int i = 0;
-	while (i < 3 && time > T[i + 1])
+	const int *T = ReverbTuning::TIME_AT;
+	i = 0;
+	while (i < ReverbTuning::TIMES - 2 && time > T[i + 1])
 		i ++;
-	const float f = float(time - T[i]) / float(T[i + 1] - T[i]);
-	return RT[type][i][band] + f * (RT[type][i + 1][band] - RT[type][i][band]);
+	f = float(std::clamp(time, T[i], T[i + 1]) - T[i]) / float(T[i + 1] - T[i]);
 }
 
-// One-pole y = b x + a y[-1] with gain g_lo at DC and g_hi at 8 kHz.
-void absorption(double g_lo, double g_hi, float &b, float &a)
+// First-order shelves by the bilinear transform: gain `g` below (low) or above (high)
+// the turnover, unity on the other side.  b0 b1 a1 of y = b0 x + b1 x[-1] - a1 y[-1].
+void low_shelf(double g, double hz, float c[3])
 {
-	const double w = 2.0 * M_PI * 8000.0 / FS;
-	double lo = 0.0, hi = 0.999;
-	for (int it = 0; it < 60; it ++)
-	{
-		const double am = 0.5 * (lo + hi);
-		const double bb = g_lo * (1.0 - am);
-		const double mag = bb / std::sqrt(1.0 - 2.0 * am * std::cos(w) + am * am);
-		if (mag > g_hi) lo = am; else hi = am;
-	}
-	a = float(0.5 * (lo + hi));
-	b = float(g_lo * (1.0 - a));
+	const double k = std::tan(M_PI * hz / FS);
+	const double a0 = 1.0 + k;
+	c[0] = float((1.0 + g * k) / a0);
+	c[1] = float((g * k - 1.0) / a0);
+	c[2] = float((k - 1.0) / a0);
+}
+
+void high_shelf(double g, double hz, float c[3])
+{
+	const double k = std::tan(M_PI * hz / FS);
+	const double a0 = 1.0 + k;
+	c[0] = float((g + k) / a0);
+	c[1] = float((k - g) / a0);
+	c[2] = float((k - 1.0) / a0);
+}
+
+// Direct form II transposed, for the shelves: one state each.
+inline float shelf(const float c[3], float &z, float x)
+{
+	const float y = c[0] * x + z;
+	z = c[1] * x - c[2] * y;
+	return y;
 }
 
 } // anonymous namespace
 
 
+// ---- ReverbTuning ---------------------------------------------------------------------
+
+bool ReverbTuning::parse(const std::string &text, std::string *error)
+{
+	std::istringstream in(text);
+	std::string line;
+	int lineno = 0;
+	auto fail = [&](const char *what) {
+		if (error)
+			*error = "line " + std::to_string(lineno) + ": " + what;
+		return false;
+	};
+	while (std::getline(in, line))
+	{
+		lineno ++;
+		if (const size_t h = line.find('#'); h != std::string::npos)
+			line.resize(h);
+		std::istringstream ls(line);
+		std::string key;
+		if (!(ls >> key))
+			continue;
+		int t = -1, i = -1;
+		if (!(ls >> t) || t < 0 || t >= TYPES)
+			return fail("bad type");
+		if (key == "rt" || key == "eq")
+		{
+			if (!(ls >> i) || i < 0 || i >= TIMES)
+				return fail("bad time index");
+			if (key == "rt")
+			{
+				if (t >= NET_TYPES)
+					return fail("rt only for Room1..Gate");
+				for (float &v : rt[t][i])
+					if (!(ls >> v) || v <= 0.0f)
+						return fail("bad rt");
+			}
+			else
+				for (float &v : eq[t][i])
+					if (!(ls >> v))
+						return fail("bad eq");
+		}
+		else if (key == "gain")
+		{
+			if (!(ls >> gain[t]))
+				return fail("bad gain");
+		}
+		else if (key == "size" || key == "pre")
+		{
+			if (t >= NET_TYPES)
+				return fail("size/pre only for Room1..Gate");
+			if (!(ls >> (key == "size" ? size[t] : pre_ms[t])))
+				return fail("bad value");
+		}
+		else
+			return fail("unknown key");
+	}
+	return true;
+}
+
+std::string ReverbTuning::format() const
+{
+	std::string s;
+	char buf[256];
+	for (int t = 0; t < TYPES; t ++)
+	{
+		std::snprintf(buf, sizeof(buf), "gain %d %.4f\n", t, gain[t]);
+		s += buf;
+		if (t < NET_TYPES)
+		{
+			std::snprintf(buf, sizeof(buf), "size %d %.3f\npre %d %.1f\n", t, size[t], t, pre_ms[t]);
+			s += buf;
+			for (int i = 0; i < TIMES; i ++)
+			{
+				std::snprintf(buf, sizeof(buf), "rt %d %d %.3f %.3f %.3f\n", t, i,
+						rt[t][i][0], rt[t][i][1], rt[t][i][2]);
+				s += buf;
+			}
+		}
+		for (int i = 0; i < TIMES; i ++)
+		{
+			int n = std::snprintf(buf, sizeof(buf), "eq %d %d", t, i);
+			for (float v : eq[t][i])
+				n += std::snprintf(buf + n, sizeof(buf) - n, " %.2f", v);
+			s += buf;
+			s += '\n';
+		}
+	}
+	return s;
+}
+
+const ReverbTuning &ReverbTuning::builtin()
+{
+	static const ReverbTuning t = [] {
+		ReverbTuning r;
+		r.parse(BUILTIN_TUNING);
+		return r;
+	}();
+	return t;
+}
+
+
+// ---- U220Reverb -----------------------------------------------------------------------
+
 U220Reverb::U220Reverb()
+	: m_t(ReverbTuning::builtin())
 {
 	for (int i = 0; i < LINES; i ++)
-		m_line[i].assign(size_t(BASE_LEN[i] * 1.2f) + 8, 0.0f);
+		m_line[i].assign(size_t(BASE_LEN[i] * 1.6f) + 8, 0.0f);
 	for (int i = 0; i < 4; i ++)
 		m_diff[i].assign(DIFF_LEN[i], 0.0f);
-	m_pre.assign(size_t(0.05 * FS) + 8, 0.0f);
+	m_pre.assign(size_t(0.06 * FS) + 8, 0.0f);
 	m_echo.assign(size_t(0.5 * FS) + 8, 0.0f);
 	configure();
 }
@@ -118,7 +195,9 @@ void U220Reverb::reset()
 	for (auto &d : m_diff) std::fill(d.begin(), d.end(), 0.0f);
 	std::fill(m_pre.begin(), m_pre.end(), 0.0f);
 	std::fill(m_echo.begin(), m_echo.end(), 0.0f);
-	std::fill(std::begin(m_lp), std::end(m_lp), 0.0f);
+	std::fill(std::begin(m_lsz), std::end(m_lsz), 0.0f);
+	std::fill(std::begin(m_hsz), std::end(m_hsz), 0.0f);
+	std::fill(&m_eqz[0][0][0], &m_eqz[0][0][0] + sizeof(m_eqz) / sizeof(float), 0.0f);
 	m_env = m_gate = 0.0f;
 	m_hold = 0;
 }
@@ -135,6 +214,9 @@ void U220Reverb::configure()
 {
 	const int type = std::clamp(m_p.reverb_type, 0, 7);
 	const int time = std::clamp(m_p.reverb_time, 0, 31);
+	int ti;
+	float tf;
+	time_weights(time, ti, tf);
 
 	// Level: 31 is the reference, 0 is off.  The hardware's tail (Hall2, Time 8, reverb
 	// energy alone) at Level 5..31, in dB below Level 31, interpolated linearly in dB;
@@ -152,22 +234,41 @@ void U220Reverb::configure()
 			db = LEVEL_DB[k - 1][1] + f * (LEVEL_DB[k][1] - LEVEL_DB[k - 1][1]);
 			break;
 		}
-	m_gain = (m_p.reverb_on && level > 0 ? 1.0f : 0.0f) * std::pow(10.0f, db / 20.0f) * TYPE_GAIN[type];
+	m_gain = (m_p.reverb_on && level > 0 ? 1.0f : 0.0f) * std::pow(10.0f, db / 20.0f) * m_t.gain[type];
+
+	// The output EQ, interpolated in dB between the Time points.
+	m_eqFlat = true;
+	for (int b = 0; b < EQ_BANDS; b ++)
+	{
+		const float g = m_t.eq[type][ti][b] + tf * (m_t.eq[type][ti + 1][b] - m_t.eq[type][ti][b]);
+		if (std::fabs(g) > 0.01f)
+			m_eqFlat = false;
+		const double A = std::pow(10.0, g / 40.0);
+		const double w = 2.0 * M_PI * ReverbTuning::EQ_HZ[b] / FS;
+		const double al = std::sin(w) / (2.0 * EQ_Q), c = std::cos(w);
+		const double a0 = 1.0 + al / A;
+		m_eq[b][0] = float((1.0 + al * A) / a0);
+		m_eq[b][1] = float(-2.0 * c / a0);
+		m_eq[b][2] = float((1.0 - al * A) / a0);
+		m_eq[b][3] = float(-2.0 * c / a0);
+		m_eq[b][4] = float((1.0 - al / A) / a0);
+	}
 
 	if (type <= EffectParams::Gate)
 	{
-		const int t = std::min(type, 4);
-		// The gate runs the network as a mid-size hall and cuts it short.
-		const float rt_lo = type == EffectParams::Gate ? 1.2f : rt_at(t, time, 0) * RT_SCALE[t];
-		const float rt_hi = type == EffectParams::Gate ? 0.9f : rt_at(t, time, 5) * RT_SCALE[t];
+		float rt[ReverbTuning::DECAY_BANDS];
+		for (int k = 0; k < ReverbTuning::DECAY_BANDS; k ++)
+			rt[k] = m_t.rt[type][ti][k] + tf * (m_t.rt[type][ti + 1][k] - m_t.rt[type][ti][k]);
 		for (int i = 0; i < LINES; i ++)
 		{
-			m_len[i] = std::min<unsigned>(unsigned(BASE_LEN[i] * TYPE_SIZE[type]), unsigned(m_line[i].size() - 1));
-			const double g_lo = std::pow(10.0, -3.0 * m_len[i] / (FS * rt_lo));
-			const double g_hi = std::pow(10.0, -3.0 * m_len[i] / (FS * rt_hi));
-			absorption(g_lo, g_hi, m_b[i], m_a[i]);
+			m_len[i] = std::min<unsigned>(unsigned(BASE_LEN[i] * m_t.size[type]), unsigned(m_line[i].size() - 1));
+			auto loop_gain = [&](float t) { return std::pow(10.0, -3.0 * m_len[i] / (FS * t)); };
+			const double gm = loop_gain(rt[1]);
+			m_gm[i] = float(gm);
+			low_shelf(loop_gain(rt[0]) / gm, LOW_SHELF_HZ, m_ls[i]);
+			high_shelf(loop_gain(rt[2]) / gm, HIGH_SHELF_HZ, m_hs[i]);
 		}
-		m_prelen = std::max(1u, unsigned(TYPE_PRE_MS[type] * 1e-3 * FS));
+		m_prelen = std::clamp(unsigned(m_t.pre_ms[type] * 1e-3 * FS), 1u, unsigned(m_pre.size() - 1));
 	}
 	else
 	{
@@ -204,8 +305,8 @@ float U220Reverb::network(float in, float &outR)
 	{
 		const unsigned n = unsigned(m_line[i].size());
 		const float raw = m_line[i][(m_pos[i] + n - m_len[i]) % n];
-		m_lp[i] = m_b[i] * raw + m_a[i] * m_lp[i];
-		o[i] = m_lp[i];
+		// Absorption: the mid-band loop gain, shelved towards the low and high decay.
+		o[i] = shelf(m_hs[i], m_hsz[i], shelf(m_ls[i], m_lsz[i], m_gm[i] * raw));
 	}
 	// Fast Walsh-Hadamard, scaled to stay energy preserving.
 	float h[LINES];
@@ -279,6 +380,22 @@ void U220Reverb::process(const float *revL, const float *revR, const float *choL
 			r = type == EffectParams::CrossDelay
 					? m_echo[(m_echopos + n - m_echolen / 2) % n] : back;
 			m_echopos = (m_echopos + 1) % n;
+		}
+		if (!m_eqFlat)
+		{
+			float *side[2] = { &l, &r };
+			for (int c = 0; c < 2; c ++)
+				for (int b = 0; b < EQ_BANDS; b ++)
+				{
+					// Direct form II transposed.
+					const float *k = m_eq[b];
+					float *z = m_eqz[c][b];
+					const float x = *side[c];
+					const float y = k[0] * x + z[0];
+					z[0] = k[1] * x - k[3] * y + z[1];
+					z[1] = k[2] * x - k[4] * y;
+					*side[c] = y;
+				}
 		}
 		outL[i] += m_gain * l;
 		outR[i] += m_gain * r;

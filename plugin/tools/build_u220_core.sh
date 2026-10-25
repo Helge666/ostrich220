@@ -67,6 +67,7 @@ for src in "${SOURCES[@]}"; do
   obj="$OUT/$(basename "${src%.cpp}").o"
   printf '  %-24s ' "$(basename "$src")"
   if [ -f "$obj" ] && [ "$obj" -nt "$src" ] && [ "$obj" -nt "$HERE/plugin/core/u220_core.h" ] && [ "$obj" -nt "$HERE/plugin/core/u220_effects.h" ] \
+     && [ "$obj" -nt "$HERE/plugin/core/u220_reverb.h" ] && [ "$obj" -nt "$HERE/plugin/core/u220_reverb_tuning.inc" ] \
      && [ "$obj" -nt "$HERE/plugin/compat/emu.h" ]; then
     echo "up to date"
     OBJS+=("$obj")
@@ -93,6 +94,14 @@ if "$CXX" "${CXXFLAGS[@]}" "${INCS[@]}" "$HERE/plugin/tools/u220_render.cpp" "$O
   echo "built"
 else
   echo "FAILED  (see $OUT/u220_render.log)"
+  fail=1
+fi
+printf '  %-24s ' "u220_reverb_run"
+if "$CXX" "${CXXFLAGS[@]}" "${INCS[@]}" "$HERE/plugin/tools/u220_reverb_run.cpp" "$OUT/libu220core.a" \
+        -o "$OUT/u220_reverb_run$EXE" 2> "$OUT/u220_reverb_run.log"; then
+  echo "built"
+else
+  echo "FAILED  (see $OUT/u220_reverb_run.log)"
   fail=1
 fi
 exit $fail
