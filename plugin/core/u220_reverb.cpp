@@ -136,9 +136,23 @@ void U220Reverb::configure()
 	const int type = std::clamp(m_p.reverb_type, 0, 7);
 	const int time = std::clamp(m_p.reverb_time, 0, 31);
 
-	// Level: 31 is the reference; 20 measured 7.9 dB down, 10 about 16 dB, 0 is off.
-	const float lv = float(std::clamp(m_p.reverb_level, 0, 31)) / 31.0f;
-	m_gain = (m_p.reverb_on ? 1.0f : 0.0f) * std::pow(lv, 1.9f) * TYPE_GAIN[type];
+	// Level: 31 is the reference, 0 is off.  The hardware's tail (Hall2, Time 8, reverb
+	// energy alone) at Level 5..31, in dB below Level 31, interpolated linearly in dB;
+	// about 0.8 dB a step, a little steeper at both ends.
+	static constexpr float LEVEL_DB[7][2] = {
+		{ 0, -40.0f }, { 5, -22.1f }, { 10, -16.2f }, { 15, -11.9f }, { 20, -8.2f },
+		{ 25, -4.9f }, { 31, 0.0f },
+	};
+	const int level = std::clamp(m_p.reverb_level, 0, 31);
+	float db = 0.0f;
+	for (int k = 1; k < 7; k ++)
+		if (level <= LEVEL_DB[k][0])
+		{
+			const float f = (level - LEVEL_DB[k - 1][0]) / (LEVEL_DB[k][0] - LEVEL_DB[k - 1][0]);
+			db = LEVEL_DB[k - 1][1] + f * (LEVEL_DB[k][1] - LEVEL_DB[k - 1][1]);
+			break;
+		}
+	m_gain = (m_p.reverb_on && level > 0 ? 1.0f : 0.0f) * std::pow(10.0f, db / 20.0f) * TYPE_GAIN[type];
 
 	if (type <= EffectParams::Gate)
 	{

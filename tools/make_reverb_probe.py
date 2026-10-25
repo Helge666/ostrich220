@@ -87,6 +87,12 @@ def settings():
     return out
 
 
+def level_settings():
+    """The level law alone (--levels): Hall2 at a mid Time, Level 0..31 in even steps."""
+    return [(f'Hall2 time 8 level {lv}', dict(rtype=4, rtime=8, rlevel=lv, rfb=15))
+            for lv in (0, 5, 10, 15, 20, 25, 31)]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('base')
@@ -94,13 +100,14 @@ def main():
     ap.add_argument('--slot', type=float, default=6.0)
     ap.add_argument("--list")
     ap.add_argument("--velocity", type=int, default=60)   # 110 clipped the XR18 at +9.5 dB gain
+    ap.add_argument("--levels", action="store_true")
     a = ap.parse_args()
 
     base = load_patch(a.base)
     ev = [(0.0, bytes([0xCF, 0x00]))]           # P-01 into the temp area, everything else as is
     labels = []
     t = 1.0
-    for label, f in settings():
+    for label, f in (level_settings() if a.levels else settings()):
         # Chorus silenced for the whole run: level 0, so neither path carries it.
         msg = packet(with_fields(base, clevel=0, **f))
         ev.append((t, b'\xf0' + vlq(len(msg) - 1) + msg[1:]))
