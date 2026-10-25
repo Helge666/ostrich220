@@ -129,6 +129,18 @@ def main():
     ev = [(0.0, bytes([0xCF, 0x00]))]           # P-01 into the temp area, everything else as is
     labels = []
     t = 1.0
+    if a.v2:
+        # The whole Temp dump of the emulation's P-01 (patch, parts, timbres) in short
+        # packets: the hardware's own P-01 may carry old edits, and this makes both play
+        # exactly the same data.  Temp only -- nothing stored on the unit changes, and the
+        # Program Change at the end brings its own P-01 back.
+        from syx_to_mid import load_dump, split_dt1
+        tt = 0.3
+        for m in load_dump(a.base):
+            for p in split_dt1(m, 64):
+                ev.append((tt, b'\xf0' + vlq(len(p) - 1) + p[1:]))
+                tt += 0.04
+        t = tt + 1.0
     chosen = v2_settings() if a.v2 else level_settings() if a.levels else settings()
     for label, f in chosen:
         # Chorus silenced for the whole run: level 0, so neither path carries it.
