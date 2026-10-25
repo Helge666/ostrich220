@@ -589,6 +589,12 @@ ausgetauscht (Schritt 4).
    - später ggf. Werte eintippen und per SysEx (DT1) setzen; dafür bräuchte es eine
      Feld→Adresse-Zuordnung je Seite
 
+10. **Komfort: Temp-Zustand über ROM Play retten (für später, selten gebraucht).** Nach den
+   Demo-Songs lädt die Firmware den aktuellen Patch neu aus dem Patch-Speicher, ungespeicherte
+   Temp-Änderungen gehen verloren (in der Emulation geprüft, 25.10.2026: Temp danach = gespeicherter
+   P-02, 80/80 Bytes). Das Gerät tut dasselbe. Ostrich könnte den Temp-Bereich vor ROM Play
+   sichern und danach zurückschreiben – bewusst besser als das Gerät.
+
 **Meilenstein 4:** Ostrich 0.1 läuft in der DAW.
 
 ## Phase 5 — Veröffentlichung und Rückfluss
