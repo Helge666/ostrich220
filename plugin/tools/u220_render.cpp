@@ -13,7 +13,7 @@
 
 #include "u220_core.h"
 #include "u220_effects.h"
-#include "u220_reverb.h"
+#include "u220_fx.h"
 
 #include <cmath>
 #include <cstdio>
@@ -189,7 +189,7 @@ int main(int argc, char **argv)
 	}
 	core.setOutputFilter(filter);
 	BusTap tap;
-	ostrich::U220Reverb rev;
+	ostrich::U220Fx rev;
 	if (!send_out.empty())
 		core.setEffects(&tap);
 	else if (reverb)

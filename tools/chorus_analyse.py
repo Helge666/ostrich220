@@ -141,10 +141,11 @@ def analyse_side(y, i0, P, tpl, n_end):
         tw = lo + jj
         taus.append((tw - s0) / P)          # fraction of a period
         gs.append(win[j] * sign / h0)
-        # Feedback: the copy of the wet edge, another tau later.
-        k2 = int(round(tw + (tw - s0))) - lo
-        if 2 <= k2 < len(win) - 2:
-            seg2 = win[k2 - 2:k2 + 3]
+        # Feedback: the copy of the wet edge, another tau later -- anywhere in the slot
+        # (a delay over half a period puts it in a later window).
+        k2 = int(round(tw + (tw - s0)))
+        if 2 <= k2 < len(r) - 2:
+            seg2 = r[k2 - 2:k2 + 3]
             fs.append((seg2[int(np.argmax(np.abs(seg2)))] * sign / h0, 0.0))
         else:
             fs.append((np.nan, 0.0))
@@ -207,9 +208,11 @@ def main():
             ph = np.unwrap(frac * 2 * np.pi) / (2 * np.pi)
             # The wet copy of the first dry edge lands in period m = floor(tau / P): the
             # first period with a real wet edge in it.
-            strong = np.nonzero(np.abs(g) > 0.3 * np.median(np.abs(g)))[0]
-            first = int(strong[0]) if len(strong) else 0
-            ph = ph - ph[first] + first + frac[first]
+            # "Real" = this and the next three periods all well above the noise.
+            ok = np.abs(g) > 0.5 * np.median(np.abs(g))
+            run = np.array([ok[k:k + 4].all() for k in range(len(ok))])
+            first = int(np.argmax(run)) if run.any() else 0
+            ph = ph - np.floor(ph[first]) + first
             tau = ph / f0
             t = tm / f0
             steady = t - t[0] > 0.25
