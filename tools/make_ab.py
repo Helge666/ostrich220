@@ -50,7 +50,9 @@ def main():
     ap.add_argument('--lead', type=float, default=0.5)
     ap.add_argument('--hold', type=float, default=5.0)
     ap.add_argument('--post', type=float, default=1.0)
+    ap.add_argument('--slots', help='only these numbers, e.g. 2,3,16 (keeps the numbering)')
     a = ap.parse_args()
+    keep = {int(v) for v in a.slots.split(',')} if a.slots else None
 
     hw, sr = load(a.hw)
     emu, esr = load(a.emu)
@@ -84,6 +86,8 @@ def main():
     print(f'Ostrich x {g:.3f} ({20 * np.log10(g):+.1f} dB) to the recording\'s level')
 
     for k, (t, hold, label) in enumerate(rows, 1):
+        if keep is not None and k not in keep:
+            continue
         d = align(t)
         j = int((a.emu_offset + t - 0.2) * sr)
         n = int((hold + 0.2 + a.post) * sr)
@@ -94,8 +98,9 @@ def main():
         save(os.path.join(a.outdir, f'{k:02d}_{name}_Ostrich.wav'), g * emu[j:j + n], sr)
     with open(os.path.join(a.outdir, 'index.txt'), 'w') as f:
         for k, (t, hold, label) in enumerate(rows, 1):
-            f.write(f'{k:02d}  {label}\n')
-    print(f'{len(rows)} pairs in {a.outdir}')
+            if keep is None or k in keep:
+                f.write(f'{k:02d}  {label}\n')
+    print(f'{len(keep) if keep else len(rows)} pairs in {a.outdir}')
 
 
 if __name__ == '__main__':

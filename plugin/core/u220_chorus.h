@@ -56,7 +56,8 @@ private:
 	float m_min = 0.0f;             // minimum delay, samples
 	float m_span = 0.0f;            // LFO span, samples
 	float m_step = 0.0f;            // LFO speed, samples per sample
-	float m_lfo = 0.0f;             // 0 .. m_span
+	float m_lfo = 0.0f;             // m_lo .. m_hi, within 0 .. m_span
+	float m_lo = 0.0f, m_hi = 0.0f;
 	float m_dir = 1.0f;
 	float m_gain = 0.0f;
 	float m_fbL = 0.0f, m_fbR = 0.0f;

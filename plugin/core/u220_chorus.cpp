@@ -29,8 +29,8 @@ constexpr float GAIN31[5]   = { 0.94f, 0.94f, 0.94f, 0.94f, 0.99f };
 constexpr float FB_STEP[5]  = { 0.0f, 0.0f, 0.0274f, 0.0270f, 0.0284f };
 
 // LFO speed in ms of delay per second, measured at these settings of the field at bits
-// 11-15; linear between.  At 0 it barely moves (0.9 ms in 4 s).
-constexpr float SPEED_AT[6][2] = { { 0, 0.24f }, { 5, 4.1f }, { 8, 7.3f }, { 16, 16.7f },
+// 11-15; linear between.  At 0 see setParams.
+constexpr float SPEED_AT[6][2] = { { 0, 0.45f }, { 5, 4.1f }, { 8, 7.3f }, { 16, 16.7f },
 		{ 24, 31.6f }, { 31, 60.1f } };
 // Gain by Level, in dB under Level 31: measured at 24, 16, 8.
 constexpr float LEVEL_DB[5][2] = { { 1, -22.2f }, { 8, -17.2f }, { 16, -11.5f }, { 24, -5.6f }, { 31, 0.0f } };
@@ -82,10 +82,22 @@ void U220Chorus::setParams(const EffectParams &p)
 	}
 	else
 	{
-		m_span = std::max(16.0f - 0.502f * std::clamp(p.chorus_rate, 0, 31), 0.0f) * ms;
+		// 16 ms at Rate 0, 0.51 ms at 31 (Helge heard Rate 31 too fast at 0.44 ms: the
+		// rate goes with 1 / span there).
+		m_span = std::max(16.0f - 0.4997f * std::clamp(p.chorus_rate, 0, 31), 0.0f) * ms;
 		m_step = table(SPEED_AT, 6, float(std::clamp(p.chorus_depth, 0, 31))) / 1000.0f;
 	}
-	m_lfo = std::min(m_lfo, m_span);
+	// At Depth 0 the hardware parks the LFO near the top of its span -- the left copy
+	// 0.6 ms under the longest delay, the right one 0.6 ms over the shortest, in every
+	// such slot of every type -- and lets it wobble there by 0.87 ms at 0.26 Hz.
+	m_lo = 0.0f;
+	m_hi = m_span;
+	if (p.chorus_depth <= 0 && m_span > 0.0f)
+	{
+		m_hi = std::max(m_span - 0.17f * ms, 0.0f);
+		m_lo = std::max(m_span - 1.04f * ms, 0.0f);
+	}
+	m_lfo = std::clamp(m_lfo, m_lo, m_hi);
 	m_gain = (p.chorus_on && level > 0)
 			? GAIN31[type] * std::pow(10.0f, table(LEVEL_DB, 5, float(level)) / 20.0f) : 0.0f;
 	const float fb = FB_STEP[type] * std::clamp(p.chorus_feedback, -31, 31);
@@ -120,8 +132,8 @@ void U220Chorus::process(const float *choL, const float *choR, float *outL, floa
 
 		// Triangle between 0 and the span; the two sides in antiphase.
 		m_lfo += m_dir * m_step;
-		if (m_lfo >= m_span) { m_lfo = m_span; m_dir = -1.0f; }
-		else if (m_lfo <= 0.0f) { m_lfo = 0.0f; m_dir = 1.0f; }
+		if (m_lfo >= m_hi) { m_lfo = m_hi; m_dir = -1.0f; }
+		else if (m_lfo <= m_lo) { m_lfo = m_lo; m_dir = 1.0f; }
 
 		m_yL = read(m_lineL, m_pos, m_min + m_lfo);
 		m_yR = read(m_lineR, m_pos, m_min + (m_span - m_lfo));
