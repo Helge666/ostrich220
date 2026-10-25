@@ -276,8 +276,7 @@ void U220Core::Impl::apply_voice_gains(int voice)
 	for (int b = 0; b < roland_u220::NUM_BUSES; b ++)
 		pcm.set_voice_gain(u8(voice), b, g[b]);
 	if (trace_gain())
-		std::fprintf(stderr, "GAIN %f v%02d dry %.3f %.3f rev %.3f %.3f cho %.3f %.3f
-", machine.time().as_double(),
+		std::fprintf(stderr, "GAIN %f v%02d dry %.3f %.3f rev %.3f %.3f cho %.3f %.3f\n", machine.time().as_double(),
 				voice, g[0], g[1], g[2], g[3], g[4], g[5]);
 }
 
