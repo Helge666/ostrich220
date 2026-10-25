@@ -421,6 +421,8 @@ sind am U-220 aber **generell etwas lauter beigemischt**. Kandidaten, in dieser 
      „am Gerät intensiver“: links und rechts lesen am Gerät **eine** Leitung mit Rückkopplung
      vom rechten Abgriff – links liegt die Rezirkulation bei τL + τR (Flanger FB +31: 0,81).
      Ostrich jetzt ebenso (0,72–0,74 an derselben Stelle). Paare: `renders/chorus_ab3/`.
+     Helge: „Intensität und LFO jetzt nahezu identisch“ → Chorus abgeschlossen bis auf
+     Chorus2-Growl und Pre-Rev-Routing.
    - **Chorus2 „Growl“ bleibt** (Helge: vermutlich analog, z. B. mitschwingende OpAmps);
      im README unter „Bekannte Abweichungen“.
    - (Frühere Notiz) **Chorus2 „Growl“** (02, 25): am Gerät sind L und R bei Chorus2 viel weniger
