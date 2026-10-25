@@ -552,6 +552,20 @@ ausgetauscht (Schritt 4).
    bearbeiteten Parameter als SysEx), als MIDI-Ausgang des Plugins – für Librarian-Arbeit in
    der DAW.
 
+9. **Mausbedienung im Display (Helge, 25.10.2026, für später).** Felder im LCD anklicken
+   und per Mausrad/Ziehen ändern, statt CURSOR/PART/VALUE zu klicken. Die Firmware kennt das
+   nicht; Ostrich übersetzt es in Tastendrücke, **im geschlossenen Regelkreis** über die
+   echte Cursorposition aus dem LCD (HD44780-Cursor, wie fürs Panel schon ausgelesen):
+   - Klick auf ein Feld → CURSOR ◀/▶ drücken, bis der Cursor dort steht (Abbruch, wenn er
+     sich nicht mehr bewegt) – funktioniert auf jeder Seite, ohne Seitenwissen
+   - Klick auf einen Part in Zeile 2 → PART ◀◀/▶▶ ebenso
+   - Mausrad/Ziehen → VALUE ▲/▼ je Raste; evtl. Doppelklick = ENTER, Rechtsklick = EXIT
+   - Tempo: heute 125 ms emulierte Haltezeit je Druck; kürzeste sichere Zeit aus der
+     Firmware-Tastenabfrage bestimmen (vermutlich 20–30 ms) und die Emulation während einer
+     Tastenfolge schneller als Echtzeit laufen lassen
+   - später ggf. Werte eintippen und per SysEx (DT1) setzen; dafür bräuchte es eine
+     Feld→Adresse-Zuordnung je Seite
+
 **Meilenstein 4:** Ostrich 0.1 läuft in der DAW.
 
 ## Phase 5 — Veröffentlichung und Rückfluss
