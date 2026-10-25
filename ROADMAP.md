@@ -362,9 +362,11 @@ Chorus fehlt noch; bei „Pre Rev“ geht der Chorus-Bus trocken in den Hall.
 
 **TODO (Stand 24.10.2026, Helges Cubase-Test):** Hall und Delay klingen nah am Original,
 sind am U-220 aber **generell etwas lauter beigemischt**. Kandidaten, in dieser Reihenfolge:
-1. Pegelgesetz zu steil: kalibriert wurde bei Rev Level 31; die Werkspatches nutzen kleinere
-   Werte (P-01: 10?), und Level 10 lag in der Messung nahe am Grundrauschen (Exponent 1,9 aus
-   nur zwei brauchbaren Punkten). Neu messen bei Level 5/10/15/20/25/31 mit mehr Abstand.
+1. ~~Pegelgesetz zu steil~~ **erledigt 25.10.2026:** `make_reverb_probe.py --levels`
+   (Hall2, Time 8, Level 0/5/…/31), Aufnahme `renders/hw_reverb_levels.wav`. Das Gerät
+   fällt um etwa 0,8 dB je Stufe (gegen Level 31: 25 −4,9, 20 −8,2, 15 −11,9, 10 −16,2,
+   5 −22,1 dB); (Level/31)^1,9 war bei Level 10 rund 4 dB zu leise. Jetzt Tabelle in dB,
+   dazu Hall2 +1,3 dB. Fahne/Direktschall danach auf allen Stufen ±0,4 dB (Level 5 −0,9).
 2. Chorus-Weg: am Gerät stand Chorus Off; Parts mit „Asgn = Cho“ gehen bei Ostrich nur bei
    „Pre Rev“ in den Hall. Klären, was das Gerät mit Cho-Parts tut, wenn der Chorus aus ist.
 3. Einstellung, die nur am Gerät anders ist: Temp-Patch/Patch-Daten am Gerät (alte Edits,
