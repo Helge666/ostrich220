@@ -528,6 +528,29 @@ ausgetauscht (Schritt 4).
 4. Formate: CLAP und VST3 unter Windows. Bei emu110 aktualisiert sich das VST3-Panel noch
    nicht, das müssen wir beheben. Standalone; macOS später.
 5. Patch-Bibliothek, SysEx-Import und -Export (U-220-Bulk-Dumps).
+6. **Mehrfachausgänge (Helge, 25.10.2026, für später).** Das Gerät hat drei Stereopaare:
+   MIX OUT (1/2), DIRECT OUT 1 (3/4), DIRECT OUT 2 (5/6). Im Plugin optional als Multi-Out
+   (wie Kontakt): ein Stereo-Hauptbus plus zwei zuschaltbare Stereo-Busse. Laut Owner's
+   Manual:
+   - Output Assign pro Part: Dry, Rev, Cho (→ MIX), Dir1, Dir2 (→ DIRECT 1/2, ohne Effekte)
+   - ist keine Buchse in DIRECT OUT gesteckt, kommt deren Klang aus MIX (ohne Effekt) – das
+     Gerät erkennt die Stecker; im Plugin: sind die Zusatzbusse aus, „stecken keine Kabel“
+   - **Multi-Out-Modus** (Setup): MIX und DIRECT werden zu OUT 1–6 mit je einem Part
+   Zu klären: wie die Firmware die Stecker abfragt (Port-Bit?) und wie IC25 die Direct-Ziele
+   (Programmwort-Ziele 0x18–0x1B) und den Multi-Out-Modus ausgibt; der Mischer im Kern hat
+   bisher nur Dry/Rev/Cho als Busse.
+7. **PCM-Card-Slots (Helge, 25.10.2026, für später).** Zwei Slots für Karten der Serie
+   SN-U110 (dieselben wie beim U-110). Plan: Card-Dumps aus dem Dateisystem einstecken und
+   wieder ziehen (Menü am Panel oder Drag & Drop auf die gezeichneten Slots), Pfad im
+   Plugin-State, beim Laden des Projekts wieder eingesteckt. Laut Manual zeigt das Gerät
+   beim Stecken/Ziehen kurz „Checking PCM Card...“; fehlt die Karte eines gewählten Tons:
+   „No Card!“, kein Ton. Zu klären: wo die Karten im 4-MB-Raum des PCM-Chips liegen (die
+   internen Waves E/F sitzen auf den ersten beiden Kartenplätzen, Phase 2), wie die Firmware
+   eine Karte erkennt (ID/Kopfdaten) und ob die Karte auch Timbre-Daten trägt;
+   SHA1-Erkennung bekannter Dumps wie bei den ROMs. Keine Card-Dateien im Repo.
+8. **MIDI OUT** aus dem Plugin: was das Gerät sendet (Bulk Dump, ENTER schickt den
+   bearbeiteten Parameter als SysEx), als MIDI-Ausgang des Plugins – für Librarian-Arbeit in
+   der DAW.
 
 **Meilenstein 4:** Ostrich 0.1 läuft in der DAW.
 
