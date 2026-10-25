@@ -87,6 +87,20 @@ def settings():
     return out
 
 
+def v2_settings():
+    """--v2: two dry slots (the floor of reverb_edr.py), every type at the five Time points
+    reverb_fit.py fits, and the feedback ends of both delays."""
+    out = [('dry (rev level 0)', dict(rtype=4, rtime=8, rlevel=0, rfb=15)),
+           ('dry 2 (rev level 0)', dict(rtype=4, rtime=8, rlevel=0, rfb=15))]
+    for t, name in enumerate(TYPES):
+        for tm in (0, 8, 16, 24, 31):
+            out.append((f'{name} time {tm} level 31', dict(rtype=t, rtime=tm, rlevel=31, rfb=15)))
+    for fb in (0, 31):
+        out.append((f'Delay time 16 fb {fb}', dict(rtype=6, rtime=16, rlevel=31, rfb=fb)))
+        out.append((f'CrossDelay time 16 fb {fb}', dict(rtype=7, rtime=16, rlevel=31, rfb=fb)))
+    return out
+
+
 def level_settings():
     """The level law alone (--levels): Hall2 at a mid Time, Level 0..31 in even steps."""
     return [(f'Hall2 time 8 level {lv}', dict(rtype=4, rtime=8, rlevel=lv, rfb=15))
@@ -101,25 +115,35 @@ def main():
     ap.add_argument("--list")
     ap.add_argument("--velocity", type=int, default=60)   # 110 clipped the XR18 at +9.5 dB gain
     ap.add_argument("--levels", action="store_true")
+    # v2: the excitation is three short drums only -- Kick 2 (35) for the low octaves, Rim
+    # Shot (37) for the mids, Closed Hi-Hat (42) for the top; in the emulation all three
+    # are 45 dB down within ~110 ms in every octave band, so from there on the recording
+    # is the reverb alone.  The piano chord of v1 rang on and does not subtract cleanly
+    # (its voices differ from hit to hit), which hid the first 300 ms of every tail.
+    ap.add_argument("--v2", action="store_true")
     a = ap.parse_args()
+    if a.v2:
+        a.velocity = 70         # the drums alone peak like v1 at 60 ~ -1 dBFS on the XR18
 
     base = load_patch(a.base)
     ev = [(0.0, bytes([0xCF, 0x00]))]           # P-01 into the temp area, everything else as is
     labels = []
     t = 1.0
-    for label, f in (level_settings() if a.levels else settings()):
+    chosen = v2_settings() if a.v2 else level_settings() if a.levels else settings()
+    for label, f in chosen:
         # Chorus silenced for the whole run: level 0, so neither path carries it.
         msg = packet(with_fields(base, clevel=0, **f))
         ev.append((t, b'\xf0' + vlq(len(msg) - 1) + msg[1:]))
         hit = t + 1.0
-        for key in (36, 38, 42):
+        for key in ((35, 37, 42) if a.v2 else (36, 38, 42)):
             ev.append((hit, bytes([0x99, key, a.velocity])))
             ev.append((hit + 0.1, bytes([0x89, key, 0])))
-        # Plus a short piano chord on channel 1, in case the rhythm part is not sent to
-        # the reverb: P-01's six parts all listen there.
-        for key in (48, 72, 96):
-            ev.append((hit, bytes([0x90, key, a.velocity])))
-            ev.append((hit + 0.15, bytes([0x80, key, 0])))
+        if not a.v2:
+            # Plus a short piano chord on channel 1, in case the rhythm part is not sent
+            # to the reverb: P-01's six parts all listen there.
+            for key in (48, 72, 96):
+                ev.append((hit, bytes([0x90, key, a.velocity])))
+                ev.append((hit + 0.15, bytes([0x80, key, 0])))
         labels.append((hit, label))
         t += a.slot
     # Put the unit back: re-selecting P-01 reloads its stored effects into the temp patch
