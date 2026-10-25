@@ -20,7 +20,9 @@ constexpr double FS = kCoreSampleRate;
 
 // Minimum delay in ms: base + step x Delay, per type (Chorus1, Chorus2, FB-Chorus,
 // Flanger, Short Delay).
-constexpr float MIN_BASE[5] = { 16.6f, 8.6f, 16.6f, 0.66f, 0.5f };
+// (The chorus types 0.6 ms under what the frozen-LFO slots suggested: the modulated
+// slots, which show the bottom of the sweep directly, put it there.)
+constexpr float MIN_BASE[5] = { 16.0f, 8.0f, 16.0f, 0.06f, 0.5f };
 constexpr float MIN_STEP[5] = { 1.03f, 0.516f, 1.03f, 0.516f, 2.05f };
 // The copy's gain at Level 31, and the feedback per step of Feedback.
 constexpr float GAIN31[5]   = { 0.94f, 0.94f, 0.94f, 0.94f, 0.99f };
@@ -28,7 +30,7 @@ constexpr float FB_STEP[5]  = { 0.0f, 0.0f, 0.0274f, 0.0270f, 0.0284f };
 
 // LFO speed in ms of delay per second, measured at these settings of the field at bits
 // 11-15; linear between.  At 0 it barely moves (0.9 ms in 4 s).
-constexpr float SPEED_AT[6][2] = { { 0, 0.45f }, { 5, 4.1f }, { 8, 7.3f }, { 16, 16.7f },
+constexpr float SPEED_AT[6][2] = { { 0, 0.24f }, { 5, 4.1f }, { 8, 7.3f }, { 16, 16.7f },
 		{ 24, 31.6f }, { 31, 60.1f } };
 // Gain by Level, in dB under Level 31: measured at 24, 16, 8.
 constexpr float LEVEL_DB[5][2] = { { 1, -22.2f }, { 8, -17.2f }, { 16, -11.5f }, { 24, -5.6f }, { 31, 0.0f } };
@@ -80,7 +82,7 @@ void U220Chorus::setParams(const EffectParams &p)
 	}
 	else
 	{
-		m_span = std::max(15.63f - 0.49f * std::clamp(p.chorus_rate, 0, 31), 0.0f) * ms;
+		m_span = std::max(16.0f - 0.502f * std::clamp(p.chorus_rate, 0, 31), 0.0f) * ms;
 		m_step = table(SPEED_AT, 6, float(std::clamp(p.chorus_depth, 0, 31))) / 1000.0f;
 	}
 	m_lfo = std::min(m_lfo, m_span);
@@ -91,15 +93,18 @@ void U220Chorus::setParams(const EffectParams &p)
 	m_fbL = type == EffectParams::ShortDelay ? fb : 0.0f;
 }
 
-// Linear interpolation, `delay` samples back from the write position `pos`.
+// `delay` samples back from the write position `pos`, cubic (Catmull-Rom): linear
+// interpolation dulled the copy, ~0.5 dB under the hardware in the edge heights.
 float U220Chorus::read(const std::vector<float> &line, unsigned pos, float delay) const
 {
 	const unsigned n = unsigned(line.size());
-	const float d = std::clamp(delay, 1.0f, float(n - 2));
+	const float d = std::clamp(delay, 1.0f, float(n - 3));
 	const unsigned i = unsigned(d);
-	const float f = d - float(i);
-	const float a = line[(pos + n - i) % n], b = line[(pos + n - i - 1) % n];
-	return a + f * (b - a);
+	const float t = d - float(i);
+	const float y0 = line[(pos + n - i + 1) % n], y1 = line[(pos + n - i) % n];
+	const float y2 = line[(pos + n - i - 1) % n], y3 = line[(pos + n - i - 2) % n];
+	return y1 + 0.5f * t * (y2 - y0 + t * (2.0f * y0 - 5.0f * y1 + 4.0f * y2 - y3
+			+ t * (3.0f * (y1 - y2) + y3 - y0)));
 }
 
 void U220Chorus::process(const float *choL, const float *choR, float *outL, float *outR, uint32_t nframes)
