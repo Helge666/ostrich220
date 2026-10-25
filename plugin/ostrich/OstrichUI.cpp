@@ -101,6 +101,21 @@ protected:
 	void onNanoDisplay() override
 	{
 		m_dbgDraws ++;
+		// Nothing may escape a draw: under Windows it unwinds through the window
+		// procedure, which swallows it and leaves pugl believing it is still drawing --
+		// the panel then never redraws (patches/0008).  Counted for the log instead.
+		try
+		{
+			drawPanel();
+		}
+		catch (...)
+		{
+			m_dbgExc ++;
+		}
+	}
+
+	void drawPanel()
+	{
 		const float s = getWidth() / kW;
 		scale(s, s);
 
@@ -356,8 +371,8 @@ private:
 			m_dbgLast = now;
 			char line[300], lcd[56];
 			lcdText(m_panel.lcd, lcd);
-			std::snprintf(line, sizeof(line), "ui %p idles %lu panels %lu bad %lu draws %lu keys %lu lcd %s",
-					(void *)this, m_dbgIdles, m_dbgPanels, m_dbgPanelBad, m_dbgDraws, m_dbgKeys, lcd);
+			std::snprintf(line, sizeof(line), "ui %p idles %lu panels %lu bad %lu draws %lu exc %lu keys %lu lcd %s",
+					(void *)this, m_dbgIdles, m_dbgPanels, m_dbgPanelBad, m_dbgDraws, m_dbgExc, m_dbgKeys, lcd);
 			debugLog("ostrich-ui", line);
 		}
 		if (m_panel.cursor_flags & 1)
@@ -425,7 +440,7 @@ private:
 
 	PanelBlob m_panel;
 	std::string m_status;
-	unsigned long m_dbgIdles = 0, m_dbgPanels = 0, m_dbgPanelBad = 0, m_dbgDraws = 0, m_dbgKeys = 0;
+	unsigned long m_dbgIdles = 0, m_dbgPanels = 0, m_dbgPanelBad = 0, m_dbgDraws = 0, m_dbgKeys = 0, m_dbgExc = 0;
 	std::chrono::steady_clock::time_point m_dbgLast {};
 	float m_volumeDb = 0.0f;
 	bool m_hwEq = true;

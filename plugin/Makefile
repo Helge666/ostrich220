@@ -48,15 +48,17 @@ all:
 # the DSP -> UI channel -- was missing from the JACK standalone and, less obviously, from
 # CLAP, whose implementation was a stub that answered true and dropped the value.  Without
 # them the panel is drawn but never updated.  tools/clap_check.sh is what now notices.
-# Idempotent: --check tells us whether they are already in.
+# Idempotent: --check tells us whether they are already in.  *.pugl.patch go to DPF's own
+# pugl submodule (dgl/src/pugl-upstream), the rest to DPF.
 patches:
 	@for p in patches/*.patch; do \
-		if git -C dpf apply --check --reverse "$(CURDIR)/$$p" 2>/dev/null; then \
+		case "$$p" in *.pugl.patch) d=dpf/dgl/src/pugl-upstream ;; *) d=dpf ;; esac; \
+		if git -C $$d apply --check --reverse "$(CURDIR)/$$p" 2>/dev/null; then \
 			:; \
-		elif git -C dpf apply "$(CURDIR)/$$p" 2>/dev/null; then \
-			echo "  applied $$(basename $$p) to dpf"; \
+		elif git -C $$d apply "$(CURDIR)/$$p" 2>/dev/null; then \
+			echo "  applied $$(basename $$p) to $$d"; \
 		else \
-			echo "  WARNING: $$(basename $$p) does not apply to dpf -- check the submodule"; \
+			echo "  WARNING: $$(basename $$p) does not apply to $$d -- check the submodule"; \
 		fi; \
 	done
 
