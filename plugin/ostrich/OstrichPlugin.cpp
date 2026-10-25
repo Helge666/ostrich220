@@ -501,11 +501,17 @@ private:
 			std::memcpy(blob.lcd + 24, l1, 24);
 			blob.cursor_pos = 0xff;
 		}
-		if (std::memcmp(&blob, &m_lastBlob, sizeof(blob)) != 0)
+		// Sent when it changed, and once a second regardless: the queue to the UI drops a
+		// push when it is full (the host not idling the view for a while), and a display
+		// that then stood still would show the dropped state's predecessor for good.
+		if (std::memcmp(&blob, &m_lastBlob, sizeof(blob)) != 0 || ++m_publishesSame >= kPanelRefreshHz)
 		{
-			m_lastBlob = blob;
 			encodeHex(reinterpret_cast<const uint8_t *>(&blob), sizeof(blob), m_blobHex);
-			updateStateValue("panel", m_blobHex);
+			if (updateStateValue("panel", m_blobHex))
+			{
+				m_lastBlob = blob;
+				m_publishesSame = 0;
+			}
 		}
 	}
 
@@ -646,7 +652,7 @@ private:
 	bool m_keyHeld[kNumKeys] = {};
 	uint32_t m_keyHeldFrames[kNumKeys] = {};
 
-	uint32_t m_publishPeriod = 1920, m_publishAccum = 0;
+	uint32_t m_publishPeriod = 1920, m_publishAccum = 0, m_publishesSame = 0;
 	PanelBlob m_lastBlob {};
 	char m_blobHex[sizeof(PanelBlob) * 2 + 1] = {};
 
