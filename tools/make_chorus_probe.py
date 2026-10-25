@@ -3,7 +3,7 @@
 """
 Write a MIDI file that measures the U-220's chorus: P-02 (whose part 1, on channel 1, is
 routed to the chorus only -- dry plus chorus send, no reverb), part 1 switched to Saw
-Wave 1 by Program Change 59, and for each setting one held C2.
+Wave 1 by Program Change 59, its vibrato off, and for each setting one held C2.
 
     tools/make_chorus_probe.py BASE.syx OUT.mid [--list OUT.txt]
 
@@ -32,6 +32,21 @@ from make_reverb_probe import PPQN, TEMPO, load_patch, packet, vlq, with_fields 
 
 CTYPES = ['Chorus1', 'Chorus2', 'FB-Chorus', 'Flanger', 'ShortDelay']
 NOTE, VELOCITY = 36, 110
+
+
+def no_vibrato():
+    """DT1 setting byte 25 of part 1's Temp timbre (nibble address 00 10 32) to 0: the
+    timbre's vibrato depth, found by zeroing each of the 32 bytes in the emulation.  Saw
+    Wave 1 has a delayed vibrato of about +-1 % (from ~0.5 s, as Helge heard), which
+    spoils the dry reference the analysis relies on.  Must follow every Program Change
+    on channel 1."""
+    addr, nib = bytes([0x00, 0x10, 0x32]), bytes([0, 0])
+    cs = (128 - (sum(addr) + sum(nib)) % 128) % 128
+    return bytes([0xF0, 0x41, 0x10, 0x2B, 0x12]) + addr + nib + bytes([cs, 0xF7])
+
+
+def sysex_event(msg):
+    return bytes([0xF0]) + vlq(len(msg) - 1) + msg[1:]
 
 
 def settings():
@@ -74,6 +89,7 @@ def main():
     base = load_patch(a.base)
     ev = [(0.0, bytes([0xCF, 0x01])),             # P-02 into the temp area
           (0.3, bytes([0xC0, 59])),               # part 1: Saw Wave 1
+          (0.32, sysex_event(no_vibrato())),
           (0.35, bytes([0xB0, 0x01, 0x00])),      # no modulation
           (0.4, bytes([0xE0, 0x00, 0x40]))]       # no bend
     labels = []
@@ -86,6 +102,7 @@ def main():
             # P-02's stored effects, as the Program Change loaded them.
             ev.append((t, bytes([0xCF, 0x01])))
             ev.append((t + 0.2, bytes([0xC0, 59])))
+            ev.append((t + 0.25, sysex_event(no_vibrato())))
         on = t + 0.8
         ev.append((on, bytes([0x90, NOTE, VELOCITY])))
         ev.append((on + hold, bytes([0x80, NOTE, 0])))
