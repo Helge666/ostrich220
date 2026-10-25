@@ -412,6 +412,16 @@ sind am U-220 aber **generell etwas lauter beigemischt**. Kandidaten, in dieser 
    - Nachbau gegen dieselbe Auswertung: Mindestverzögerung ±0,3 ms, Spanne < 1 %, Rate 2–3 %,
      g ±0,02, f ±0,03. A/B-Paare: `tools/make_ab.py` → `renders/chorus_ab/` (lokal).
    - Offen: was „Chorus Out = Pre Rev“ in den Hall schickt.
+   - **Hörtest Helge (53 Paare):** „unglaublich nahe“; abweichend 02, 03, 16, 25, 26, 31,
+     32, 35, 40, 41, 44. Behoben: Rate 31 lief zu schnell (Spanne 0,44 → 0,51 ms); bei
+     Depth 0 parkt das Gerät den LFO oben (links 0,6 ms unter der längsten, rechts 0,6 ms über
+     der kürzesten Verzögerung, wackelt 0,87 ms bei 0,26 Hz) – Ostrich ließ ihn liegen, wo er
+     war, was mit starkem Feedback andere Kammfilter gab. Neue Paare: `renders/chorus_ab2/`.
+   - **Offen: Chorus2 „Growl“** (02, 25): am Gerät sind L und R bei Chorus2 viel weniger
+     korreliert (0,16/0,27 statt 0,57/0,63 bei Ostrich; Chorus1/FB/Flanger stimmen auf ±0,02).
+     Verzögerung, Hub, LFO, Gain, Feedback und Klangfarbe der Kopie stimmen; das Fehlende
+     steckt nicht in der einen gemessenen Kopie. Nächster Ansatz: Restsignal nach Abzug von
+     Dry + Kopie pro Seite untersuchen (zweite, dumpfere Kopie? Kreuzkopplung L↔R?).
 2. Chorus-Weg: am Gerät stand Chorus Off; Parts mit „Asgn = Cho“ gehen bei Ostrich nur bei
    „Pre Rev“ in den Hall. Klären, was das Gerät mit Cho-Parts tut, wenn der Chorus aus ist.
 3. Einstellung, die nur am Gerät anders ist: Temp-Patch/Patch-Daten am Gerät (alte Edits,
