@@ -417,7 +417,13 @@ sind am U-220 aber **generell etwas lauter beigemischt**. Kandidaten, in dieser 
      Depth 0 parkt das Gerät den LFO oben (links 0,6 ms unter der längsten, rechts 0,6 ms über
      der kürzesten Verzögerung, wackelt 0,87 ms bei 0,26 Hz) – Ostrich ließ ihn liegen, wo er
      war, was mit starkem Feedback andere Kammfilter gab. Neue Paare: `renders/chorus_ab2/`.
-   - **Offen: Chorus2 „Growl“** (02, 25): am Gerät sind L und R bei Chorus2 viel weniger
+   - **Hörtest 2:** Rate 31 nun zu langsam (0,51 ms) → 0,49 ms wie gemessen (≈17 Hz). FB±31
+     „am Gerät intensiver“: links und rechts lesen am Gerät **eine** Leitung mit Rückkopplung
+     vom rechten Abgriff – links liegt die Rezirkulation bei τL + τR (Flanger FB +31: 0,81).
+     Ostrich jetzt ebenso (0,72–0,74 an derselben Stelle). Paare: `renders/chorus_ab3/`.
+   - **Chorus2 „Growl“ bleibt** (Helge: vermutlich analog, z. B. mitschwingende OpAmps);
+     im README unter „Bekannte Abweichungen“.
+   - (Frühere Notiz) **Chorus2 „Growl“** (02, 25): am Gerät sind L und R bei Chorus2 viel weniger
      korreliert (0,16/0,27 statt 0,57/0,63 bei Ostrich; Chorus1/FB/Flanger stimmen auf ±0,02).
      Verzögerung, Hub, LFO, Gain, Feedback und Klangfarbe der Kopie stimmen; das Fehlende
      steckt nicht in der einen gemessenen Kopie. Nächster Ansatz: Restsignal nach Abzug von
