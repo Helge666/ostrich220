@@ -1,8 +1,8 @@
 diff --git a/src/internal.c b/src/internal.c
-index 09b3680..778ae56 100644
+index 09b3680..29e2abf 100644
 --- a/src/internal.c
 +++ b/src/internal.c
-@@ -323,8 +323,20 @@ puglDispatchEvent(PuglView* view, const PuglEvent* event)
+@@ -323,8 +323,26 @@ puglDispatchEvent(PuglView* view, const PuglEvent* event)
      if (!(st0 = view->backend->enter(view, &event->expose))) {
        const PuglWorldState old_state = view->world->state;
  
@@ -10,6 +10,12 @@ index 09b3680..778ae56 100644
 -      st0                = view->eventFunc(view, event);
 +      view->world->state       = PUGL_WORLD_EXPOSING;
 +      view->world->exposeStart = puglGetTime(view->world);
++#ifdef _WIN32
++      {
++        extern unsigned long puglWinDebug[16];
++        ++puglWinDebug[1];
++      }
++#endif
 +#ifdef __cplusplus
 +      // A draw that throws must not leave the world "exposing": every later
 +      // redisplay request would be refused and the view would never be drawn
@@ -38,13 +44,46 @@ index 7179193..3a0a3ee 100644
  
  /// Opaque surface used by graphics backend
 diff --git a/src/win.c b/src/win.c
-index c56cc44..fc80dc9 100644
+index c56cc44..999c868 100644
 --- a/src/win.c
 +++ b/src/win.c
-@@ -1197,9 +1197,23 @@ puglGetTime(const PuglWorld* world)
+@@ -822,7 +822,11 @@ handleMessage(PuglView* view, UINT message, WPARAM wParam, LPARAM lParam)
+     }
+     break;
+   case WM_PAINT:
+-    GetUpdateRect(view->impl->hwnd, &rect, false);
++    ++puglWinDebug[0];
++    puglWinDebug[10] = (unsigned long)view->stage;
++    if (!GetUpdateRect(view->impl->hwnd, &rect, false)) {
++      ++puglWinDebug[12];
++    }
+     event.expose.type   = PUGL_EXPOSE;
+     event.expose.x      = (PuglCoord)rect.left;
+     event.expose.y      = (PuglCoord)rect.top;
+@@ -1131,9 +1135,11 @@ puglUpdate(PuglWorld* world, double timeout)
+   const PuglWorldState startState = world->state;
+   PuglStatus           st         = PUGL_SUCCESS;
+ 
++  ++puglWinDebug[6];
+   if (startState == PUGL_WORLD_IDLE) {
+     world->state = PUGL_WORLD_UPDATING;
+   } else if (startState != PUGL_WORLD_RECURSING) {
++    ++puglWinDebug[7];
+     return PUGL_BAD_CALL;
+   }
+ 
+@@ -1197,9 +1203,38 @@ puglGetTime(const PuglWorld* world)
            world->startTime);
  }
  
++/* Diagnostics for the Ostrich panel freeze, read by its UI (OstrichUI.cpp):
++   0 WM_PAINT received, 1 exposes drawn, 2 expose enters failed, 3 obscure calls,
++   4 obscures refused (EXPOSING), 5 stale exposes healed, 6 puglUpdate calls,
++   7 puglUpdate refused, 8 InvalidateRect failed, 9 world state at the last
++   obscure, 10 view stage at the last WM_PAINT, 11 window visible at the last
++   obscure, 12 WM_PAINT with an empty update rect. */
++unsigned long puglWinDebug[16];
++
 +/* The world stuck in EXPOSING -- a draw that never returned (an exception the
 +   window procedure swallowed, a fault in the driver) -- refuses every redisplay
 +   for good: the view freezes while its plugin runs on.  No real expose lasts a
@@ -55,6 +94,13 @@ index c56cc44..fc80dc9 100644
 +  if (view->world->state == PUGL_WORLD_EXPOSING &&
 +      puglGetTime(view->world) - view->world->exposeStart > 1.0) {
 +    view->world->state = PUGL_WORLD_IDLE;
++    ++puglWinDebug[5];
++  }
++  ++puglWinDebug[3];
++  puglWinDebug[9]  = (unsigned long)view->world->state;
++  puglWinDebug[11] = IsWindowVisible(view->impl->hwnd) ? 1UL : 0UL;
++  if (view->world->state == PUGL_WORLD_EXPOSING) {
++    ++puglWinDebug[4];
 +  }
 +}
 +
@@ -65,7 +111,7 @@ index c56cc44..fc80dc9 100644
    return view->world->state == PUGL_WORLD_EXPOSING
             ? PUGL_BAD_CALL
             : puglWinStatus(InvalidateRect(view->impl->hwnd, NULL, false));
-@@ -1212,6 +1226,7 @@ puglObscureRegion(PuglView* const view,
+@@ -1212,6 +1247,7 @@ puglObscureRegion(PuglView* const view,
                    const unsigned  width,
                    const unsigned  height)
  {
@@ -73,3 +119,18 @@ index c56cc44..fc80dc9 100644
    if (view->world->state == PUGL_WORLD_EXPOSING) {
      return PUGL_BAD_CALL;
    }
+diff --git a/src/win_gl.c b/src/win_gl.c
+index 4f33e36..f04060f 100644
+--- a/src/win_gl.c
++++ b/src/win_gl.c
+@@ -270,6 +270,10 @@ puglWinGlEnter(PuglView* view, const PuglExposeEvent* expose)
+ {
+   PuglWinGlSurface* surface = (PuglWinGlSurface*)view->impl->surface;
+   if (!surface || !surface->hglrc) {
++    if (expose) {
++      extern unsigned long puglWinDebug[16];
++      ++puglWinDebug[2];
++    }
+     return PUGL_FAILURE;
+   }
+ 

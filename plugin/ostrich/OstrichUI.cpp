@@ -8,6 +8,13 @@
 #include "OstrichShared.hpp"
 
 #include <chrono>
+
+#ifdef _WIN32
+// pugl's paint-path counters (patches/0008), for the freeze diagnostics below.
+START_NAMESPACE_DGL
+extern unsigned long puglWinDebug[16];
+END_NAMESPACE_DGL
+#endif
 #include <cmath>
 #include <string>
 
@@ -369,10 +376,18 @@ private:
 		if (now - m_dbgLast >= std::chrono::seconds(1))
 		{
 			m_dbgLast = now;
-			char line[300], lcd[56];
+			char line[512], lcd[56], pugl[200] = "";
 			lcdText(m_panel.lcd, lcd);
-			std::snprintf(line, sizeof(line), "ui %p idles %lu panels %lu bad %lu draws %lu exc %lu keys %lu lcd %s",
-					(void *)this, m_dbgIdles, m_dbgPanels, m_dbgPanelBad, m_dbgDraws, m_dbgExc, m_dbgKeys, lcd);
+#ifdef _WIN32
+			const unsigned long *d = DGL_NAMESPACE::puglWinDebug;
+			std::snprintf(pugl, sizeof(pugl),
+					" | pugl paint %lu exposed %lu enterfail %lu obscure %lu refused %lu healed %lu"
+					" update %lu/%lu invfail %lu state %lu stage %lu visible %lu emptyrect %lu",
+					d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12]);
+#endif
+			std::snprintf(line, sizeof(line), "ui %p idles %lu panels %lu bad %lu draws %lu exc %lu keys %lu vis %d %ux%u lcd %s%s",
+					(void *)this, m_dbgIdles, m_dbgPanels, m_dbgPanelBad, m_dbgDraws, m_dbgExc, m_dbgKeys,
+					getWindow().isVisible() ? 1 : 0, getWidth(), getHeight(), lcd, pugl);
 			debugLog("ostrich-ui", line);
 		}
 		if (m_panel.cursor_flags & 1)
