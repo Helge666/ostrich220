@@ -68,7 +68,7 @@ private:
 
 	// Chorus2's bass copy
 	bool m_bass = false;
-	float m_min2 = 0.0f, m_step2 = 0.0f, m_lfo2 = 0.0f, m_dir2 = 1.0f;
+	float m_min2 = 0.0f, m_step2 = 0.0f, m_lfo2 = 0.0f, m_dir2 = 1.0f, m_span2 = 1.0f, m_gain2 = 0.0f;
 	float m_lp[5] = {}, m_lpz[2][2] = {};       // low-pass b0 b1 b2 a1 a2, states
 };
 

@@ -11,6 +11,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 
 namespace ostrich {
 
@@ -27,9 +29,25 @@ constexpr float MIN_STEP[5] = { 1.03f, 0.516f, 1.03f, 0.516f, 2.05f };
 // The copy's gain at Level 31, and the feedback per step of Feedback.
 constexpr float GAIN31[5]   = { 0.94f, 0.94f, 0.94f, 0.94f, 0.99f };
 constexpr float FB_STEP[5]  = { 0.0f, 0.0f, 0.0274f, 0.0270f, 0.0284f };
-// Chorus2's bass copy: low-pass corner and gain.
-constexpr double BASS_HZ = 220.0;
-constexpr float BASS_GAIN = 0.65f;
+// Chorus2's second copy: filter, gain, speed relative to the main LFO, offset under the
+// main shortest delay, span relative to the main span.  U220_CHO2="lp|hp|flat,Hz,gain,
+// speed,offset_ms,span" overrides them for fitting runs (tools, not the plugin).
+struct Copy2 { char type = 'l'; double hz = 220.0; float gain = 0.65f, speed = 3.3f, offset = 12.0f, span = 1.0f; };
+
+const Copy2 &copy2()
+{
+	static const Copy2 c = [] {
+		Copy2 r;
+		if (const char *e = std::getenv("U220_CHO2"))
+		{
+			char t[8] = {};
+			std::sscanf(e, "%7[a-z],%lf,%f,%f,%f,%f", t, &r.hz, &r.gain, &r.speed, &r.offset, &r.span);
+			r.type = t[0];
+		}
+		return r;
+	}();
+	return c;
+}
 
 // LFO speed in ms of delay per second, measured at these settings of the field at bits
 // 11-15; linear between.  At 0 see setParams.
@@ -111,16 +129,33 @@ void U220Chorus::setParams(const EffectParams &p)
 	// antiphase, through a low-pass -- 0.63 of the dry below 250 Hz, little above.  Found
 	// as what dry + main copy leave unexplained in the held-sawtooth recording.
 	m_bass = type == EffectParams::Chorus2;
-	m_min2 = std::max(m_min - 12.0f * ms, 1.0f);
-	m_step2 = 3.3f * m_step;
+	const Copy2 &c2 = copy2();
+	m_min2 = std::max(m_min - c2.offset * ms, 1.0f);
+	m_step2 = c2.speed * m_step;
+	m_span2 = c2.span;
+	m_gain2 = c2.gain;
 	m_lfo2 = std::clamp(m_lfo2, m_lo, m_hi);
-	const double w = 2.0 * M_PI * BASS_HZ / FS, al = std::sin(w) / (2.0 * 0.7071), c = std::cos(w);
+	const double w = 2.0 * M_PI * c2.hz / FS, al = std::sin(w) / (2.0 * 0.7071), c = std::cos(w);
 	const double a0 = 1.0 + al;
-	m_lp[0] = float((1.0 - c) / 2.0 / a0);
-	m_lp[1] = float((1.0 - c) / a0);
-	m_lp[2] = m_lp[0];
-	m_lp[3] = float(-2.0 * c / a0);
-	m_lp[4] = float((1.0 - al) / a0);
+	if (c2.type == 'h')
+	{
+		m_lp[0] = float((1.0 + c) / 2.0 / a0);
+		m_lp[1] = float(-(1.0 + c) / a0);
+		m_lp[2] = m_lp[0];
+	}
+	else if (c2.type == 'f')
+	{
+		m_lp[0] = 1.0f;
+		m_lp[1] = m_lp[2] = 0.0f;
+	}
+	else
+	{
+		m_lp[0] = float((1.0 - c) / 2.0 / a0);
+		m_lp[1] = float((1.0 - c) / a0);
+		m_lp[2] = m_lp[0];
+	}
+	m_lp[3] = c2.type == 'f' ? 0.0f : float(-2.0 * c / a0);
+	m_lp[4] = c2.type == 'f' ? 0.0f : float((1.0 - al) / a0);
 }
 
 // `delay` samples back from the write position `pos`, cubic (Catmull-Rom): linear
@@ -162,8 +197,8 @@ void U220Chorus::process(const float *choL, const float *choR, float *outL, floa
 			if (m_lfo2 >= m_hi) { m_lfo2 = m_hi; m_dir2 = -1.0f; }
 			else if (m_lfo2 <= m_lo) { m_lfo2 = m_lo; m_dir2 = 1.0f; }
 			float *side[2] = { &bL, &bR };
-			const float in2[2] = { read(m_line, m_pos, m_min2 + m_lfo2),
-			                       read(m_line, m_pos, m_min2 + (m_span - m_lfo2)) };
+			const float in2[2] = { read(m_line, m_pos, m_min2 + m_span2 * m_lfo2),
+			                       read(m_line, m_pos, m_min2 + m_span2 * (m_span - m_lfo2)) };
 			for (int c = 0; c < 2; c ++)
 			{
 				// Direct form II transposed.
@@ -171,7 +206,7 @@ void U220Chorus::process(const float *choL, const float *choR, float *outL, floa
 				const float y = m_lp[0] * in2[c] + z[0];
 				z[0] = m_lp[1] * in2[c] - m_lp[3] * y + z[1];
 				z[1] = m_lp[2] * in2[c] - m_lp[4] * y;
-				*side[c] = BASS_GAIN * y;
+				*side[c] = m_gain2 * y;
 			}
 		}
 		m_pos = (m_pos + 1) % n;
