@@ -3,8 +3,18 @@
 Ein nicht-kommerzielles Fan-Projekt: Der Roland U-220 (RS-PCM Sound Module, 1989) soll als
 Standalone-Programm und als Plugin (CLAP/VST3) weiterleben, wenn die Hardware einmal versagt.
 
-**Stand: Phase 0.** Der Code ist im Moment noch der unveränderte U-110-Emulator, auf dem wir
-aufbauen. Was wann kommt, steht in [ROADMAP.md](ROADMAP.md).
+**Stand:** Der U-220 läuft emuliert in MAME und als Plugin „Ostrich“ (VST3/CLAP), mit
+Hall/Delay und Chorus, die an einem echten Gerät gemessen und nachgebaut sind. Was wann
+kommt, steht in [ROADMAP.md](ROADMAP.md).
+
+## Bekannte Abweichungen vom Gerät
+
+- **Chorus2 „Growl“:** Am U-220 klingt Chorus2 rauer, „growliger“ als in Ostrich (z. B. im
+  Werkspatch P-02). Messbar ist, dass linker und rechter Kanal dort am Gerät viel weniger
+  korreliert sind; Verzögerung, LFO, Pegel, Feedback und Klangfarbe der Chorus-Kopie stimmen.
+  Vermutlich ein analoger Effekt des Geräts. Bleibt vorerst so.
+- **Effekte allgemein:** Hall, Delay und Chorus sind nach Messungen eines Geräts angenähert,
+  nicht aus dem Effektchip (IC25) emuliert. Einzelgeräte können durch Alterung abweichen.
 
 ## Herkunft
 

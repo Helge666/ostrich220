@@ -15,8 +15,9 @@
                 0-4: 15.6 ms at 0, 0.49 ms less a step); its rate is speed / (2 span).
                 Left and right in antiphase.  Short Delay has none
       gain      the copy's gain by Level, 0.94 at 31, about 0.7 dB less a step
-      feedback  FB-Chorus and Flanger on the right side only, Short Delay on both;
-                0.027 a step of Feedback, sign included
+      feedback  one delay line for both sides, fed back from the right tap (FB-Chorus,
+                Flanger, Short Delay): 0.027 a step of Feedback, sign included; the left
+                tap hears the recirculation too, at tau_L + tau_R
 
     The menu agrees with EffectParams' names (Helge read P-02: Rate 4, Depth 5): Rate is
     the field at bits 0-4, Depth the one at 11-15.  So on the U-220 a higher Rate makes
@@ -51,7 +52,7 @@ private:
 	float read(const std::vector<float> &line, unsigned pos, float delay) const;
 
 	EffectParams m_p;
-	std::vector<float> m_lineL, m_lineR;
+	std::vector<float> m_line;
 	unsigned m_pos = 0;
 	float m_min = 0.0f;             // minimum delay, samples
 	float m_span = 0.0f;            // LFO span, samples
@@ -60,7 +61,7 @@ private:
 	float m_lo = 0.0f, m_hi = 0.0f;
 	float m_dir = 1.0f;
 	float m_gain = 0.0f;
-	float m_fbL = 0.0f, m_fbR = 0.0f;
+	float m_fb = 0.0f;
 	float m_yL = 0.0f, m_yR = 0.0f; // last outputs, for the feedback
 };
 

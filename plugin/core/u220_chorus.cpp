@@ -50,15 +50,13 @@ float table(const float (*t)[2], int n, float x)
 U220Chorus::U220Chorus()
 {
 	// The longest: Chorus1 at Delay 31 plus the full span, or Short Delay at 31.
-	m_lineL.assign(size_t(0.1 * FS), 0.0f);
-	m_lineR.assign(size_t(0.1 * FS), 0.0f);
+	m_line.assign(size_t(0.1 * FS), 0.0f);
 	m_p.chorus_level = -1;          // force the first setParams through
 }
 
 void U220Chorus::reset()
 {
-	std::fill(m_lineL.begin(), m_lineL.end(), 0.0f);
-	std::fill(m_lineR.begin(), m_lineR.end(), 0.0f);
+	std::fill(m_line.begin(), m_line.end(), 0.0f);
 	m_lfo = 0.0f;
 	m_dir = 1.0f;
 	m_yL = m_yR = 0.0f;
@@ -82,9 +80,9 @@ void U220Chorus::setParams(const EffectParams &p)
 	}
 	else
 	{
-		// 16 ms at Rate 0, 0.51 ms at 31 (Helge heard Rate 31 too fast at 0.44 ms: the
-		// rate goes with 1 / span there).
-		m_span = std::max(16.0f - 0.4997f * std::clamp(p.chorus_rate, 0, 31), 0.0f) * ms;
+		// 16 ms at Rate 0, 0.49 ms at 31 as measured -- by ear 0.44 ms ran too fast and
+		// 0.51 too slow: at Rate 31 the rate goes with 1 / span (~17 Hz at Depth 16).
+		m_span = std::max(16.0f - 0.5004f * std::clamp(p.chorus_rate, 0, 31), 0.0f) * ms;
 		m_step = table(SPEED_AT, 6, float(std::clamp(p.chorus_depth, 0, 31))) / 1000.0f;
 	}
 	// At Depth 0 the hardware parks the LFO near the top of its span -- the left copy
@@ -100,9 +98,7 @@ void U220Chorus::setParams(const EffectParams &p)
 	m_lfo = std::clamp(m_lfo, m_lo, m_hi);
 	m_gain = (p.chorus_on && level > 0)
 			? GAIN31[type] * std::pow(10.0f, table(LEVEL_DB, 5, float(level)) / 20.0f) : 0.0f;
-	const float fb = FB_STEP[type] * std::clamp(p.chorus_feedback, -31, 31);
-	m_fbR = fb;
-	m_fbL = type == EffectParams::ShortDelay ? fb : 0.0f;
+	m_fb = FB_STEP[type] * std::clamp(p.chorus_feedback, -31, 31);
 }
 
 // `delay` samples back from the write position `pos`, cubic (Catmull-Rom): linear
@@ -123,20 +119,20 @@ void U220Chorus::process(const float *choL, const float *choR, float *outL, floa
 {
 	if (m_gain <= 0.0f)
 		return;
-	const unsigned n = unsigned(m_lineL.size());
+	const unsigned n = unsigned(m_line.size());
 	for (uint32_t i = 0; i < nframes; i ++)
 	{
-		const float in = 0.5f * (choL[i] + choR[i]);
-		m_lineL[m_pos] = in + m_fbL * m_yL;
-		m_lineR[m_pos] = in + m_fbR * m_yR;
+		// One line for both sides, fed back from the right tap: the left output shows the
+		// recirculation too, at tau_L + tau_R (Flanger FB +31: 0.81 there, 25.10.2026).
+		m_line[m_pos] = 0.5f * (choL[i] + choR[i]) + m_fb * m_yR;
 
 		// Triangle between 0 and the span; the two sides in antiphase.
 		m_lfo += m_dir * m_step;
 		if (m_lfo >= m_hi) { m_lfo = m_hi; m_dir = -1.0f; }
 		else if (m_lfo <= m_lo) { m_lfo = m_lo; m_dir = 1.0f; }
 
-		m_yL = read(m_lineL, m_pos, m_min + m_lfo);
-		m_yR = read(m_lineR, m_pos, m_min + (m_span - m_lfo));
+		m_yL = read(m_line, m_pos, m_min + m_lfo);
+		m_yR = read(m_line, m_pos, m_min + (m_span - m_lfo));
 		m_pos = (m_pos + 1) % n;
 
 		outL[i] += m_gain * m_yL;
