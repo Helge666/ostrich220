@@ -69,7 +69,7 @@ for src in "${SOURCES[@]}"; do
   printf '  %-24s ' "$(basename "$src")"
   if [ -f "$obj" ] && [ "$obj" -nt "$src" ] && [ "$obj" -nt "$HERE/plugin/core/u220_core.h" ] && [ "$obj" -nt "$HERE/plugin/core/u220_effects.h" ] \
      && [ "$obj" -nt "$HERE/plugin/core/u220_reverb.h" ] && [ "$obj" -nt "$HERE/plugin/core/u220_chorus.h" ] && [ "$obj" -nt "$HERE/plugin/core/u220_reverb_tuning.inc" ] \
-     && [ "$obj" -nt "$HERE/plugin/compat/emu.h" ]; then
+     && [ "$obj" -nt "$HERE/plugin/compat/emu.h" ] && [ "$obj" -nt "$MAME/src/mame/roland/roland_u220_ic25.h" ]; then
     echo "up to date"
     OBJS+=("$obj")
     continue
