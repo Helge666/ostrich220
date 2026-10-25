@@ -393,6 +393,24 @@ sind am U-220 aber **generell etwas lauter beigemischt**. Kandidaten, in dieser 
      Room1, Hall1, Gate, Delay identisch bzw. nahezu identisch; Room3 nahezu (gegen Ende
      minimal mehr Höhen am Gerät, lohnt nicht); CrossDelay nahezu. Room2 und Hall2 am Gerät
      etwas mehr Hall → beide +1 dB nach Gehör (in der Tuning-Datei vermerkt).
+   **Chorus (25.10.2026):** `plugin/core/u220_chorus.{h,cpp}`, zusammen mit dem Hall in
+   `U220Fx` (`u220_fx.h`). Messung mit Helges Idee: gehaltener Sägezahn (P-02, Part 1 nur
+   Dry+Cho, Program Change 59 = T-060 Saw Wave 1, Vibrato aus über Temp-Timbre-Byte 25 =
+   Adresse 00 10 32), `tools/make_chorus_probe.py`; Auswertung `tools/chorus_analyse.py`
+   liest τ(t), g, f an der einen steilen Flanke pro 30,6-ms-Schleife (Saw Wave 1 wiederholt
+   sich alle zwei Perioden). Befund:
+   - pro Seite eine verzögerte Kopie; Mindestverzögerung per Delay: Chorus1/FB-Chorus
+     16,0 + 1,03 ms/Stufe, Chorus2 8,0 + 0,516, Flanger 0,06 + 0,516, Short Delay 0,5 + 2,05
+     (ohne LFO)
+   - LFO: Dreieck mit fester Geschwindigkeit (ms/s, Feld Bits 11–15: 0,24/4,1/7,3/16,7/31,6/
+     60,1 bei 0/5/8/16/24/31) zwischen 0 und einer Spanne (Feld Bits 0–4: 16,0 − 0,5 ms/Stufe);
+     Rate = Geschwindigkeit/(2·Spanne); links/rechts gegenphasig. Welches Feld im Menü
+     „Rate“ und welches „Depth“ heißt, ist noch zu bestätigen (P-02: Bits 0–4 = 4, 11–15 = 5).
+   - Gain 0,94 bei Level 31 (Short Delay 0,99), ~0,7 dB/Stufe darunter
+   - Feedback 0,027/Stufe: FB-Chorus und Flanger nur rechts, Short Delay beidseitig
+   - Nachbau gegen dieselbe Auswertung: Mindestverzögerung ±0,3 ms, Spanne < 1 %, Rate 2–3 %,
+     g ±0,02, f ±0,03. A/B-Paare: `tools/make_ab.py` → `renders/chorus_ab/` (lokal).
+   - Offen: was „Chorus Out = Pre Rev“ in den Hall schickt.
 2. Chorus-Weg: am Gerät stand Chorus Off; Parts mit „Asgn = Cho“ gehen bei Ostrich nur bei
    „Pre Rev“ in den Hall. Klären, was das Gerät mit Cho-Parts tut, wenn der Chorus aus ist.
 3. Einstellung, die nur am Gerät anders ist: Temp-Patch/Patch-Daten am Gerät (alte Edits,
