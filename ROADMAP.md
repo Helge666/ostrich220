@@ -441,9 +441,13 @@ sind am U-220 aber **generell etwas lauter beigemischt**. Kandidaten, in dieser 
      f < 16 kHz kommt 32 kHz − f mit (−3 dB bei 16,3 k … −38 dB bei 23,5 k; Bassline: Spektren
      12,5–15,5 k und Spiegel korrelieren 0,61). `DacStage.hpp`: 32→64 kHz, Spiegel durch die
      gemessene Kurve, → Host; an mit HW-EQ. Dabei: Resampler schnitt bei 14,9 kHz, jetzt 15,5.
-   - **Offen:** Bei P-02 (Chorus2, **Pre Rev**) ist am Gerät die Seite in den Höhen lauter als
-     die Mitte (Bassline 12–16 kHz: S −33/M −39 dB; Ostrich M −33/S −40), bei Slot 25 (Chorus2,
-     Post Rev) nicht. Messfolge `make_chorus_probe.py --prepost` liegt bereit (48 s).
+   - **Pre Rev: rechts ein Sample später.** Bei P-02 (Chorus2, Pre Rev) war am Gerät die Seite
+     in den Höhen lauter als die Mitte (Bassline 12–16 kHz: S −33/M −39 dB). Messfolge
+     `--prepost`: bei Pre Rev kommt der **rechte** Kanal der Cho-Parts (Dry und Chorus) 31 µs =
+     1 Sample bei 32 kHz später, bei Chorus1 und Chorus2; bei Post Rev oder Chorus aus nicht.
+     In `U220Fx` nachgebaut; Bassline 8–16 kHz L/R −0,24 (Gerät −0,29, vorher +0,58).
+     Paare: `renders/prepost_ab2/`, `renders/growl_ab/` (04 = neu).
+   - Offen: Bass-Kopie noch zu zahm (unter 4 kHz L/R 0,47–0,51 statt 0,38–0,43).
    - (Frühere Notiz) **Chorus2 „Growl“** (02, 25): am Gerät sind L und R bei Chorus2 viel weniger
      korreliert (0,16/0,27 statt 0,57/0,63 bei Ostrich; Chorus1/FB/Flanger stimmen auf ±0,02).
      Verzögerung, Hub, LFO, Gain, Feedback und Klangfarbe der Kopie stimmen; das Fehlende
