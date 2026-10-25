@@ -12,7 +12,7 @@
 
 #include "u220_core.h"
 #include "u220_fx.h"
-#include "../src/Resampler.hpp"
+#include "DacStage.hpp"
 
 #include <algorithm>
 #include <array>
@@ -272,6 +272,9 @@ protected:
 			// A flag the core reads per block; no lock needed for a bool.
 			m_outputStage = value > 0.5f;
 			m_core.setOutputFilter(m_outputStage);
+			// The DAC's images belong to the same analogue output (a bool, read per sample).
+			m_dac[0].setImages(m_outputStage);
+			m_dac[1].setImages(m_outputStage);
 			return;
 		}
 		const uint32_t k = index - kParamKeyFirst;
@@ -371,8 +374,8 @@ protected:
 
 	void activate() override
 	{
-		m_resampler[0].reset();
-		m_resampler[1].reset();
+		m_dac[0].reset();
+		m_dac[1].reset();
 		m_gain = m_gainTarget;
 		// A new instance with no session behind it: the factory-fresh machine.  Done here
 		// and not in run(): it is a few seconds of emulated time, a fraction of one in CPU.
@@ -403,7 +406,7 @@ protected:
 			return;
 		}
 
-		const uint32_t coreFrames = m_resampler[0].inputsFor(frames);
+		const uint32_t coreFrames = m_dac[0].inputsFor(frames);
 		tickKeys(coreFrames);
 
 		for (uint32_t i = 0; i < midiEventCount; i ++)
@@ -427,8 +430,8 @@ protected:
 		m_dbgMidi.fetch_add(midiEventCount, std::memory_order_relaxed);
 		m_core.renderStereo(m_coreL.data(), m_coreR.data(), coreFrames);
 		m_dbgEmu.store(m_core.emulatedSeconds(), std::memory_order_relaxed);
-		m_resampler[0].process(m_coreL.data(), coreFrames, outL, frames);
-		m_resampler[1].process(m_coreR.data(), coreFrames, outR, frames);
+		m_dac[0].process(m_coreL.data(), coreFrames, outL, frames);
+		m_dac[1].process(m_coreR.data(), coreFrames, outR, frames);
 
 		for (uint32_t i = 0; i < frames; i ++)
 		{
@@ -448,13 +451,15 @@ private:
 	void setupRate(double rate)
 	{
 		m_hostRate = rate > 0.0 ? rate : 48000.0;
-		m_resampler[0].setup(kCoreRate, m_hostRate);
-		m_resampler[1].setup(kCoreRate, m_hostRate);
+		m_dac[0].setup(kCoreRate, m_hostRate, 8192);
+		m_dac[1].setup(kCoreRate, m_hostRate, 8192);
+		m_dac[0].setImages(m_outputStage);
+		m_dac[1].setImages(m_outputStage);
 		m_publishPeriod = uint32_t(m_hostRate / kPanelRefreshHz);
-		const uint32_t worst = m_resampler[0].inputsFor(8192) + 16;
+		const uint32_t worst = m_dac[0].inputsFor(8192) + 16;
 		m_coreL.assign(worst, 0.0f);
 		m_coreR.assign(worst, 0.0f);
-		setLatency(m_resampler[0].latency());
+		setLatency(m_dac[0].latency());
 	}
 
 	void tickKeys(uint32_t coreFrames)
@@ -688,7 +693,7 @@ private:
 	std::atomic<bool> m_statusPending { false };
 
 	double m_hostRate = 48000.0;
-	voltaire::Resampler m_resampler[2];
+	DacStage m_dac[2];              // 32 kHz -> host, with the DAC's images (DacStage.hpp)
 	std::vector<float> m_coreL, m_coreR;
 
 	float m_volumeDb = 0.0f, m_gainTarget = 1.0f, m_gain = 1.0f;

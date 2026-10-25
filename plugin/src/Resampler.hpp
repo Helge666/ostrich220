@@ -36,7 +36,8 @@ public:
     /// comfortably below the 16-bit floor the rest of the chain works to.
     static constexpr unsigned kTaps = 48;
 
-    void setup(double coreRate, double hostRate)
+    /// `passband` is where the cutoff sits as a fraction of the lower Nyquist.
+    void setup(double coreRate, double hostRate, double passband = 0.93)
     {
         const long cr = long(coreRate + 0.5), hr = long(hostRate + 0.5);
         const long g = std::gcd(cr, hr);
@@ -44,7 +45,7 @@ public:
         m_M = unsigned(cr / g);            // then decimate by M
 
         // The cutoff has to protect both Nyquists, expressed on the upsampled grid.
-        const double cutoff = 0.5 / double(std::max(m_L, m_M)) * 0.93;
+        const double cutoff = 0.5 / double(std::max(m_L, m_M)) * passband;
 
         const unsigned n = m_L * kTaps;
         m_taps.assign(n, 0.0f);
