@@ -126,10 +126,11 @@ bool ReverbTuning::parse(const std::string &text, std::string *error)
 			if (!(ls >> gain[t]))
 				return fail("bad gain");
 		}
-		else if (key == "fbscale")
+		else if (key == "fbcurve")
 		{
-			if (!(ls >> fb_scale[t]) || fb_scale[t] < 0.0f)
-				return fail("bad fbscale");
+			for (float &v : fb_curve[t])
+				if (!(ls >> v) || v < 0.0f || v >= 1.0f)
+					return fail("bad fbcurve");
 		}
 		else if (key == "size" || key == "pre")
 		{
@@ -154,7 +155,8 @@ std::string ReverbTuning::format() const
 		s += buf;
 		if (t >= EffectParams::Delay)
 		{
-			std::snprintf(buf, sizeof(buf), "fbscale %d %.4f\n", t, fb_scale[t]);
+			std::snprintf(buf, sizeof(buf), "fbcurve %d %.4f %.4f %.4f\n", t,
+					fb_curve[t][0], fb_curve[t][1], fb_curve[t][2]);
 			s += buf;
 		}
 		if (t < NET_TYPES)
@@ -301,12 +303,11 @@ void U220Reverb::configure()
 	{
 		const double period = (10.0 + 12.9 * time) * 1e-3;
 		m_echolen = std::clamp<unsigned>(unsigned(period * FS), 2u, unsigned(m_echo.size() - 1));
-		// Measured per-repeat gains: Delay 0.26 at FB 15 and 0.75 at FB 31 (none at 0);
-		// CrossDelay rings on even at FB 0 and less than Delay at 31.
-		const float fb = float(std::clamp(m_p.delay_feedback, 0, 31)) / 31.0f;
-		m_echofb = type == EffectParams::CrossDelay ? 0.25f + 0.38f * std::pow(fb, 2.2f)
-				: 0.75f * std::pow(fb, 1.5f);
-		m_echofb = std::min(m_echofb * m_t.fb_scale[type], 0.98f);
+		// The gain per repeat, fitted at FB 0, 15 and 31 (CrossDelay rings on even at 0).
+		const int fb = std::clamp(m_p.delay_feedback, 0, 31);
+		const float *c = m_t.fb_curve[type];
+		m_echofb = fb <= 15 ? c[0] + (c[1] - c[0]) * fb / 15.0f : c[1] + (c[2] - c[1]) * (fb - 15) / 16.0f;
+		m_echofb = std::min(m_echofb, 0.98f);
 	}
 }
 

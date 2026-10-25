@@ -367,6 +367,27 @@ sind am U-220 aber **generell etwas lauter beigemischt**. Kandidaten, in dieser 
    fällt um etwa 0,8 dB je Stufe (gegen Level 31: 25 −4,9, 20 −8,2, 15 −11,9, 10 −16,2,
    5 −22,1 dB); (Level/31)^1,9 war bei Level 10 rund 4 dB zu leise. Jetzt Tabelle in dB,
    dazu Hall2 +1,3 dB. Fahne/Direktschall danach auf allen Stufen ±0,4 dB (Level 5 −0,9).
+   **Klang abgeglichen 25.10.2026 (automatisch):** Helge hörte trotz Pegel große
+   Unterschiede (Gerät Room1 T10 ≈ Ostrich Room3 T4). Neues Verfahren:
+   - `tools/reverb_edr.py`: Energy Decay Relief in Oktavbändern 125 Hz–8 kHz × Zeitfenster
+     0–4,8 s, Hall allein (Gerät − trockene Emulation, Ostrich nass − trocken), jeder Slot
+     einzeln auf Bruchteile eines Samples ausgerichtet (MIDI-Weg jittert ±1,5 ms), Zellen
+     unter Rauschgrenze + 6 dB verworfen.
+   - Messfolge v2 (`make_reverb_probe.py --v2`): Anregung nur Kick 2/Rim Shot/Closed Hi-Hat
+     (alle Bänder nach ~110 ms 45 dB unten), vorab der komplette Temp-Dump von P-01 in
+     kurzen Paketen, damit Gerät und Ostrich dieselben Patchdaten spielen. Die Klavier-Anregung
+     von v1 ließ sich nicht abziehen (weder gegen Emulation noch gegen das Gerät selbst) und
+     verdeckte die ersten 300 ms. Rauschgrenze v2: −87…−98 dB.
+   - `ReverbTuning` (`plugin/core/u220_reverb_tuning.inc`): pro Typ und Time-Punkt
+     Oktav-Ausgangs-EQ, Abklingzeit tief/mitte/hoch (Shelving-Dämpfung in jeder Leitung),
+     Gate-Haltezeit und -Release, Echo-Feedback-Skalierung. `u220_reverb_run` rendert nur den
+     Hall aus aufgezeichneten Send-Bussen; `tools/reverb_fit.py` passt alles an (~17 s pro
+     Iteration, kein Mensch in der Schleife).
+   - Ergebnis: rms-Fehler über alle Bänder × Fenster 7,6 → 1,5 dB. Room3/Hall1/Hall2 ~1 dB,
+     Room2 ~1,7, Room1 ~2,3 (die Fahne am Gerät klingt nicht exponentiell ab, späte Bässe
+     sehr lang), Gate ~2,5, Delays < 0,6.
+   - Gate am Gerät: kein harter Schnitt, flach ~100–200 ms (je nach Time), dann ~250 dB/s.
+   - Room1 war bei Ostrich in den Höhen bis 15 dB zu laut, Room2 4–6 dB zu leise.
 2. Chorus-Weg: am Gerät stand Chorus Off; Parts mit „Asgn = Cho“ gehen bei Ostrich nur bei
    „Pre Rev“ in den Hall. Klären, was das Gerät mit Cho-Parts tut, wenn der Chorus aus ist.
 3. Einstellung, die nur am Gerät anders ist: Temp-Patch/Patch-Daten am Gerät (alte Edits,

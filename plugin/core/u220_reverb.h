@@ -57,10 +57,11 @@ struct ReverbTuning
 	// The gate: open for `hold` after an attack, then a release at so many dB/s.
 	float gate_hold_ms[TIMES] = {};
 	float gate_release_dbps[TIMES] = {};
-	float fb_scale[TYPES] = { 1, 1, 1, 1, 1, 1, 1, 1 };   // Delay, CrossDelay: feedback x
+	// Delay, CrossDelay: the echo's gain per repeat at FB 0, 15 and 31, linear between.
+	float fb_curve[TYPES][3] = {};
 
 	/// Lines of "rt T I lo mid hi", "eq T I b0..b6", "gain T g", "size T s", "pre T ms",
-	/// "gate 5 I hold_ms release_dB/s", "fbscale T x"; '#' starts a comment.  Anything not mentioned
+	/// "gate 5 I hold_ms release_dB/s", "fbcurve T g0 g15 g31"; '#' starts a comment.  Anything not mentioned
 	/// keeps its value.
 	bool parse(const std::string &text, std::string *error = nullptr);
 	std::string format() const;

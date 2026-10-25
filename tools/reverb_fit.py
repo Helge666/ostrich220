@@ -27,8 +27,8 @@ What is fitted, per type and Time point (the probe's "level 31" slots at Time 0,
   gate       the Gate's hold and release, from the broadband envelope: the release slope
              (between 10 and 30 dB under the open level) scales by hardware / Ostrich,
              the hold moves by the difference in when each falls 10 dB
-  feedback   Delay, CrossDelay: a scale of the echo feedback, from the same error slope
-             (the probe's slots run at FB 15)
+  feedback   Delay, CrossDelay: the gain per repeat at FB 0, 15 and 31, from the same
+             error slope (the probe's Time slots run at FB 15, two more at 0 and 31)
 
 All damped, so the coupled bands (neighbouring EQ peaks overlap, and a decay change
 moves the level too) settle over the iterations.
@@ -58,7 +58,7 @@ class Tuning:
     def __init__(self, text):
         self.gain, self.size, self.pre = {}, {}, {}
         self.gate = np.zeros((5, 2))                # hold ms, release dB/s
-        self.fbscale = {6: 1.0, 7: 1.0}
+        self.fbcurve = {6: [0.0, 0.25, 0.745], 7: [0.191, 0.25, 0.48]}
         self.rt = np.zeros((6, 5, 3))
         self.eq = np.zeros((8, 5, 7))
         for line in text.splitlines():
@@ -79,15 +79,15 @@ class Tuning:
                 self.eq[t, int(v[0])] = v[1:]
             elif k == 'gate':
                 self.gate[int(v[0])] = v[1:]
-            elif k == 'fbscale':
-                self.fbscale[t] = v[0]
+            elif k == 'fbcurve':
+                self.fbcurve[t] = v[:3]
 
     def text(self):
         out = []
         for t in range(8):
             out.append(f'gain {t} {self.gain[t]:.4f}')
             if t >= 6:
-                out.append(f'fbscale {t} {self.fbscale[t]:.4f}')
+                out.append(f'fbcurve {t} ' + ' '.join(f'{v:.4f}' for v in self.fbcurve[t]))
             if t < 6:
                 out.append(f'size {t} {self.size[t]:.3f}')
                 out.append(f'pre {t} {self.pre[t]:.1f}')
@@ -137,12 +137,20 @@ def render(run, send, tuning, work):
     return lfilter(b, a, x, axis=0)
 
 
+FB_AT = [0, 15, 31]
+
+
 def fit_slots(probe):
+    """(slot, type, time index, FB index): the Time slots (FB 15) and the delays' FB ones."""
     out = []
     for s in probe.slots:
         m = re.match(r'(\w+) time (\d+) level 31$', s['label'])
         if m and m.group(1) in TYPES and int(m.group(2)) in TIME_AT:
-            out.append((s, TYPES.index(m.group(1)), TIME_AT.index(int(m.group(2)))))
+            out.append((s, TYPES.index(m.group(1)), TIME_AT.index(int(m.group(2))), 1))
+        m = re.match(r'(Delay|CrossDelay) time (\d+) fb (\d+)$', s['label'])
+        if m and int(m.group(2)) in TIME_AT and int(m.group(3)) in FB_AT:
+            out.append((s, TYPES.index(m.group(1)), TIME_AT.index(int(m.group(2))),
+                        FB_AT.index(int(m.group(3)))))
     return out
 
 
@@ -173,7 +181,7 @@ def measure(probe, slots, rev):
     """Per fit slot: band level errors (dB), RT ratios hw/emu, and the rms error."""
     res = []
     dur = np.array([b - a for a, b in WINDOWS])
-    for s, t, i in slots:
+    for s, t, i, fbi in slots:
         ec, rt_e = probe.emu_cells(rev, s)
         hc, trust = s['hw_db'], s['trust']
         band = np.full(len(BANDS), np.nan)
@@ -200,7 +208,7 @@ def measure(probe, slots, rev):
                         y.append(cells[k, j])
             return np.polyfit(x, y, 1)[0] if len(set(x)) >= 3 else np.nan
         slopes = [trend(g, 1) for g in DECAY_GROUPS]
-        r = dict(slot=s, t=t, i=i, band=band, rt_ratio=rt_ratio, rms=rms, slopes=slopes,
+        r = dict(slot=s, t=t, i=i, fb=fbi, band=band, rt_ratio=rt_ratio, rms=rms, slopes=slopes,
                  slope_all=trend(range(len(BANDS)), 2))
         if t == 5:
             from reverb_edr import band_energy
@@ -242,12 +250,20 @@ def main():
         print(f'\niteration {it}: rms error {total:.2f} dB over all trusted cells')
         for t in range(8):
             rows = [r for r in res if r['t'] == t]
-            print(f'  {TYPES[t]:10s} ' + '  '.join(f'T{TIME_AT[r["i"]]}:{r["rms"]:4.1f}' for r in rows))
+            print(f'  {TYPES[t]:10s} ' + '  '.join(f'T{TIME_AT[r["i"]]}{"" if r["fb"] == 1 else "fb" + str(FB_AT[r["fb"]])}:{r["rms"]:4.1f}' for r in rows))
         if it == a.iterations:
             break
-        echo = {6: [], 7: []}
+        echo = {}
         for r in res:
             t, i = r['t'], r['i']
+            if t >= 6 and np.isfinite(r['slope_all']):
+                period = (10 + 12.9 * TIME_AT[i]) / 1000
+                g = tuning.fbcurve[t][r['fb']]
+                if 0.01 < g < 0.98:
+                    d = -20 * np.log10(g) / period + RT_STEP * float(np.clip(r['slope_all'], -30, 30))
+                    echo.setdefault((t, r['fb']), []).append(10 ** (-max(d, 0.5) * period / 20))
+            if r['fb'] != 1:
+                continue                # the FB slots only steer the feedback
             ok = np.isfinite(r['band'])
             tuning.eq[t, i, ok] = np.clip(tuning.eq[t, i, ok] - EQ_STEP * r['band'][ok], -30, 24)
             if t == 5:
@@ -262,16 +278,8 @@ def main():
                     if np.isfinite(sl):
                         d = 60.0 / tuning.rt[t, i, k] + RT_STEP * float(np.clip(sl, -30, 30))
                         tuning.rt[t, i, k] = float(np.clip(60.0 / max(d, 4.0), 0.1, 15.0))
-            if t >= 6 and np.isfinite(r['slope_all']):
-                period = (10 + 12.9 * TIME_AT[i]) / 1000
-                x = 15 / 31          # the probe's FB
-                fb = (0.25 + 0.38 * x ** 2.2 if t == 7 else 0.75 * x ** 1.5) * tuning.fbscale[t]
-                if 0 < fb < 0.98:
-                    d = -20 * np.log10(fb) / period + RT_STEP * float(np.clip(r['slope_all'], -30, 30))
-                    echo[t].append(10 ** (-max(d, 0.5) * period / 20) / fb)
-        for t, f in echo.items():
-            if f:
-                tuning.fbscale[t] = float(np.clip(tuning.fbscale[t] * np.median(f), 0.2, 3.0))
+        for (t, f), g in echo.items():
+            tuning.fbcurve[t][f] = float(np.clip(np.median(g), 0.0, 0.97))
 
     print('\nfinal per slot (band level error dB 125..8k | RT hw/emu low mid high):')
     for r in res:
