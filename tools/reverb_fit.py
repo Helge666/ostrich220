@@ -22,9 +22,12 @@ What is fitted, per type and Time point (the probe's "level 31" slots at Time 0,
   decay      Room1..Hall2 only: the low (125-250 Hz), mid (500 Hz-1 kHz) and high
              (4-8 kHz) reverberation times scale by hardware / Ostrich
 
+  gate       the Gate's hold and release, from the broadband envelope: the release slope
+             (between 10 and 30 dB under the open level) scales by hardware / Ostrich,
+             the hold moves by the difference in when each falls 10 dB
+
 Both damped, so the coupled bands (neighbouring EQ peaks overlap, and a decay change
-moves the level too) settle over the iterations.  The Gate's decay is its gate, and the
-delays have none, so for those only the EQ is fitted.
+moves the level too) settle over the iterations.  The delays have no decay to fit.
 """
 
 import argparse
@@ -50,6 +53,7 @@ SHELF_HZ, SHELF_DB, SHELF_Q = 5200.0, -3.3, 0.5    # the core's output stage
 class Tuning:
     def __init__(self, text):
         self.gain, self.size, self.pre = {}, {}, {}
+        self.gate = np.zeros((5, 2))                # hold ms, release dB/s
         self.rt = np.zeros((6, 5, 3))
         self.eq = np.zeros((8, 5, 7))
         for line in text.splitlines():
@@ -68,6 +72,8 @@ class Tuning:
                 self.rt[t, int(v[0])] = v[1:]
             elif k == 'eq':
                 self.eq[t, int(v[0])] = v[1:]
+            elif k == 'gate':
+                self.gate[int(v[0])] = v[1:]
 
     def text(self):
         out = []
@@ -78,6 +84,9 @@ class Tuning:
                 out.append(f'pre {t} {self.pre[t]:.1f}')
                 for i in range(5):
                     out.append(f'rt {t} {i} ' + ' '.join(f'{v:.3f}' for v in self.rt[t, i]))
+            if t == 5:
+                for i in range(5):
+                    out.append(f'gate 5 {i} {self.gate[i, 0]:.1f} {self.gate[i, 1]:.1f}')
             for i in range(5):
                 out.append(f'eq {t} {i} ' + ' '.join(f'{v:.2f}' for v in self.eq[t, i]))
         return '\n'.join(out) + '\n'
@@ -128,6 +137,29 @@ def fit_slots(probe):
     return out
 
 
+def gate_shape(env):
+    """(time it falls 10 dB under the open level, release slope dB/s) of a broadband
+    energy envelope; the open level is the peak of 20 ms frames 120-300 ms after the
+    hit, where the dry drums are gone."""
+    from reverb_edr import PRE
+    f = int(0.02 * SR)
+    e = env.sum(0)
+    n = len(e) // f
+    db = 10 * np.log10(e[:n * f].reshape(n, f).mean(1) + 1e-20)
+    t = (np.arange(n) + 0.5) * 0.02 - PRE
+    top = db[(t > 0.12) & (t < 0.3)].max()
+    after = np.nonzero((t > 0.12) & (db < top - 10))[0]
+    if not len(after):
+        return np.nan, np.nan
+    t10 = t[after[0]]
+    sel = (t >= t10) & (db < top - 10) & (db > top - 30)
+    sel &= np.cumsum(~sel & (t > t10)) == 0            # the first stretch only
+    if sel.sum() < 3:
+        return t10, np.nan
+    slope = -np.polyfit(t[sel], db[sel], 1)[0]
+    return t10, slope
+
+
 def measure(probe, slots, rev):
     """Per fit slot: band level errors (dB), RT ratios hw/emu, and the rms error."""
     res = []
@@ -146,7 +178,12 @@ def measure(probe, slots, rev):
                              for h, e in zip(s['rt_hw'], rt_e)])
         cells = np.where(trust, ec - hc, np.nan)
         rms = np.sqrt(np.nanmean(cells ** 2)) if trust.any() else np.nan
-        res.append(dict(slot=s, t=t, i=i, band=band, rt_ratio=rt_ratio, rms=rms))
+        r = dict(slot=s, t=t, i=i, band=band, rt_ratio=rt_ratio, rms=rms)
+        if t == 5:
+            from reverb_edr import band_energy
+            r['gate_hw'] = gate_shape(s['hw_env'])
+            r['gate_emu'] = gate_shape(band_energy(probe.g * probe._emu_seg(rev, s)))
+        res.append(r)
     return res
 
 
@@ -189,6 +226,12 @@ def main():
             t, i = r['t'], r['i']
             ok = np.isfinite(r['band'])
             tuning.eq[t, i, ok] = np.clip(tuning.eq[t, i, ok] - EQ_STEP * r['band'][ok], -30, 24)
+            if t == 5:
+                (h10, hs), (e10, es) = r['gate_hw'], r['gate_emu']
+                if np.isfinite(h10) and np.isfinite(e10):
+                    tuning.gate[i, 0] = float(np.clip(tuning.gate[i, 0] + 0.8 * (h10 - e10) * 1000, 0, 2000))
+                if np.isfinite(hs) and np.isfinite(es) and es > 0:
+                    tuning.gate[i, 1] = float(np.clip(tuning.gate[i, 1] * (hs / es) ** 0.8, 5, 2000))
             if t <= 4:
                 for k, grp in enumerate(DECAY_GROUPS):
                     q = r['rt_ratio'][list(grp)]
@@ -203,6 +246,10 @@ def main():
               + ' | ' + ' '.join('  .  ' if not np.isfinite(v) else f'{v:5.2f}'
                                  for v in [np.nanmedian(r['rt_ratio'][list(g)]) if np.isfinite(r['rt_ratio'][list(g)]).any() else np.nan
                                            for g in DECAY_GROUPS]))
+    for r in res:
+        if r['t'] == 5:
+            print(f'  gate T{TIME_AT[r["i"]]}: hw falls 10 dB at {r["gate_hw"][0] * 1000:.0f} ms, '
+                  f'{r["gate_hw"][1]:.0f} dB/s; Ostrich {r["gate_emu"][0] * 1000:.0f} ms, {r["gate_emu"][1]:.0f} dB/s')
     note = (f'Fitted to {os.path.basename(a.hw)}: rms error {history[0]:.2f} -> {history[-1]:.2f} dB '
             f'over {len(slots)} slots, {a.iterations} iterations.')
     print('\n' + note)

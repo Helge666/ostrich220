@@ -115,6 +115,12 @@ bool ReverbTuning::parse(const std::string &text, std::string *error)
 					if (!(ls >> v))
 						return fail("bad eq");
 		}
+		else if (key == "gate")
+		{
+			if (t != EffectParams::Gate || !(ls >> i) || i < 0 || i >= TIMES
+					|| !(ls >> gate_hold_ms[i] >> gate_release_dbps[i]) || gate_release_dbps[i] <= 0.0f)
+				return fail("bad gate");
+		}
 		else if (key == "gain")
 		{
 			if (!(ls >> gain[t]))
@@ -151,6 +157,13 @@ std::string ReverbTuning::format() const
 						rt[t][i][0], rt[t][i][1], rt[t][i][2]);
 				s += buf;
 			}
+			if (t == EffectParams::Gate)
+				for (int i = 0; i < TIMES; i ++)
+				{
+					std::snprintf(buf, sizeof(buf), "gate %d %d %.1f %.1f\n", t, i,
+							gate_hold_ms[i], gate_release_dbps[i]);
+					s += buf;
+				}
 		}
 		for (int i = 0; i < TIMES; i ++)
 		{
@@ -269,6 +282,10 @@ void U220Reverb::configure()
 			high_shelf(loop_gain(rt[2]) / gm, HIGH_SHELF_HZ, m_hs[i]);
 		}
 		m_prelen = std::clamp(unsigned(m_t.pre_ms[type] * 1e-3 * FS), 1u, unsigned(m_pre.size() - 1));
+		const float hold = m_t.gate_hold_ms[ti] + tf * (m_t.gate_hold_ms[ti + 1] - m_t.gate_hold_ms[ti]);
+		const float rel = m_t.gate_release_dbps[ti] + tf * (m_t.gate_release_dbps[ti + 1] - m_t.gate_release_dbps[ti]);
+		m_holdLen = unsigned(std::max(0.0f, hold) * 1e-3f * FS);
+		m_release = std::pow(10.0f, -std::max(rel, 1.0f) / (20.0f * float(FS)));
 	}
 	else
 	{
@@ -353,17 +370,20 @@ void U220Reverb::process(const float *revL, const float *revR, const float *choL
 			l = network(in, r);
 			if (type == EffectParams::Gate)
 			{
-				// Opened by an attack (a new peak), held ~450 ms whatever follows, closed in
-				// ~15 ms: the hardware's gate is as short after a sustained note as after
-				// a drum hit.
+				// Opened by an attack (a new peak), held for a time that grows with Time,
+				// then released exponentially -- not cut: measured on the hardware, a flat
+				// stretch of ~170 ms (Time 8) to ~260 ms (Time 31), then ~90 dB/s.  As short
+				// after a sustained note as after a drum hit.
 				const float a = std::fabs(in);
 				if (a > 1e-4f && a >= m_env)
-					m_hold = unsigned(0.45 * FS);
+					m_hold = m_holdLen;
 				else if (m_hold)
 					m_hold --;
 				m_env = std::max(a, m_env * 0.99995f);
-				const float target = m_hold ? 1.0f : 0.0f;
-				m_gate += (target - m_gate) * (target > m_gate ? 0.05f : 0.002f);
+				if (m_hold)
+					m_gate += (1.0f - m_gate) * 0.05f;
+				else
+					m_gate *= m_release;
 				// The gate is nearly mono on the hardware (L/R correlation 0.74): cross-mix.
 				const float gl = m_gate * (l + 0.45f * r), gr = m_gate * (r + 0.45f * l);
 				l = gl;

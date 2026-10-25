@@ -54,9 +54,13 @@ struct ReverbTuning
 	float gain[TYPES] = {};                           // linear, at Level 31
 	float size[NET_TYPES] = {};                       // line length scale
 	float pre_ms[NET_TYPES] = {};
+	// The gate: open for `hold` after an attack, then a release at so many dB/s.
+	float gate_hold_ms[TIMES] = {};
+	float gate_release_dbps[TIMES] = {};
 
-	/// Lines of "rt T I lo mid hi", "eq T I b0..b6", "gain T g", "size T s", "pre T ms";
-	/// '#' starts a comment.  Anything not mentioned keeps its value.
+	/// Lines of "rt T I lo mid hi", "eq T I b0..b6", "gain T g", "size T s", "pre T ms",
+	/// "gate 5 I hold_ms release_dB/s"; '#' starts a comment.  Anything not mentioned
+	/// keeps its value.
 	bool parse(const std::string &text, std::string *error = nullptr);
 	std::string format() const;
 
@@ -100,7 +104,8 @@ private:
 
 	// --- the gate
 	float m_env = 0.0f, m_gate = 0.0f;
-	unsigned m_hold = 0;
+	unsigned m_hold = 0, m_holdLen = 0;
+	float m_release = 0.0f;         // per-sample gain once the hold has run out
 
 	// --- the echo line
 	std::vector<float> m_echo;
