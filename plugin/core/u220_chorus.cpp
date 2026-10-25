@@ -27,6 +27,9 @@ constexpr float MIN_STEP[5] = { 1.03f, 0.516f, 1.03f, 0.516f, 2.05f };
 // The copy's gain at Level 31, and the feedback per step of Feedback.
 constexpr float GAIN31[5]   = { 0.94f, 0.94f, 0.94f, 0.94f, 0.99f };
 constexpr float FB_STEP[5]  = { 0.0f, 0.0f, 0.0274f, 0.0270f, 0.0284f };
+// Chorus2's bass copy: low-pass corner and gain.
+constexpr double BASS_HZ = 220.0;
+constexpr float BASS_GAIN = 0.65f;
 
 // LFO speed in ms of delay per second, measured at these settings of the field at bits
 // 11-15; linear between.  At 0 see setParams.
@@ -59,7 +62,10 @@ void U220Chorus::reset()
 	std::fill(m_line.begin(), m_line.end(), 0.0f);
 	m_lfo = 0.0f;
 	m_dir = 1.0f;
+	m_lfo2 = 0.0f;
+	m_dir2 = 1.0f;
 	m_yL = m_yR = 0.0f;
+	std::fill(&m_lpz[0][0], &m_lpz[0][0] + 4, 0.0f);
 }
 
 void U220Chorus::setParams(const EffectParams &p)
@@ -99,6 +105,22 @@ void U220Chorus::setParams(const EffectParams &p)
 	m_gain = (p.chorus_on && level > 0)
 			? GAIN31[type] * std::pow(10.0f, table(LEVEL_DB, 5, float(level)) / 20.0f) : 0.0f;
 	m_fb = FB_STEP[type] * std::clamp(p.chorus_feedback, -31, 31);
+
+	// Chorus2's bass copy (its "growl", 25.10.2026): a second tap 12 ms under the main
+	// one's shortest delay, swept over the same span 3.3 times as fast, the sides in
+	// antiphase, through a low-pass -- 0.63 of the dry below 250 Hz, little above.  Found
+	// as what dry + main copy leave unexplained in the held-sawtooth recording.
+	m_bass = type == EffectParams::Chorus2;
+	m_min2 = std::max(m_min - 12.0f * ms, 1.0f);
+	m_step2 = 3.3f * m_step;
+	m_lfo2 = std::clamp(m_lfo2, m_lo, m_hi);
+	const double w = 2.0 * M_PI * BASS_HZ / FS, al = std::sin(w) / (2.0 * 0.7071), c = std::cos(w);
+	const double a0 = 1.0 + al;
+	m_lp[0] = float((1.0 - c) / 2.0 / a0);
+	m_lp[1] = float((1.0 - c) / a0);
+	m_lp[2] = m_lp[0];
+	m_lp[3] = float(-2.0 * c / a0);
+	m_lp[4] = float((1.0 - al) / a0);
 }
 
 // `delay` samples back from the write position `pos`, cubic (Catmull-Rom): linear
@@ -133,10 +155,29 @@ void U220Chorus::process(const float *choL, const float *choR, float *outL, floa
 
 		m_yL = read(m_line, m_pos, m_min + m_lfo);
 		m_yR = read(m_line, m_pos, m_min + (m_span - m_lfo));
+		float bL = 0.0f, bR = 0.0f;
+		if (m_bass)
+		{
+			m_lfo2 += m_dir2 * m_step2;
+			if (m_lfo2 >= m_hi) { m_lfo2 = m_hi; m_dir2 = -1.0f; }
+			else if (m_lfo2 <= m_lo) { m_lfo2 = m_lo; m_dir2 = 1.0f; }
+			float *side[2] = { &bL, &bR };
+			const float in2[2] = { read(m_line, m_pos, m_min2 + m_lfo2),
+			                       read(m_line, m_pos, m_min2 + (m_span - m_lfo2)) };
+			for (int c = 0; c < 2; c ++)
+			{
+				// Direct form II transposed.
+				float *z = m_lpz[c];
+				const float y = m_lp[0] * in2[c] + z[0];
+				z[0] = m_lp[1] * in2[c] - m_lp[3] * y + z[1];
+				z[1] = m_lp[2] * in2[c] - m_lp[4] * y;
+				*side[c] = BASS_GAIN * y;
+			}
+		}
 		m_pos = (m_pos + 1) % n;
 
-		outL[i] += m_gain * m_yL;
-		outR[i] += m_gain * m_yR;
+		outL[i] += m_gain * (m_yL + bL);
+		outR[i] += m_gain * (m_yR + bR);
 	}
 }
 

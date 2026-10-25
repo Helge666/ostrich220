@@ -15,6 +15,8 @@
                 0-4: 15.6 ms at 0, 0.49 ms less a step); its rate is speed / (2 span).
                 Left and right in antiphase.  Short Delay has none
       gain      the copy's gain by Level, 0.94 at 31, about 0.7 dB less a step
+      Chorus2   adds a bass copy: a second tap 12 ms under the main one, swept 3.3 times
+                as fast over the same span, low-passed at ~220 Hz, 0.65 -- its growl
       feedback  one delay line for both sides, fed back from the right tap (FB-Chorus,
                 Flanger, Short Delay): 0.027 a step of Feedback, sign included; the left
                 tap hears the recirculation too, at tau_L + tau_R
@@ -63,6 +65,11 @@ private:
 	float m_gain = 0.0f;
 	float m_fb = 0.0f;
 	float m_yL = 0.0f, m_yR = 0.0f; // last outputs, for the feedback
+
+	// Chorus2's bass copy
+	bool m_bass = false;
+	float m_min2 = 0.0f, m_step2 = 0.0f, m_lfo2 = 0.0f, m_dir2 = 1.0f;
+	float m_lp[5] = {}, m_lpz[2][2] = {};       // low-pass b0 b1 b2 a1 a2, states
 };
 
 } // namespace ostrich
