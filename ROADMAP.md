@@ -404,8 +404,9 @@ sind am U-220 aber **generell etwas lauter beigemischt**. Kandidaten, in dieser 
      (ohne LFO)
    - LFO: Dreieck mit fester Geschwindigkeit (ms/s, Feld Bits 11–15: 0,24/4,1/7,3/16,7/31,6/
      60,1 bei 0/5/8/16/24/31) zwischen 0 und einer Spanne (Feld Bits 0–4: 16,0 − 0,5 ms/Stufe);
-     Rate = Geschwindigkeit/(2·Spanne); links/rechts gegenphasig. Welches Feld im Menü
-     „Rate“ und welches „Depth“ heißt, ist noch zu bestätigen (P-02: Bits 0–4 = 4, 11–15 = 5).
+     Rate = Geschwindigkeit/(2·Spanne); links/rechts gegenphasig. Menü bestätigt (Helge,
+     P-02: Rate 4, Depth 5): **Rate** = Bits 0–4 = Spanne (höher → enger und schneller),
+     **Depth** = Bits 11–15 = Geschwindigkeit.
    - Gain 0,94 bei Level 31 (Short Delay 0,99), ~0,7 dB/Stufe darunter
    - Feedback 0,027/Stufe: FB-Chorus und Flanger nur rechts, Short Delay beidseitig
    - Nachbau gegen dieselbe Auswertung: Mindestverzögerung ±0,3 ms, Spanne < 1 %, Rate 2–3 %,

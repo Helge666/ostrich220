@@ -18,8 +18,10 @@
       feedback  FB-Chorus and Flanger on the right side only, Short Delay on both;
                 0.027 a step of Feedback, sign included
 
-    The two fields are called rate (bits 0-4) and depth (bits 11-15) in EffectParams,
-    after the order the menu edits changed them; what they do is as above.
+    The menu agrees with EffectParams' names (Helge read P-02: Rate 4, Depth 5): Rate is
+    the field at bits 0-4, Depth the one at 11-15.  So on the U-220 a higher Rate makes
+    the sweep narrower -- and with it faster -- and a higher Depth makes it move faster
+    over the same span.
 
 ***************************************************************************************/
 
