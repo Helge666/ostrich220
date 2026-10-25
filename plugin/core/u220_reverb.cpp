@@ -65,7 +65,7 @@ constexpr unsigned BASE_LEN[8] = { 1031, 1201, 1361, 1493, 1657, 1777, 1913, 205
 constexpr float TYPE_SIZE[6]   = { 0.55f, 0.75f, 0.65f, 1.15f, 1.0f, 0.6f };   // ..Hall2, Gate
 constexpr float TYPE_PRE_MS[6] = { 6.0f, 10.0f, 8.0f, 22.0f, 18.0f, 4.0f };
 // Output calibration per type (all 8 types), against the tail level of the hardware probe.
-constexpr float TYPE_GAIN[8]   = { 0.96f, 0.22f, 0.45f, 0.275f, 0.23f, 0.44f, 0.96f, 0.96f };
+constexpr float TYPE_GAIN[8]   = { 0.96f, 0.22f, 0.45f, 0.275f, 0.27f, 0.44f, 0.96f, 0.96f };
 // The network's own diffusion lengthens the decay it is set to; measured hw/emulation
 // ratios of the decay time, applied to the targets.
 constexpr float RT_SCALE[5]    = { 0.79f, 1.05f, 0.85f, 1.10f, 0.98f };
