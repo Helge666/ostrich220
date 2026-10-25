@@ -20,14 +20,18 @@ What is fitted, per type and Time point (the probe's "level 31" slots at Time 0,
              energy over the trusted windows, so the early, loud part of the tail counts
              most
   decay      Room1..Hall2 only: the low (125-250 Hz), mid (500 Hz-1 kHz) and high
-             (4-8 kHz) reverberation times scale by hardware / Ostrich
-
+             (4-8 kHz) decay rate moves by the slope of the level error over the
+             windows from 50 ms on (a straight line through error vs time: if Ostrich
+             falls behind the hardware later on, its decay is too fast).  Not a T20
+             ratio: the hardware's rooms flatten out late, which T20 does not see
   gate       the Gate's hold and release, from the broadband envelope: the release slope
              (between 10 and 30 dB under the open level) scales by hardware / Ostrich,
              the hold moves by the difference in when each falls 10 dB
+  feedback   Delay, CrossDelay: a scale of the echo feedback, from the same error slope
+             (the probe's slots run at FB 15)
 
-Both damped, so the coupled bands (neighbouring EQ peaks overlap, and a decay change
-moves the level too) settle over the iterations.  The delays have no decay to fit.
+All damped, so the coupled bands (neighbouring EQ peaks overlap, and a decay change
+moves the level too) settle over the iterations.
 """
 
 import argparse
@@ -54,6 +58,7 @@ class Tuning:
     def __init__(self, text):
         self.gain, self.size, self.pre = {}, {}, {}
         self.gate = np.zeros((5, 2))                # hold ms, release dB/s
+        self.fbscale = {6: 1.0, 7: 1.0}
         self.rt = np.zeros((6, 5, 3))
         self.eq = np.zeros((8, 5, 7))
         for line in text.splitlines():
@@ -74,11 +79,15 @@ class Tuning:
                 self.eq[t, int(v[0])] = v[1:]
             elif k == 'gate':
                 self.gate[int(v[0])] = v[1:]
+            elif k == 'fbscale':
+                self.fbscale[t] = v[0]
 
     def text(self):
         out = []
         for t in range(8):
             out.append(f'gain {t} {self.gain[t]:.4f}')
+            if t >= 6:
+                out.append(f'fbscale {t} {self.fbscale[t]:.4f}')
             if t < 6:
                 out.append(f'size {t} {self.size[t]:.3f}')
                 out.append(f'pre {t} {self.pre[t]:.1f}')
@@ -139,16 +148,16 @@ def fit_slots(probe):
 
 def gate_shape(env):
     """(time it falls 10 dB under the open level, release slope dB/s) of a broadband
-    energy envelope; the open level is the peak of 20 ms frames 120-300 ms after the
-    hit, where the dry drums are gone."""
+    energy envelope; the open level is the peak of 20 ms frames 80-300 ms after the
+    hit (the dry drums are 30 dB or more under the gate there)."""
     from reverb_edr import PRE
     f = int(0.02 * SR)
     e = env.sum(0)
     n = len(e) // f
     db = 10 * np.log10(e[:n * f].reshape(n, f).mean(1) + 1e-20)
     t = (np.arange(n) + 0.5) * 0.02 - PRE
-    top = db[(t > 0.12) & (t < 0.3)].max()
-    after = np.nonzero((t > 0.12) & (db < top - 10))[0]
+    top = db[(t > 0.08) & (t < 0.3)].max()
+    after = np.nonzero((t > 0.08) & (db < top - 10))[0]
     if not len(after):
         return np.nan, np.nan
     t10 = t[after[0]]
@@ -178,7 +187,21 @@ def measure(probe, slots, rev):
                              for h, e in zip(s['rt_hw'], rt_e)])
         cells = np.where(trust, ec - hc, np.nan)
         rms = np.sqrt(np.nanmean(cells ** 2)) if trust.any() else np.nan
-        r = dict(slot=s, t=t, i=i, band=band, rt_ratio=rt_ratio, rms=rms)
+        # The error's trend over time, dB/s: a line through the trusted cells from 50 ms
+        # on, per decay group, and over all bands from 150 ms on (for the echoes).
+        tc = np.array([(a + b) / 2 for a, b in WINDOWS])
+
+        def trend(ks, first):
+            x, y = [], []
+            for k in ks:
+                for j in range(first, len(WINDOWS)):
+                    if trust[k, j]:
+                        x.append(tc[j])
+                        y.append(cells[k, j])
+            return np.polyfit(x, y, 1)[0] if len(set(x)) >= 3 else np.nan
+        slopes = [trend(g, 1) for g in DECAY_GROUPS]
+        r = dict(slot=s, t=t, i=i, band=band, rt_ratio=rt_ratio, rms=rms, slopes=slopes,
+                 slope_all=trend(range(len(BANDS)), 2))
         if t == 5:
             from reverb_edr import band_energy
             r['gate_hw'] = gate_shape(s['hw_env'])
@@ -222,6 +245,7 @@ def main():
             print(f'  {TYPES[t]:10s} ' + '  '.join(f'T{TIME_AT[r["i"]]}:{r["rms"]:4.1f}' for r in rows))
         if it == a.iterations:
             break
+        echo = {6: [], 7: []}
         for r in res:
             t, i = r['t'], r['i']
             ok = np.isfinite(r['band'])
@@ -233,12 +257,21 @@ def main():
                 if np.isfinite(hs) and np.isfinite(es) and es > 0:
                     tuning.gate[i, 1] = float(np.clip(tuning.gate[i, 1] * (hs / es) ** 0.8, 5, 2000))
             if t <= 4:
-                for k, grp in enumerate(DECAY_GROUPS):
-                    q = r['rt_ratio'][list(grp)]
-                    q = q[np.isfinite(q)]
-                    if len(q):
-                        f = float(np.clip(np.median(q), 0.5, 2.0)) ** RT_STEP
-                        tuning.rt[t, i, k] = float(np.clip(tuning.rt[t, i, k] * f, 0.1, 15.0))
+                # error slope = hardware decay rate - Ostrich decay rate (dB/s)
+                for k, sl in enumerate(r['slopes']):
+                    if np.isfinite(sl):
+                        d = 60.0 / tuning.rt[t, i, k] + RT_STEP * float(np.clip(sl, -30, 30))
+                        tuning.rt[t, i, k] = float(np.clip(60.0 / max(d, 4.0), 0.1, 15.0))
+            if t >= 6 and np.isfinite(r['slope_all']):
+                period = (10 + 12.9 * TIME_AT[i]) / 1000
+                x = 15 / 31          # the probe's FB
+                fb = (0.25 + 0.38 * x ** 2.2 if t == 7 else 0.75 * x ** 1.5) * tuning.fbscale[t]
+                if 0 < fb < 0.98:
+                    d = -20 * np.log10(fb) / period + RT_STEP * float(np.clip(r['slope_all'], -30, 30))
+                    echo[t].append(10 ** (-max(d, 0.5) * period / 20) / fb)
+        for t, f in echo.items():
+            if f:
+                tuning.fbscale[t] = float(np.clip(tuning.fbscale[t] * np.median(f), 0.2, 3.0))
 
     print('\nfinal per slot (band level error dB 125..8k | RT hw/emu low mid high):')
     for r in res:

@@ -126,6 +126,11 @@ bool ReverbTuning::parse(const std::string &text, std::string *error)
 			if (!(ls >> gain[t]))
 				return fail("bad gain");
 		}
+		else if (key == "fbscale")
+		{
+			if (!(ls >> fb_scale[t]) || fb_scale[t] < 0.0f)
+				return fail("bad fbscale");
+		}
 		else if (key == "size" || key == "pre")
 		{
 			if (t >= NET_TYPES)
@@ -147,6 +152,11 @@ std::string ReverbTuning::format() const
 	{
 		std::snprintf(buf, sizeof(buf), "gain %d %.4f\n", t, gain[t]);
 		s += buf;
+		if (t >= EffectParams::Delay)
+		{
+			std::snprintf(buf, sizeof(buf), "fbscale %d %.4f\n", t, fb_scale[t]);
+			s += buf;
+		}
 		if (t < NET_TYPES)
 		{
 			std::snprintf(buf, sizeof(buf), "size %d %.3f\npre %d %.1f\n", t, size[t], t, pre_ms[t]);
@@ -296,6 +306,7 @@ void U220Reverb::configure()
 		const float fb = float(std::clamp(m_p.delay_feedback, 0, 31)) / 31.0f;
 		m_echofb = type == EffectParams::CrossDelay ? 0.25f + 0.38f * std::pow(fb, 2.2f)
 				: 0.75f * std::pow(fb, 1.5f);
+		m_echofb = std::min(m_echofb * m_t.fb_scale[type], 0.98f);
 	}
 }
 
