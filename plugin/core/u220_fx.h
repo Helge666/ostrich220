@@ -15,11 +15,11 @@
                 the chorus": parts on Cho get the chorus only
 
     And measured (make_chorus_probe.py --prepost, 25.10.2026): at Pre Rev the unit puts
-    out the left side of everything on Cho -- dry and chorus alike -- one sample (31 us)
+    out the right side of everything on Cho -- dry and chorus alike -- one sample (31 us)
     late, which reads as a much wider top (4-15 kHz) and nowhere else; at Post Rev, or
     with the chorus off, not.  The dry of a part on Cho is the chorus send itself (equal
     level, measured), so that share of the dry mix is moved by a sample here, and the
-    chorus reads its left tap a sample later.
+    chorus's right copy likewise.
 
 ***************************************************************************************/
 
@@ -46,7 +46,7 @@ public:
 	void setParams(const EffectParams &p) override
 	{
 		m_preRev = !p.chorus_post_reverb;
-		m_shiftLeft = m_preRev && p.chorus_on;
+		m_shiftRight = m_preRev && p.chorus_on;
 		m_rev.setParams(p);
 		m_cho.setParams(p);
 	}
@@ -63,19 +63,19 @@ public:
 			m_cho.process(choL + done, choR + done, m_wetL, m_wetR, n);
 			for (uint32_t i = 0; i < n; i ++)
 			{
-				float wl = m_wetL[i];
-				if (m_shiftLeft)
+				float wr = m_wetR[i];
+				if (m_shiftRight)
 				{
-					// The Cho parts' left side a sample late: their dry share of the mix
+					// The Cho parts' right side a sample late: their dry share of the mix
 					// swapped for last sample's, the chorus copy likewise.
-					outL[done + i] += m_lastChoL - choL[done + i];
-					m_lastChoL = choL[done + i];
-					const float w = wl;
-					wl = m_lastWetL;
-					m_lastWetL = w;
+					outR[done + i] += m_lastChoR - choR[done + i];
+					m_lastChoR = choR[done + i];
+					const float w = wr;
+					wr = m_lastWetR;
+					m_lastWetR = w;
 				}
-				outL[done + i] += wl;
-				outR[done + i] += m_wetR[i];
+				outL[done + i] += m_wetL[i];
+				outR[done + i] += wr;
 			}
 			if (m_revOn)
 			{
@@ -95,7 +95,7 @@ public:
 			done += n;
 		}
 	}
-	void reset() override { m_rev.reset(); m_cho.reset(); m_lastChoL = m_lastWetL = 0.0f; }
+	void reset() override { m_rev.reset(); m_cho.reset(); m_lastChoR = m_lastWetR = 0.0f; }
 
 private:
 	static constexpr uint32_t CHUNK = 256;
@@ -103,8 +103,8 @@ private:
 	U220Chorus m_cho;
 	float m_wetL[CHUNK] = {}, m_wetR[CHUNK] = {};
 	bool m_preRev = true;
-	bool m_shiftLeft = false;
-	float m_lastChoL = 0.0f, m_lastWetL = 0.0f;
+	bool m_shiftRight = false;
+	float m_lastChoR = 0.0f, m_lastWetR = 0.0f;
 	bool m_revOn = true;
 };
 
