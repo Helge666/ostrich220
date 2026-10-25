@@ -43,6 +43,7 @@ TRACE_FLAG(trace_tg,   "U220_TGTRACE")
 TRACE_FLAG(trace_midi, "U220_MIDITRACE")
 TRACE_FLAG(trace_lcd,  "U220_LCDTRACE")
 TRACE_FLAG(trace_fx,   "U220_FXTRACE")
+TRACE_FLAG(trace_gain, "U220_GAINTRACE")
 #undef TRACE_FLAG
 
 constexpr u32 CPU_CLOCK = 12000000;         // 12 MHz XTAL
@@ -274,6 +275,10 @@ void U220Core::Impl::apply_voice_gains(int voice)
 	pcm.stream()->update();
 	for (int b = 0; b < roland_u220::NUM_BUSES; b ++)
 		pcm.set_voice_gain(u8(voice), b, g[b]);
+	if (trace_gain())
+		std::fprintf(stderr, "GAIN %f v%02d dry %.3f %.3f rev %.3f %.3f cho %.3f %.3f
+", machine.time().as_double(),
+				voice, g[0], g[1], g[2], g[3], g[4], g[5]);
 }
 
 // The effect fields of the temp patch, bytes 12-19 at 0x1430 (IC10 0x743C), read as one
