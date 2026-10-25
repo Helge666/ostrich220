@@ -79,11 +79,26 @@ def settings():
     return out
 
 
+def prepost_settings():
+    """--prepost: P-02's chorus values (Delay 18, Rate 4, Depth 5, Level 31) for Chorus1
+    and Chorus2, each with Chorus Out = Post Rev and = Pre Rev -- whether Pre Rev changes
+    the sound with the reverb off (Helge's bassline, P-02 = Pre Rev: the unit's highs much
+    wider than Ostrich's; slot 25, Chorus2 at Post Rev, not)."""
+    def c(t, out):
+        return dict(rlevel=0, cout=out, ctype=t, clevel=31, cdelay=18, crate=4, cdepth=5, cfb=32)
+    out = [('dry (chorus level 0)', dict(rlevel=0, cout=1, ctype=0, clevel=0, cdelay=18, crate=4, cdepth=5, cfb=32), 4.0)]
+    for t, name in ((0, 'Chorus1'), (1, 'Chorus2')):
+        for o, oname in ((1, 'Post Rev'), (0, 'Pre Rev')):
+            out.append((f'{name} P-02 values {oname}', c(t, o), 8.0))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('base')
     ap.add_argument('mid')
     ap.add_argument('--list')
+    ap.add_argument('--prepost', action='store_true')
     a = ap.parse_args()
 
     base = load_patch(a.base)
@@ -94,7 +109,7 @@ def main():
           (0.4, bytes([0xE0, 0x00, 0x40]))]       # no bend
     labels = []
     t = 1.0
-    for label, f, hold in settings():
+    for label, f, hold in (prepost_settings() if a.prepost else settings()):
         if f is not None:
             msg = packet(with_fields(base, **f))
             ev.append((t, b'\xf0' + vlq(len(msg) - 1) + msg[1:]))
