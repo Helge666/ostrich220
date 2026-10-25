@@ -14,6 +14,13 @@
       Post Rev  "Reverb will not be added to the sound that has been processed through
                 the chorus": parts on Cho get the chorus only
 
+    And measured (make_chorus_probe.py --prepost, 25.10.2026): at Pre Rev the unit puts
+    out the left side of everything on Cho -- dry and chorus alike -- one sample (31 us)
+    late, which reads as a much wider top (4-15 kHz) and nowhere else; at Post Rev, or
+    with the chorus off, not.  The dry of a part on Cho is the chorus send itself (equal
+    level, measured), so that share of the dry mix is moved by a sample here, and the
+    chorus reads its left tap a sample later.
+
 ***************************************************************************************/
 
 #ifndef OSTRICH_U220_FX_H
@@ -39,6 +46,7 @@ public:
 	void setParams(const EffectParams &p) override
 	{
 		m_preRev = !p.chorus_post_reverb;
+		m_shiftLeft = m_preRev && p.chorus_on;
 		m_rev.setParams(p);
 		m_cho.setParams(p);
 	}
@@ -55,7 +63,18 @@ public:
 			m_cho.process(choL + done, choR + done, m_wetL, m_wetR, n);
 			for (uint32_t i = 0; i < n; i ++)
 			{
-				outL[done + i] += m_wetL[i];
+				float wl = m_wetL[i];
+				if (m_shiftLeft)
+				{
+					// The Cho parts' left side a sample late: their dry share of the mix
+					// swapped for last sample's, the chorus copy likewise.
+					outL[done + i] += m_lastChoL - choL[done + i];
+					m_lastChoL = choL[done + i];
+					const float w = wl;
+					wl = m_lastWetL;
+					m_lastWetL = w;
+				}
+				outL[done + i] += wl;
 				outR[done + i] += m_wetR[i];
 			}
 			if (m_revOn)
@@ -76,7 +95,7 @@ public:
 			done += n;
 		}
 	}
-	void reset() override { m_rev.reset(); m_cho.reset(); }
+	void reset() override { m_rev.reset(); m_cho.reset(); m_lastChoL = m_lastWetL = 0.0f; }
 
 private:
 	static constexpr uint32_t CHUNK = 256;
@@ -84,6 +103,8 @@ private:
 	U220Chorus m_cho;
 	float m_wetL[CHUNK] = {}, m_wetR[CHUNK] = {};
 	bool m_preRev = true;
+	bool m_shiftLeft = false;
+	float m_lastChoL = 0.0f, m_lastWetL = 0.0f;
 	bool m_revOn = true;
 };
 
