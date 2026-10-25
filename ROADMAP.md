@@ -595,6 +595,14 @@ ausgetauscht (Schritt 4).
    P-02, 80/80 Bytes). Das Gerät tut dasselbe. Ostrich könnte den Temp-Bereich vor ROM Play
    sichern und danach zurückschreiben – bewusst besser als das Gerät.
 
+**Panel-Freeze (Stand 25.10.2026, unter Beobachtung):** Logs zeigten: Maschine läuft, das Panel
+bekommt alle Displaydaten, aber das Fenster wird nicht mehr neu gezeichnet (draws stehen, idles
+laufen). Ausnahme beim Zeichnen ausgeschlossen (exc 0), Selbstheilung eines hängenden
+pugl-EXPOSING-Status (Patch 0008) half beim zweiten Mal nicht. Seit dem Build mit den
+pugl-Zählern (Patch 0008: WM_PAINT, exposes, enter-Fehler, obscure/refused, Fensterzustand im
+`ostrich-ui.log`) nicht wieder aufgetreten. Beim nächsten Mal zeigen die Zähler die Stelle.
+Diagnose bleibt drin, bis das geklärt ist.
+
 **Meilenstein 4:** Ostrich 0.1 läuft in der DAW.
 
 ## Phase 5 — Veröffentlichung und Rückfluss

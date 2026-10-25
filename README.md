@@ -3,18 +3,33 @@
 Ein nicht-kommerzielles Fan-Projekt: Der Roland U-220 (RS-PCM Sound Module, 1989) soll als
 Standalone-Programm und als Plugin (CLAP/VST3) weiterleben, wenn die Hardware einmal versagt.
 
-**Stand:** Der U-220 läuft emuliert in MAME und als Plugin „Ostrich“ (VST3/CLAP), mit
-Hall/Delay und Chorus, die an einem echten Gerät gemessen und nachgebaut sind. Was wann
-kommt, steht in [ROADMAP.md](ROADMAP.md).
+**Stand:** Der U-220 läuft emuliert in MAME und als Plugin „Ostrich“ (VST3/CLAP) und ist im
+Prinzip schon nutzbar: Klangerzeugung und Bedienung sind die echte Firmware, Hall/Delay und
+Chorus sind an einem echten Gerät gemessen und nachgebaut. Was wann kommt, steht in
+[ROADMAP.md](ROADMAP.md).
 
-## Bekannte Abweichungen vom Gerät
+## Die Effekte sind eine Annäherung
+
+Hall, Delay und Chorus des U-220 entstehen in einem eigenen Effektchip (IC25, Toshiba
+TC23SC140), dessen Innenleben niemand dokumentiert hat. Ostrich emuliert diesen Chip
+**nicht**, sondern ersetzt ihn durch einen Nachbau, der an einem echten U-220 vermessen und
+abgeglichen ist (Messfolgen, automatischer Abgleich, Hörvergleiche). Im Hörvergleich liegt
+das sehr nah am Original – es bleibt aber eine **vorläufige Annäherung**, bis jemand den
+Effektchip und sein Programm analysiert. Dann wird nur dieses eine Modul ausgetauscht; der
+Rest von Ostrich bleibt, wie er ist.
+
+Einzelgeräte können außerdem durch Alterung der analogen Bauteile voneinander abweichen.
+
+## Bekannte Abweichungen und offene Punkte
 
 - **Chorus2 „Growl“ (gelöst, 25.10.2026):** Chorus2 hat eine zweite, schneller modulierte
   Kopie, und bei „Chorus Out = Pre Rev“ kommt der rechte Kanal der Chorus-Parts ein Sample
   später. Beides ist jetzt nachgebaut; an einer Syn-Bass-Line nach Helges Urteil „nahezu
   ununterscheidbar“.
-- **Effekte allgemein:** Hall, Delay und Chorus sind nach Messungen eines Geräts angenähert,
-  nicht aus dem Effektchip (IC25) emuliert. Einzelgeräte können durch Alterung abweichen.
+- **Panel friert ein (unter Beobachtung):** In Cubase hörte das Plugin-Fenster mehrmals auf,
+  sich neu zu zeichnen, während der Klang weiterlief. Eine Absicherung ist eingebaut, und die
+  Diagnose schreibt nach `%PROGRAMDATA%\Ostrich\ostrich-dsp.log` und `ostrich-ui.log`; seither
+  ist es nicht wieder aufgetreten.
 
 ## Herkunft
 
