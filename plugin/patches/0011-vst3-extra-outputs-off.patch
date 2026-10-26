@@ -1,0 +1,29 @@
+diff --git a/distrho/src/DistrhoPluginVST3.cpp b/distrho/src/DistrhoPluginVST3.cpp
+--- a/distrho/src/DistrhoPluginVST3.cpp
++++ b/distrho/src/DistrhoPluginVST3.cpp
+@@ -2701,7 +2701,9 @@
+             {
+                 port.busId = std::find(vpgStart, vpgEnd, port.groupId) - vpgStart;
+ 
+-                if (busInfo.audio == 0 && (port.hints & kAudioPortIsSidechain) == 0x0)
++                // Only the first group starts enabled: the others are extra outputs the
++                // user switches on in the host (Ostrich, patches/0011).
++                if (busInfo.audio == 0 && (port.hints & kAudioPortIsSidechain) == 0x0 && port.busId == 0)
+                     enabledPorts[i] = true;
+             }
+             else
+@@ -2778,6 +2780,14 @@
+                         busType = V3_AUX;
+                         flags = 0;
+                     }
++                    else if (busId != 0)
++                    {
++                        // A second or third group is an extra output, off until the user
++                        // switches it on -- for Ostrich, a DIRECT OUT jack with a plug in
++                        // it (Ostrich, patches/0011).
++                        busType = V3_AUX;
++                        flags = 0;
++                    }
+                     else
+                     {
+                         busType = V3_MAIN;

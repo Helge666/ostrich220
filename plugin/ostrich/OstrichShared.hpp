@@ -40,6 +40,11 @@ enum Params : uint32_t
 	/// is the raw core, as MAME's driver produces it.
 	kParamOutputStage = kParamKeyEnd,
 
+	/// DIRECT OUT 1 and 2 on outputs of their own, where the host provides them (in VST3:
+	/// the extra outputs switched on -- a plug in the jack).  Off, or without them, the
+	/// direct sound joins MIX without effect, as on the unit with nothing plugged in.
+	kParamDirectOuts,
+
 	kParamCount
 };
 

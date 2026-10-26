@@ -238,6 +238,17 @@ protected:
 			p.ranges.max = 1.0f;
 			return;
 		}
+		if (index == kParamDirectOuts)
+		{
+			p.hints = kParameterIsBoolean;
+			p.name = "DIRECT OUT 1/2 on own outputs";
+			p.shortName = "Direct outs";
+			p.symbol = "direct_outs";
+			p.ranges.def = 1.0f;
+			p.ranges.min = 0.0f;
+			p.ranges.max = 1.0f;
+			return;
+		}
 		const uint32_t k = index - kParamKeyFirst;
 		p.hints = kParameterIsBoolean | kParameterIsAutomatable;
 		p.name = kKeyNames[k];
@@ -253,6 +264,8 @@ protected:
 			return m_volumeDb;
 		if (index == kParamOutputStage)
 			return m_outputStage ? 1.0f : 0.0f;
+		if (index == kParamDirectOuts)
+			return m_directOuts ? 1.0f : 0.0f;
 		return m_keyDown[index - kParamKeyFirst].load() ? 1.0f : 0.0f;
 	}
 
@@ -273,13 +286,48 @@ protected:
 			m_outputStage = value > 0.5f;
 			m_core.setOutputFilter(m_outputStage);
 			// The DAC's images belong to the same analogue output (a bool, read per sample).
-			m_dac[0].setImages(m_outputStage);
-			m_dac[1].setImages(m_outputStage);
+			for (DacStage &d : m_dac)
+				d.setImages(m_outputStage);
+			return;
+		}
+		if (index == kParamDirectOuts)
+		{
+			m_directOuts = value > 0.5f;     // read per block
 			return;
 		}
 		const uint32_t k = index - kParamKeyFirst;
 		if (k < kNumKeys)
 			setKey(k, value > 0.5f);
+	}
+
+	// The unit's three stereo pairs.  DIRECT OUT 1 and 2 are extra outputs, off until the
+	// user switches them on in the host (patches/0011): a plug in the jack.
+	void initAudioPort(bool input, uint32_t index, AudioPort &port) override
+	{
+		if (input)
+			return Plugin::initAudioPort(input, index, port);
+		static const char *const names[6] = {
+			"MIX OUT L", "MIX OUT R", "DIRECT OUT 1 L", "DIRECT OUT 1 R", "DIRECT OUT 2 L", "DIRECT OUT 2 R" };
+		static const char *const symbols[6] = { "mix_l", "mix_r", "dir1_l", "dir1_r", "dir2_l", "dir2_r" };
+		port.name = names[index];
+		port.symbol = symbols[index];
+		port.groupId = index < 2 ? kPortGroupStereo : index < 4 ? kGroupDirect1 : kGroupDirect2;
+	}
+
+	void initPortGroup(uint32_t groupId, PortGroup &group) override
+	{
+		if (groupId == kGroupDirect1)
+		{
+			group.name = "DIRECT OUT 1";
+			group.symbol = "direct_out_1";
+		}
+		else if (groupId == kGroupDirect2)
+		{
+			group.name = "DIRECT OUT 2";
+			group.symbol = "direct_out_2";
+		}
+		else
+			Plugin::initPortGroup(groupId, group);
 	}
 
 	void setKey(uint32_t k, bool down)
@@ -392,8 +440,8 @@ protected:
 
 	void activate() override
 	{
-		m_dac[0].reset();
-		m_dac[1].reset();
+		for (DacStage &d : m_dac)
+			d.reset();
 		m_gain = m_gainTarget;
 		// A new instance with no session behind it: the factory-fresh machine.  Done here
 		// and not in run(): it is a few seconds of emulated time, a fraction of one in CPU.
@@ -417,8 +465,8 @@ protected:
 		if (!lock.owns_lock() || !m_romsLoaded || m_needFirstBoot)
 		{
 			m_dbgIdleRuns.fetch_add(1, std::memory_order_relaxed);
-			std::memset(outL, 0, sizeof(float) * frames);
-			std::memset(outR, 0, sizeof(float) * frames);
+			for (uint32_t c = 0; c < DISTRHO_PLUGIN_NUM_OUTPUTS; c ++)
+				std::memset(outputs[c], 0, sizeof(float) * frames);
 			if (!m_romsLoaded)
 				publishPanel(frames);
 			return;
@@ -439,18 +487,31 @@ protected:
 			m_core.midiIn(data, ev.size, off);
 		}
 
-		if (m_coreL.size() < coreFrames)
+		if (m_coreBuf[0].size() < coreFrames)
 		{
 			// Only on a host block larger than any seen so far, so practically never.
-			m_coreL.resize(coreFrames);
-			m_coreR.resize(coreFrames);
+			for (auto &b : m_coreBuf)
+				b.resize(coreFrames);
 		}
 		m_dbgMidi.fetch_add(midiEventCount, std::memory_order_relaxed);
-		m_core.renderStereo(m_coreL.data(), m_coreR.data(), coreFrames);
-		m_dbgEmu.store(m_core.emulatedSeconds(), std::memory_order_relaxed);
-		m_dac[0].process(m_coreL.data(), coreFrames, outL, frames);
-		m_dac[1].process(m_coreR.data(), coreFrames, outR, frames);
 
+		// A DIRECT OUT pair has a plug in its jack when the host gave it buffers of its own:
+		// DPF hands every output switched off in the host one and the same dummy buffer.
+		const bool plugged[2] = {
+			m_directOuts && outputs[2] != outputs[3],
+			m_directOuts && outputs[4] != outputs[5] };
+		float *core[6];
+		for (int c = 0; c < 6; c ++)
+			core[c] = m_coreBuf[c].data();
+		m_core.render(&core[0], plugged[0] ? &core[2] : nullptr, plugged[1] ? &core[4] : nullptr, coreFrames);
+		m_dbgEmu.store(m_core.emulatedSeconds(), std::memory_order_relaxed);
+		for (int c = 0; c < 6; c ++)
+			if (c < 2 || plugged[(c - 2) / 2])
+				m_dac[c].process(core[c], coreFrames, outputs[c], frames);
+			else
+				std::memset(outputs[c], 0, sizeof(float) * frames);
+
+		// The Volume knob acts on MIX OUT only; the DIRECT OUT jacks are at a fixed level.
 		for (uint32_t i = 0; i < frames; i ++)
 		{
 			m_gain += (m_gainTarget - m_gain) * 0.001f;
@@ -469,14 +530,15 @@ private:
 	void setupRate(double rate)
 	{
 		m_hostRate = rate > 0.0 ? rate : 48000.0;
-		m_dac[0].setup(kCoreRate, m_hostRate, 8192);
-		m_dac[1].setup(kCoreRate, m_hostRate, 8192);
-		m_dac[0].setImages(m_outputStage);
-		m_dac[1].setImages(m_outputStage);
+		for (DacStage &d : m_dac)
+		{
+			d.setup(kCoreRate, m_hostRate, 8192);
+			d.setImages(m_outputStage);
+		}
 		m_publishPeriod = uint32_t(m_hostRate / kPanelRefreshHz);
 		const uint32_t worst = m_dac[0].inputsFor(8192) + 16;
-		m_coreL.assign(worst, 0.0f);
-		m_coreR.assign(worst, 0.0f);
+		for (auto &b : m_coreBuf)
+			b.assign(worst, 0.0f);
 		setLatency(m_dac[0].latency());
 	}
 
@@ -713,11 +775,14 @@ private:
 	mutable std::mutex m_uiSizeLock;
 
 	double m_hostRate = 48000.0;
-	DacStage m_dac[2];              // 32 kHz -> host, with the DAC's images (DacStage.hpp)
-	std::vector<float> m_coreL, m_coreR;
+	// MIX OUT L/R, DIRECT OUT 1 L/R, DIRECT OUT 2 L/R, as the outputs.
+	DacStage m_dac[6];              // 32 kHz -> host, with the DAC's images (DacStage.hpp)
+	std::vector<float> m_coreBuf[6];
+	static constexpr uint32_t kGroupDirect1 = 0, kGroupDirect2 = 1;
 
 	float m_volumeDb = 0.0f, m_gainTarget = 1.0f, m_gain = 1.0f;
 	bool m_outputStage = true;
+	bool m_directOuts = true;
 
 	std::atomic<bool> m_keyDown[kNumKeys] {};
 	std::atomic<uint32_t> m_keySeq[kNumKeys];

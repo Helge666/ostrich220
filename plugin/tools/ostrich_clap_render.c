@@ -4,10 +4,15 @@
     the PLUGIN (ROM search, first boot into factory data, MIDI timing, resampler, state)
     is tested and not only the core.
 
-        ostrich_clap_render Ostrich.clap out.wav [note] [rate]
+        ostrich_clap_render Ostrich.clap out.wav [note] [rate] [presses] [channel] [params]
+                            [seconds] [note-on]
 
-    Plays `note` (default 60) at velocity 100 from 1.0 s to 3.0 s, renders 6 s at `rate`
-    (default 48000), then saves the plugin state and prints its size.
+    Plays `note` (default 60) at velocity 100 on `channel` (1-16, default 1) from `note-on`
+    (default 1.0 s) for 2 s, renders `seconds` (default 6) at `rate` (default 48000), then
+    saves the plugin state and prints its size.  `presses`: parameters to press for 0.1 s,
+    "id@sec,id@sec,..." (a bare id presses at 2.0 s) -- the panel keys.  `params`: values
+    to set at the start, "id=value,...".  The WAV has all six outputs: MIX OUT, DIRECT OUT
+    1, DIRECT OUT 2, each given buffers of its own (plugged in).
 */
 
 #define _GNU_SOURCE
@@ -32,7 +37,7 @@ static const clap_host_t host = {
 };
 
 typedef union { clap_event_header_t header; clap_event_note_t note; clap_event_param_value_t param; } any_event_t;
-typedef struct { any_event_t ev[4]; uint32_t n; } events_t;
+typedef struct { any_event_t ev[64]; uint32_t n; } events_t;
 static uint32_t in_size(const clap_input_events_t *l) { return ((const events_t *)l->ctx)->n; }
 static const clap_event_header_t *in_get(const clap_input_events_t *l, uint32_t i)
 { return &((const events_t *)l->ctx)->ev[i].header; }
@@ -51,8 +56,28 @@ int main(int argc, char **argv)
 	if (argc < 3) { fprintf(stderr, "usage: %s plugin.clap out.wav [note] [rate]\n", argv[0]); return 2; }
 	const int note = argc > 3 ? atoi(argv[3]) : 60;
 	const double rate = argc > 4 ? atof(argv[4]) : 48000.0;
-	const int press_param = argc > 5 ? atoi(argv[5]) : -1;
 	const int channel = argc > 6 ? atoi(argv[6]) - 1 : 0;    // 1-based on the command line
+	const double seconds = argc > 8 ? atof(argv[8]) : 6.0;
+	const double note_on = argc > 9 ? atof(argv[9]) : 1.0;
+
+	// Presses ("id@sec,...", a bare id at 2.0 s) and starting values ("id=value,...").
+	struct { int id; double at; } presses[32]; int npress = 0;
+	if (argc > 5 && atoi(argv[5]) >= 0)
+		for (char *t = strtok(strdup(argv[5]), ","); t && npress < 32; t = strtok(NULL, ","))
+		{
+			char *at = strchr(t, '@');
+			presses[npress].id = atoi(t);
+			presses[npress ++].at = at ? atof(at + 1) : 2.0;
+		}
+	struct { int id; double value; } params[16]; int nparam = 0;
+	if (argc > 7)
+		for (char *t = strtok(strdup(argv[7]), ","); t && nparam < 16; t = strtok(NULL, ","))
+		{
+			char *eq = strchr(t, '=');
+			if (!eq) continue;
+			params[nparam].id = atoi(t);
+			params[nparam ++].value = atof(eq + 1);
+		}
 
 	void *lib = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
 	if (!lib) { fprintf(stderr, "%s\n", dlerror()); return 1; }
@@ -66,12 +91,26 @@ int main(int argc, char **argv)
 	if (!p->activate(p, rate, 1, FRAMES)) { fprintf(stderr, "activate failed\n"); return 1; }
 	p->start_processing(p);
 
-	const uint32_t total = (uint32_t)(rate * 6.0);
-	float *L = calloc(total + FRAMES, sizeof(float)), *R = calloc(total + FRAMES, sizeof(float));
+	const uint32_t total = (uint32_t)(rate * seconds);
+	float *out[6];
+	for (int c = 0; c < 6; c ++)
+		out[c] = calloc(total + FRAMES, sizeof(float));
 	for (uint32_t pos = 0; pos < total; pos += FRAMES)
 	{
 		events_t evs; memset(&evs, 0, sizeof(evs));
-		const uint32_t on = (uint32_t)(rate * 1.0), off = (uint32_t)(rate * 3.0);
+		const uint32_t on = (uint32_t)(rate * note_on), off = (uint32_t)(rate * (note_on + 2.0));
+		if (pos == 0)
+			for (int k = 0; k < nparam; k ++)
+			{
+				clap_event_param_value_t *e = &evs.ev[evs.n ++].param;
+				memset(e, 0, sizeof(*e));
+				e->header.size = sizeof(*e);
+				e->header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+				e->header.type = CLAP_EVENT_PARAM_VALUE;
+				e->param_id = (clap_id)params[k].id;
+				e->note_id = -1; e->port_index = -1; e->channel = -1; e->key = -1;
+				e->value = params[k].value;
+			}
 		for (int k = 0; k < 2; k ++)
 		{
 			const uint32_t at = k ? off : on;
@@ -86,12 +125,12 @@ int main(int argc, char **argv)
 				e->velocity = 100.0 / 127.0;
 			}
 		}
-		// argv[5]: a parameter to press at 2.0 s and release at 2.1 s (a panel key)
-		if (press_param >= 0)
+		// The panel keys: pressed at their time, released 0.1 s later.
+		for (int j = 0; j < npress; j ++)
 			for (int k = 0; k < 2; k ++)
 			{
-				const uint32_t at = (uint32_t)(rate * (k ? 2.1 : 2.0));
-				if (at >= pos && at < pos + FRAMES)
+				const uint32_t at = (uint32_t)(rate * (presses[j].at + (k ? 0.1 : 0.0)));
+				if (at >= pos && at < pos + FRAMES && evs.n < 64)
 				{
 					clap_event_param_value_t *e = &evs.ev[evs.n ++].param;
 					memset(e, 0, sizeof(*e));
@@ -99,16 +138,22 @@ int main(int argc, char **argv)
 					e->header.time = at - pos;
 					e->header.space_id = CLAP_CORE_EVENT_SPACE_ID;
 					e->header.type = CLAP_EVENT_PARAM_VALUE;
-					e->param_id = (clap_id)press_param;
+					e->param_id = (clap_id)presses[j].id;
 					e->note_id = -1; e->port_index = -1; e->channel = -1; e->key = -1;
 					e->value = k ? 0.0 : 1.0;
 				}
 			}
 		clap_input_events_t in = { &evs, in_size, in_get };
-		clap_output_events_t out = { NULL, out_push };
-		float *chans[2] = { L + pos, R + pos };
-		clap_audio_buffer_t ob = { chans, NULL, 2, 0, 0 };
-		clap_process_t proc = { (int64_t)pos, FRAMES, NULL, NULL, &ob, 0, 1, &in, &out };
+		clap_output_events_t oev = { NULL, out_push };
+		float *chans[3][2];
+		clap_audio_buffer_t ob[3];
+		for (int b = 0; b < 3; b ++)
+		{
+			chans[b][0] = out[2 * b] + pos;
+			chans[b][1] = out[2 * b + 1] + pos;
+			ob[b] = (clap_audio_buffer_t){ chans[b], NULL, 2, 0, 0 };
+		}
+		clap_process_t proc = { (int64_t)pos, FRAMES, NULL, NULL, ob, 0, 3, &in, &oev };
 		p->process(p, &proc);
 	}
 
@@ -128,22 +173,24 @@ int main(int argc, char **argv)
 	entry->deinit();
 
 	FILE *w = fopen(argv[2], "wb");
-	const uint32_t bytes = total * 4;
+	const uint32_t bytes = total * 12;
 	uint32_t v; uint16_t s;
 	fwrite("RIFF", 1, 4, w); v = 36 + bytes; fwrite(&v, 4, 1, w); fwrite("WAVEfmt ", 1, 8, w);
-	v = 16; fwrite(&v, 4, 1, w); s = 1; fwrite(&s, 2, 1, w); s = 2; fwrite(&s, 2, 1, w);
-	v = (uint32_t)rate; fwrite(&v, 4, 1, w); v = (uint32_t)rate * 4; fwrite(&v, 4, 1, w);
-	s = 4; fwrite(&s, 2, 1, w); s = 16; fwrite(&s, 2, 1, w); fwrite("data", 1, 4, w); fwrite(&bytes, 4, 1, w);
-	float peak = 0;
+	v = 16; fwrite(&v, 4, 1, w); s = 1; fwrite(&s, 2, 1, w); s = 6; fwrite(&s, 2, 1, w);
+	v = (uint32_t)rate; fwrite(&v, 4, 1, w); v = (uint32_t)rate * 12; fwrite(&v, 4, 1, w);
+	s = 12; fwrite(&s, 2, 1, w); s = 16; fwrite(&s, 2, 1, w); fwrite("data", 1, 4, w); fwrite(&bytes, 4, 1, w);
+	float peak[6] = { 0 };
 	for (uint32_t i = 0; i < total; i ++)
-		for (int c = 0; c < 2; c ++)
+		for (int c = 0; c < 6; c ++)
 		{
-			float x = c ? R[i] : L[i];
-			if (x > peak) peak = x; if (-x > peak) peak = -x;
+			const float x = out[c][i];
+			if (x > peak[c]) peak[c] = x;
+			if (-x > peak[c]) peak[c] = -x;
 			int q = (int)(x * 32767.0f); if (q > 32767) q = 32767; if (q < -32768) q = -32768;
 			int16_t q16 = (int16_t)q; fwrite(&q16, 2, 1, w);
 		}
 	fclose(w);
-	printf("wrote %s, peak %.3f\n", argv[2], peak);
+	printf("wrote %s, peak MIX %.3f %.3f  DIRECT 1 %.3f %.3f  DIRECT 2 %.3f %.3f\n", argv[2],
+	       peak[0], peak[1], peak[2], peak[3], peak[4], peak[5]);
 	return 0;
 }
