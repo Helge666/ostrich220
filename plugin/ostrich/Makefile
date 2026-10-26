@@ -10,7 +10,7 @@
 NAME = Ostrich
 
 FILES_DSP = OstrichPlugin.cpp
-FILES_UI  = OstrichUI.cpp OstrichFrameWatch.cpp
+FILES_UI  = OstrichUI.cpp
 
 include ../dpf/Makefile.plugins.mk
 

@@ -1,48 +1,16 @@
 diff --git a/distrho/src/DistrhoUIVST3.cpp b/distrho/src/DistrhoUIVST3.cpp
 --- a/distrho/src/DistrhoUIVST3.cpp
 +++ b/distrho/src/DistrhoUIVST3.cpp
-@@ -16,6 +16,11 @@
+@@ -16,6 +16,8 @@
  
  #include "DistrhoUIInternal.hpp"
  
 +#include <cmath>
-+#include <cstdio>
-+#include <cstdlib>
-+#include <ctime>
 +
  #include "travesty/base.h"
  #include "travesty/edit_controller.h"
  #include "travesty/host.h"
-@@ -59,6 +64,28 @@
- 
- // --------------------------------------------------------------------------------------------------------------------
- 
-+// Every size call between host and view, to %PROGRAMDATA%/Ostrich/ostrich-ui.log (Ostrich,
-+// patches/0010): Cubase at 125 % shrank the view step by step on opening.
-+static void sizeTrace(const char* const what, const int32_t w, const int32_t h, const int32_t w2 = -1, const int32_t h2 = -1)
-+{
-+    const char* const base = std::getenv("PROGRAMDATA");
-+    if (base == nullptr)
-+        return;
-+    char path[512];
-+    std::snprintf(path, sizeof(path), "%s/Ostrich/ostrich-ui.log", base);
-+    if (FILE* const f = std::fopen(path, "a"))
-+    {
-+        const std::time_t now = std::time(nullptr);
-+        char stamp[32];
-+        std::strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
-+        if (w2 >= 0)
-+            std::fprintf(f, "%s vst3 %s %dx%d -> %dx%d\n", stamp, what, w, h, w2, h2);
-+        else
-+            std::fprintf(f, "%s vst3 %s %dx%d\n", stamp, what, w, h);
-+        std::fclose(f);
-+    }
-+}
-+
- static void applyGeometryConstraints(const uint minimumWidth,
-                                      const uint minimumHeight,
-                                      const bool keepAspectRatio,
-@@ -79,7 +106,11 @@
+@@ -79,7 +81,11 @@
          const double ratio = static_cast<double>(minWidth) / static_cast<double>(minHeight);
          const double reqRatio = static_cast<double>(rect->right) / static_cast<double>(rect->bottom);
  
@@ -55,24 +23,7 @@ diff --git a/distrho/src/DistrhoUIVST3.cpp b/distrho/src/DistrhoUIVST3.cpp
          {
              // fix width
              if (reqRatio > ratio)
-@@ -312,6 +343,7 @@
-         }
- 
-         d_debug("getSize request returning %i %i", rect->right, rect->bottom);
-+        sizeTrace("getSize", rect->right - rect->left, rect->bottom - rect->top);
-         return V3_OK;
-     }
- 
-@@ -338,6 +370,8 @@
-             d_debug("host->plugin onSize request %i %i (OK)", rect.right - rect.left, rect.bottom - rect.top);
-         }
- 
-+        sizeTrace(fIsResizingFromPlugin ? "onSize (plugin resize active)" : "onSize",
-+                  rect.right - rect.left, rect.bottom - rect.top);
-         fIsResizingFromHost = true;
-         fUI.setWindowSizeFromHost(rect.right - rect.left, rect.bottom - rect.top);
-         return V3_OK;
-@@ -364,9 +398,18 @@
+@@ -364,6 +370,13 @@
          const double scaleFactor = fUI.getScaleFactor();
          minimumWidth /= scaleFactor;
          minimumHeight /= scaleFactor;
@@ -85,33 +36,4 @@ diff --git a/distrho/src/DistrhoUIVST3.cpp b/distrho/src/DistrhoUIVST3.cpp
 +        minimumHeight = d_roundToUnsignedInt(minimumHeight * scaleFactor);
         #endif
  
-+        const int32_t inW = rect->right - rect->left, inH = rect->bottom - rect->top;
          applyGeometryConstraints(minimumWidth, minimumHeight, keepAspectRatio, rect);
-+        sizeTrace("checkSizeConstraint", inW, inH, rect->right - rect->left, rect->bottom - rect->top);
-         return V3_TRUE;
-     }
- 
-@@ -530,6 +573,7 @@
- 
-     v3_result setContentScaleFactor(const float factor)
-     {
-+        sizeTrace("setContentScaleFactor x1000", static_cast<int32_t>(factor * 1000.0f), 0);
-         if (d_isEqual(fScaleFactor, factor))
-             return V3_OK;
- 
-@@ -778,6 +822,7 @@
-             else
-             {
-                 d_debug("plugin->host setSize %u %u (IGNORED, host resize active)", width, height);
-+                sizeTrace("setSize ignored", width, height);
-                 return;
-             }
-         }
-@@ -793,6 +838,7 @@
-         rect.right = width;
-         rect.bottom = height;
-         fNextPluginRect = rect;
-+        sizeTrace("resize_view", width, height);
-         v3_cpp_obj(fFrame)->resize_view(fFrame, fView, &rect);
-     }
- 

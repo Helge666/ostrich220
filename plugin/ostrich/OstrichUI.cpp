@@ -5,18 +5,9 @@
 // drawn panel comes later; the layout here already follows Helge's photo of the unit.
 
 #include "DistrhoUI.hpp"
-#include "OstrichFrameWatch.hpp"
 #include "OstrichShared.hpp"
 
 #include <chrono>
-#include <memory>
-
-#ifdef _WIN32
-// pugl's paint-path counters (patches/0008), for the freeze diagnostics below.
-START_NAMESPACE_DGL
-extern unsigned long puglWinDebug[16];
-END_NAMESPACE_DGL
-#endif
 #include <cmath>
 #include <string>
 
@@ -92,7 +83,6 @@ public:
 	{
 		loadSharedResources();
 		std::memset(&m_panel, 0, sizeof(m_panel));
-		m_frameWatch = std::make_unique<FrameWatch>(getWindow().getNativeWindowHandle());
 	}
 
 protected:
@@ -115,11 +105,8 @@ protected:
 			if (decodeHex(value, reinterpret_cast<uint8_t *>(&b), sizeof(b)))
 			{
 				m_panel = b;
-				m_dbgPanels ++;
 				repaint();
 			}
-			else
-				m_dbgPanelBad ++;
 		}
 		else if (std::strcmp(key, "uisize") == 0)
 			restoreSize(value);
@@ -166,17 +153,15 @@ protected:
 
 	void onNanoDisplay() override
 	{
-		m_dbgDraws ++;
 		// Nothing may escape a draw: under Windows it unwinds through the window
 		// procedure, which swallows it and leaves pugl believing it is still drawing --
-		// the panel then never redraws (patches/0008).  Counted for the log instead.
+		// the panel then never redraws (patches/0008).
 		try
 		{
 			drawPanel();
 		}
 		catch (...)
 		{
-			m_dbgExc ++;
 		}
 	}
 
@@ -236,20 +221,10 @@ protected:
 
 	bool onMouse(const MouseEvent &ev) override
 	{
-		m_dbgMouse ++;
 		if (ev.button != 1)
 			return false;
 		const float s = mouseScale();
 		const float x = float(ev.pos.getX()) / s, y = float(ev.pos.getY()) / s;
-		if (ev.press && m_dbgMouseLines < 200)
-		{
-			m_dbgMouseLines ++;
-			char line[200];
-			std::snprintf(line, sizeof(line), "ui %p press at %.0f,%.0f -> %.0f,%.0f (widget %ux%u, window %ux%u)",
-					(void *)this, ev.pos.getX(), ev.pos.getY(), double(x), double(y),
-					getWidth(), getHeight(), getWindow().getWidth(), getWindow().getHeight());
-			debugLog("ostrich-ui", line);
-		}
 
 		if (ev.press)
 		{
@@ -365,7 +340,6 @@ private:
 		char msg[16];
 		std::snprintf(msg, sizeof(msg), "%u %u", unsigned(k), down ? 1u : 0u);
 		setState("key", msg);
-		m_dbgKeys ++;
 	}
 
 	void browseCard(unsigned s)
@@ -646,10 +620,6 @@ private:
 		m_sizeSaved = value;
 		const double scale = getWindow().getScaleFactor();
 		const uint pw = uint(std::lround(w * scale)), ph = uint(std::lround(h * scale));
-		char line[160];
-		std::snprintf(line, sizeof(line), "ui %p restore size %ux%u -> %ux%u (window %ux%u)",
-				(void *)this, w, h, pw, ph, getWindow().getWidth(), getWindow().getHeight());
-		debugLog("ostrich-ui", line);
 		if (std::abs(int(pw) - int(getWindow().getWidth())) > 2 || std::abs(int(ph) - int(getWindow().getHeight())) > 2)
 			getWindow().setSize(pw, ph);
 	}
@@ -681,9 +651,6 @@ private:
 			return;                     // the host's rounding, not a resize
 		m_sizeSaved = value;
 		setState("uisize", value);
-		char line[96];
-		std::snprintf(line, sizeof(line), "ui %p save size %s (window %ux%u)", (void *)this, value, pw, ph);
-		debugLog("ostrich-ui", line);
 	}
 
 	// Mouse events come in the window's own pixels.  The panel is drawn in design units
@@ -705,33 +672,7 @@ private:
 
 	void uiIdle() override
 	{
-		m_dbgIdles ++;
-		m_frameWatch->idle();
 		saveSizeWhenSettled();
-		const auto now = std::chrono::steady_clock::now();
-		if (now - m_dbgLast >= std::chrono::seconds(1))
-		{
-			m_dbgLast = now;
-			char line[900], lcd[56], pugl[240] = "", frame[120];
-			lcdText(m_panel.lcd, lcd);
-#ifdef _WIN32
-			const unsigned long *d = DGL_NAMESPACE::puglWinDebug;
-			std::snprintf(pugl, sizeof(pugl),
-					" | pugl paint %lu exposed %lu enterfail %lu obscure %lu refused %lu healed %lu"
-					" update %lu/%lu invfail %lu state %lu stage %lu visible %lu emptyrect %lu"
-					" lbutton %lu dgl %lu dropped %lu",
-					d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12],
-					d[13], d[14], d[15]);
-#endif
-			m_frameWatch->status(frame, sizeof(frame));
-			std::snprintf(line, sizeof(line), "ui %p idles %lu panels %lu bad %lu draws %lu exc %lu keys %lu mouse %lu vis %d %ux%u win %ux%u"
-					" cursor %u/%u lcd %s%s%s",
-					(void *)this, m_dbgIdles, m_dbgPanels, m_dbgPanelBad, m_dbgDraws, m_dbgExc, m_dbgKeys, m_dbgMouse,
-					getWindow().isVisible() ? 1 : 0, getWidth(), getHeight(),
-					getWindow().getWidth(), getWindow().getHeight(),
-					unsigned(m_panel.cursor_pos), unsigned(m_panel.cursor_flags), lcd, pugl, frame);
-			debugLog("ostrich-ui", line);
-		}
 		if (m_panel.cursor_flags & 1)
 			repaint();
 	}
@@ -806,10 +747,6 @@ private:
 	int m_browseSlot = -1;
 	unsigned m_syxSeq = 0;
 	std::string m_syxDir;
-	unsigned long m_dbgIdles = 0, m_dbgPanels = 0, m_dbgPanelBad = 0, m_dbgDraws = 0, m_dbgKeys = 0, m_dbgExc = 0;
-	unsigned long m_dbgMouse = 0, m_dbgMouseLines = 0;
-	std::chrono::steady_clock::time_point m_dbgLast {};
-	std::unique_ptr<FrameWatch> m_frameWatch;   // the host frame around the panel (freeze)
 	const std::chrono::steady_clock::time_point m_created = std::chrono::steady_clock::now();
 	std::string m_sizeSaved;                    // "<w> <h>" unscaled, as in the plugin state
 	uint m_sizeSeenW = 0, m_sizeSeenH = 0;

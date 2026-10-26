@@ -189,14 +189,10 @@ public:
 		m_core.setEffects(&m_fx);
 		loadRoms();
 		setupRate(getSampleRate());
-		m_dbgThread = std::thread([this] { debugLoop(); });
 	}
 
 	~OstrichPlugin() override
 	{
-		m_dbgStop.store(true);
-		if (m_dbgThread.joinable())
-			m_dbgThread.join();
 		if (m_sysexThread.joinable())
 			m_sysexThread.join();
 	}
@@ -443,7 +439,6 @@ protected:
 			unsigned k = 0, down = 0;
 			if (std::sscanf(value, "%u %u", &k, &down) == 2 && k < kNumKeys)
 			{
-				m_dbgKeyMsgs.fetch_add(1);
 				if (s_debug)
 					d_stdout("Ostrich: key %u %s (state)", k, down ? "down" : "up");
 				setKey(k, down != 0);
@@ -525,10 +520,8 @@ protected:
 
 		// setState() reboots the machine on another thread.  Never wait for it here.
 		std::unique_lock<std::mutex> lock(m_machine, std::try_to_lock);
-		m_dbgRuns.fetch_add(1, std::memory_order_relaxed);
 		if (!lock.owns_lock() || !m_romsLoaded || m_needFirstBoot)
 		{
-			m_dbgIdleRuns.fetch_add(1, std::memory_order_relaxed);
 			for (uint32_t c = 0; c < DISTRHO_PLUGIN_NUM_OUTPUTS; c ++)
 				std::memset(outputs[c], 0, sizeof(float) * frames);
 			if (!m_romsLoaded)
@@ -558,7 +551,6 @@ protected:
 			for (auto &b : m_coreBuf)
 				b.resize(coreFrames);
 		}
-		m_dbgMidi.fetch_add(midiEventCount, std::memory_order_relaxed);
 
 		// A DIRECT OUT pair has a plug in its jack when the host gave it buffers of its own:
 		// DPF hands every output switched off in the host one and the same dummy buffer.
@@ -569,7 +561,6 @@ protected:
 		for (int c = 0; c < 6; c ++)
 			core[c] = m_coreBuf[c].data();
 		m_core.render(&core[0], plugged[0] ? &core[2] : nullptr, plugged[1] ? &core[4] : nullptr, coreFrames);
-		m_dbgEmu.store(m_core.emulatedSeconds(), std::memory_order_relaxed);
 		sendMidiOut(frames);
 		for (int c = 0; c < 6; c ++)
 			if (c < 2 || plugged[(c - 2) / 2])
@@ -619,7 +610,6 @@ private:
 				m_keyHeld[k] = true;
 				m_keyHeldFrames[k] = 0;
 				m_core.setButton(Button(kKeyBits[k]), true);
-				m_dbgPresses.fetch_add(1, std::memory_order_relaxed);
 				if (s_debug)
 					d_stdout("Ostrich: machine key %u pressed", k);
 				continue;
@@ -969,9 +959,7 @@ private:
 					m_sysex[m_sysexLen ++] = b;
 					emitMidi(m_sysex, m_sysexLen, frame);
 				}
-				else
-					m_dbgMidiOutDropped.fetch_add(1, std::memory_order_relaxed);
-				m_sysexLen = 0;
+				m_sysexLen = 0;                     // otherwise cut short or too long: dropped
 				if (b == 0xF7)
 					return;
 			}
@@ -1035,18 +1023,12 @@ private:
 		{
 			// The host reads the bytes when the block is done: one copy each, kept till then.
 			if (m_sysexUsed + size > sizeof(m_sysexArena))
-			{
-				m_dbgMidiOutDropped.fetch_add(1, std::memory_order_relaxed);
 				return;
-			}
 			std::memcpy(m_sysexArena + m_sysexUsed, data, size);
 			ev.dataExt = m_sysexArena + m_sysexUsed;
 			m_sysexUsed += size;
 		}
-		if (writeMidiEvent(ev))
-			m_dbgMidiOut.fetch_add(1, std::memory_order_relaxed);
-		else
-			m_dbgMidiOutDropped.fetch_add(1, std::memory_order_relaxed);
+		writeMidiEvent(ev);
 	}
 
 	void publishPanel(uint32_t frames)
@@ -1085,11 +1067,7 @@ private:
 			{
 				m_lastBlob = blob;
 				m_publishesSame = 0;
-				m_dbgPanelOk.fetch_add(1, std::memory_order_relaxed);
 			}
-			else
-				m_dbgPanelFail.fetch_add(1, std::memory_order_relaxed);
-			std::memcpy(m_dbgLcd, blob.lcd, sizeof(m_dbgLcd));
 		}
 	}
 
@@ -1210,35 +1188,6 @@ private:
 		setStatus("Factory data loaded (" + std::to_string(msgs.size()) + " packets) from " + pstr(m_factoryPath));
 	}
 
-	// ---- diagnostics (the panel freeze, ROADMAP.md Phase 4) ---------------------------
-
-	// Once a second: what the machine shows and how far each link of DSP -> UI got.
-	// Counters only on the audio side; the file is written here.
-	void debugLoop()
-	{
-		char line[480], lcd[56];
-		uint8_t raw[48];
-		uint64_t lastRuns = 0;
-		while (!m_dbgStop.load())
-		{
-			for (int i = 0; i < 10 && !m_dbgStop.load(); i ++)
-				std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			std::memcpy(raw, m_dbgLcd, sizeof(raw));
-			lcdText(raw, lcd);
-			const uint64_t runs = m_dbgRuns.load();
-			std::snprintf(line, sizeof(line),
-					"dsp %p runs %llu (+%llu, idle %llu) emu %.1f s midi %llu out %llu (dropped %llu) keymsgs %llu presses %llu panel ok %llu fail %llu lcd %s",
-					(void *)this, (unsigned long long)runs, (unsigned long long)(runs - lastRuns),
-					(unsigned long long)m_dbgIdleRuns.load(), m_dbgEmu.load(),
-					(unsigned long long)m_dbgMidi.load(), (unsigned long long)m_dbgMidiOut.load(),
-					(unsigned long long)m_dbgMidiOutDropped.load(), (unsigned long long)m_dbgKeyMsgs.load(),
-					(unsigned long long)m_dbgPresses.load(), (unsigned long long)m_dbgPanelOk.load(),
-					(unsigned long long)m_dbgPanelFail.load(), lcd);
-			lastRuns = runs;
-			debugLog("ostrich-dsp", line);
-		}
-	}
-
 	// ---- members ---------------------------------------------------------------------
 
 	mutable std::mutex m_machine;
@@ -1300,13 +1249,6 @@ private:
 	uint8_t m_sysexArena[8192];
 	size_t m_sysexUsed = 0;
 
-	std::thread m_dbgThread;
-	std::atomic<bool> m_dbgStop { false };
-	std::atomic<uint64_t> m_dbgRuns { 0 }, m_dbgIdleRuns { 0 }, m_dbgMidi { 0 }, m_dbgKeyMsgs { 0 },
-			m_dbgPresses { 0 }, m_dbgPanelOk { 0 }, m_dbgPanelFail { 0 }, m_dbgMidiOut { 0 },
-			m_dbgMidiOutDropped { 0 };
-	std::atomic<double> m_dbgEmu { 0.0 };
-	uint8_t m_dbgLcd[48] = {};
 
 	DISTRHO_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OstrichPlugin)
 };

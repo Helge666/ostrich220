@@ -7,10 +7,7 @@
 #define OSTRICH_SHARED_HPP
 
 #include <cstdint>
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
-#include <ctime>
 
 namespace ostrich {
 
@@ -137,49 +134,6 @@ inline bool decodeHex(const char *s, uint8_t *out, size_t n)
 		out[i] = uint8_t((hi << 4) | lo);
 	}
 	return true;
-}
-
-// Diagnostics while the panel freeze is hunted (ROADMAP.md, Phase 4): one line at a time
-// appended to %PROGRAMDATA%\Ostrich\<name>.log (ProgramData: Cubase's MSIX packaging hides
-// what a plugin writes to %LOCALAPPDATA%), restarted when it passes 2 MB.  Called once a
-// second from a non-audio thread only.
-inline void debugLog(const char *name, const char *line)
-{
-	const char *base = std::getenv("PROGRAMDATA");
-	if (base == nullptr)
-		return;
-	char path[512];
-	std::snprintf(path, sizeof(path), "%s/Ostrich/%s.log", base, name);
-	FILE *f = std::fopen(path, "a");
-	if (f == nullptr)
-		return;
-	if (std::ftell(f) > 2 * 1024 * 1024)
-	{
-		std::fclose(f);
-		f = std::fopen(path, "w");
-		if (f == nullptr)
-			return;
-	}
-	const std::time_t now = std::time(nullptr);
-	char stamp[32];
-	std::strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
-	std::fprintf(f, "%s %s\n", stamp, line);
-	std::fclose(f);
-}
-
-// The LCD's two rows as printable text, for the logs.
-inline void lcdText(const uint8_t *lcd, char *out /* 52 */)
-{
-	int k = 0;
-	out[k ++] = '[';
-	for (int i = 0; i < 48; i ++)
-	{
-		if (i == 24) { out[k ++] = ']'; out[k ++] = '['; }
-		const uint8_t c = lcd[i];
-		out[k ++] = (c >= 0x20 && c < 0x7f) ? char(c) : '~';
-	}
-	out[k ++] = ']';
-	out[k] = 0;
 }
 
 } // namespace ostrich
