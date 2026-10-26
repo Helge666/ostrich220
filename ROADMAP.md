@@ -22,12 +22,11 @@ Done and checked against a real U-220 (details in [analysis/](analysis/README-AN
 
 ## Before the first public release (0.1)
 
-- [ ] GitHub: the repository (private first), a fork of `eliggett/mame` with branch `u220`
-      and `.gitmodules` pointing to it; check that both submodule pins are pushed
-      (BUILDING.md §6). Pushing is done together with Helge, step by step.
-- [ ] CI: build Linux and Windows on GitHub, no ROMs needed; release zips on a `v*` tag.
-      Written (`.github/workflows/build.yml`), smoke test checked on the build host; not
-      yet run on GitHub.
+- [x] GitHub: [Helge666/ostrich220](https://github.com/Helge666/ostrich220) (private for now),
+      the MAME fork [Helge666/mame](https://github.com/Helge666/mame), branch `u220`; both
+      submodule pins are pushed.
+- [x] CI: builds Linux and Windows on GitHub without ROMs, smoke test, zips (~4 min);
+      a `v*` tag publishes a release.
 - [x] The plugin's home page (`getHomePage`): https://github.com/Helge666/ostrich220
 - [ ] Release 0.1: Windows zip (VST3, CLAP, standalone) and Linux zip, no ROMs.
 - [ ] Make the repository public.
