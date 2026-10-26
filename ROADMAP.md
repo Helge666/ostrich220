@@ -609,11 +609,22 @@ Mitschnitt). Die Vermutung "Cubase lässt WM_SETREDRAW aus" war falsch.
 
 Diagnose, die vorerst drin bleibt: `FrameWatch` (WM_SETREDRAW/Show/Hide an den Vorfahren,
 Selbstheilung nach SETREDRAW), Klick-Zähler in pugl/DGL (Patches 0008/0009) und jede
-Klick-Abbildung im `ostrich-ui.log`. Nach einigen Tagen ohne Freeze ausbauen.
+Klick-Abbildung im `ostrich-ui.log`, Größen-Trace aus Patch 0010. Nach einigen Tagen ohne
+Freeze ausbauen (die Größen-Toleranz und die skalierte Mindestgröße in 0010 bleiben).
 `tools/freeze_probe.ps1 -Press CUR>,CUR<` drückt Panel-Tasten per Skript, auch im Hintergrund.
 
-Noch offen: Beim Öffnen handeln Cubase und DPF die Größe in einer schrumpfenden Kette aus
-(1438x313 -> 1428x308; Seitenverhältnis 4,6 bei 125 % nicht ganzzahlig).
+**Fenstergröße (26.10.2026, erledigt):** Beim Öffnen schrumpfte das Panel in Cubase
+schrittweise (1438x313 -> 1428x308). Ursache war 1150x250, das bei 125 % 1437,5 x 312,5
+ergibt: Cubase rechnet in eigene Einheiten und zurück, setzt das Fenster einen Pixel niedriger,
+als es meldet, und der nächste Layout-Durchgang startet von dort. Seither:
+- Standardgröße 1196x260 (weiter 4,6 : 1, durch 4 teilbar, ganze Pixel bei 125/150/175/200 %).
+- Patch 0010: DPF nimmt Größen innerhalb der Rundung an und meldet unter Windows die
+  skalierte Mindestgröße (vorher unskaliert, Cubase fragte dutzendfach nach). Außerdem
+  protokolliert er alle VST3-Größenaufrufe (`vst3 ...` im `ostrich-ui.log`).
+- Das Panel merkt sich seine Größe im Projekt (State `uisize`, unskaliert), von Helge geprüft.
+- Offen, harmlos: Cubase fragt in Schüben `checkSizeConstraint 292x12` (Antwort: die
+  Mindestgröße). `setContentScaleFactor` kommt oft erst Sekunden nach dem Öffnen -- mit dem
+  alten Klick-Code war das vermutlich der Moment, ab dem das Panel "einfror".
 
 **Meilenstein 4:** Ostrich 0.1 läuft in der DAW.
 
