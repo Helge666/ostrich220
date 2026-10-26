@@ -3,5 +3,5 @@
 	url = https://github.com/DISTRHO/DPF.git
 [submodule "mame"]
 	path = mame
-	url = https://github.com/eliggett/mame.git
-	branch = u110
+	url = https://github.com/Helge666/mame.git
+	branch = u220

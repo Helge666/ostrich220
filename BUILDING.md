@@ -23,7 +23,7 @@ opinions about `std::mutex`.
 ## 2. Clone
 
 ```sh
-git clone --recurse-submodules <repository URL> ostrich220
+git clone --recurse-submodules https://github.com/Helge666/ostrich220.git
 ```
 
 All three levels are needed: `mame`, `plugin/dpf`, and DPF's own `dgl/src/pugl-upstream`.

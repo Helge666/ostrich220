@@ -91,7 +91,7 @@ Submodules:
 
 | Path | Source | What for |
 |---|---|---|
-| `mame/` | MAME fork, branch `u220` | CPU, PCM chip, the `roland_u220` driver, IC25 mixer |
+| `mame/` | [Helge666/mame](https://github.com/Helge666/mame), branch `u220` (a fork of emu110's `eliggett/mame`) | CPU, PCM chip, the `roland_u220` driver, IC25 mixer |
 | `plugin/dpf/` | [DISTRHO/DPF](https://github.com/DISTRHO/DPF), with the patches in `plugin/patches/` | plugin framework |
 
 ## Licences

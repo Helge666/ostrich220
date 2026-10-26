@@ -206,7 +206,7 @@ protected:
 	const char *getLabel() const override { return "Ostrich220"; }
 	const char *getMaker() const override { return "Ostrich 220 project"; }
 	const char *getLicense() const override { return "GPL-3.0-or-later"; }
-	const char *getHomePage() const override { return "https://example.invalid/ostrich"; }
+	const char *getHomePage() const override { return "https://github.com/Helge666/ostrich220"; }
 	uint32_t getVersion() const override { return d_version(0, 1, 0); }
 	int64_t getUniqueId() const override { return d_cconst('O', '2', '2', '0'); }
 	const char *getDescription() const override
