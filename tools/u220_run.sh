@@ -22,7 +22,7 @@ export PATH=/usr/lib/ccache:$PATH
 unset DISPLAY WAYLAND_DISPLAY
 srcs=src/mame/roland/roland_u20.cpp,src/mame/roland/roland_u110.cpp,src/mame/roland/roland_u220.cpp
 if ! nice -n 19 make -C "$mame" SUBTARGET=u220 SOURCES="$srcs" NOWERROR=1 USE_QTDEBUG=0 \
-		-j10 > "$HOME/dev/build_u220.log" 2>&1; then
+		-j5 > "$HOME/dev/build_u220.log" 2>&1; then
 	grep -E "error" "$HOME/dev/build_u220.log" | head -20
 	exit 1
 fi

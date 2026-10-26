@@ -608,8 +608,9 @@ ausgetauscht (Schritt 4).
    - **Panel:** 1350 x 250 Designeinheiten (vorher 1150), Standard 1404 x 260. Rechts zwei
      Slots: Klick öffnet den Dateidialog, das Auswurf-Symbol zieht die Karte. Alte Projekte
      behalten ihre Höhe, die Breite passt sich an.
-   - Offen: der MAME-Treiber kennt die Slots noch nicht; Erkennung bekannter Dumps per
-     SHA1; SN-MV30-Karten ungeprüft.
+   - MAME-Treiber: dieselben zwei Slots (`-cart1`, `-cart2`, Softwareliste `u110_card`),
+     headless geprüft: `02-002 LATIN 2` mit Karte in Slot 1 oder 2, ohne `No Card!`.
+   - Offen: Erkennung bekannter Dumps per SHA1; SN-MV30-Karten ungeprüft.
 8. **MIDI OUT** aus dem Plugin (umgesetzt 26.10.2026, offline geprüft; in Cubase kommt SysEx nicht an):
    was die Firmware an MIDI OUT sendet, als MIDI-Ausgang des Plugins – für Librarian-Arbeit
    in der DAW. Das Plugin zerlegt den Bytestrom wie die Leitung (Running Status, SysEx über

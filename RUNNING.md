@@ -298,6 +298,16 @@ Notes on the file:
 Card presence is reported to the firmware on PORT1, so the U-110 notices the card and its
 tones become selectable — you do not have to tell it anything else.
 
+### U-220: two slots (`-cart1`, `-cart2`)
+
+The U-220 driver has two slots, with the same options and the same file rules. Its 8098
+has no PORT1: a card's detect line is bit 6 (slot 1) or 7 (slot 2) of the key matrix.
+Card tones are media 01–31 on the Tone page, for example `02-001 LATIN 1` for SN-U110-02.
+
+```sh
+./u220 u220 -cart1 /path/to/sn-u110-02.bin
+```
+
 ### By software-list short name
 
 `hash/u110_card.xml` carries 19 known cards. `./u110 u110 -listsoftware` prints them all.
