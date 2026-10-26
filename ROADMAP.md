@@ -700,11 +700,14 @@ als es meldet, und der nächste Layout-Durchgang startet von dort. Seither:
       mehr gebraucht werden (alte Builds, Proben-WAVs, Logs, Einmal-Skripte), hier unter
       Windows und auf kellerkind2. Vorher Liste zeigen; Hörproben-Ordner und Analysen
       bleiben nach AGENTS.md.
-- [ ] **Umbenennung in „Ostrich 220“ (kurz O-220)**, Idee von Helge. Der
+- [ ] **Umbenennung in „Ostrich 220“ (kurz O-220)**, Idee von Helge, **schon für die erste
+      öffentliche Version (Entscheidung 26.10.2026)**. Der
       Bezug zum Roland U-220 steht dann in der README. Betrifft Plugin-Name, VST3/CLAP-IDs
       (neue IDs, damit Sessions mit Voltaire 110 nicht verwechselt werden), Datenordner.
 - [ ] Vor jedem öffentlichen Push: Prüfung, dass die Historie keine ROM-, Wave- oder
       Handbuch-Datei enthält (`git log --all --stat` gegen die `.gitignore`-Regeln).
+- [ ] **Push gemeinsam (Helge, 26.10.2026):** Helge ist kein Entwickler; jeder Schritt wird
+      erklärt und einzeln freigegeben. Konto und Repo legt Helge im Browser an.
 - [ ] Repo öffentlich machen, Releases nur mit Binärdateien ohne ROMs. Die
       Selbsttests in CI dürfen keine ROMs brauchen; emu110 hat sie im Repo, wir nicht.
 - [ ] Treiber `roland_u220.cpp` und Chip-Verbesserungen als PR an mamedev (BSD-3-Clause). Achtung! Zuvor prüfen, wie mamedev mit durch LLM erzeugten PRs umgeht. Wenn Policy unbekannt, PR erzeugen und Projekt selbst entscheiden lassen. Wenn gesichert unerwünscht, hier vermerken und Schritt überspringen. 
