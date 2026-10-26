@@ -4,7 +4,7 @@
 # Bring in what changed in emu110 since .upstream-base, WITHOUT its ROMs.
 #
 # Ostrich's history was started fresh because emu110 tracks Roland's ROMs (README.md,
-# "Herkunft"), so a plain `git merge` from emu110 would drag them into ours. Instead this
+# "Origin"), so a plain `git merge` from emu110 would drag them into ours. Instead this
 # takes the upstream diff with the copyrighted paths cut out and applies it as a patch.
 #
 #   tools/sync_upstream.sh [path-to-emu110-clone]     default: ../upstream/emu110
@@ -49,4 +49,4 @@ if git -C "$here" diff --cached --name-only | git -C "$here" check-ignore --no-i
 fi
 
 echo "Applied. README.md changes upstream go to README-emu110.md by hand, if wanted."
-echo "Submodule pointers (mame, plugin/dpf) are not touched; see ROADMAP.md §0."
+echo "Submodule pointers (mame, plugin/dpf) are not touched; see BUILDING.md."

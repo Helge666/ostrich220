@@ -15,7 +15,7 @@
 
     WHAT IS NOT HERE YET.  The effect processor (IC25) is not emulated.  The firmware's
     writes to it are passed to an EffectsModule (u220_effects.h), which for now is a
-    bypass; Phase 3 replaces the module without touching this class.  The MIX/DIRECT
+    bypass; an emulation of IC25 would replace the module without touching this class.  The MIX/DIRECT
     output split and the MIDI lamp are not modelled either.
 
 ***************************************************************************************/

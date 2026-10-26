@@ -12,7 +12,7 @@ emulation (Data > Bulk > Temp, captured with u220_render --midi-out); it is fact
 and stays out of the repo.
 
 The effect fields, found by changing one parameter at a time in the emulated menus and
-diffing Temp dumps (ROADMAP.md, Phase 3).  Bytes 12..19 of the patch, read as one
+diffing Temp dumps (analysis/U220-HARDWARE.md, MIDI).  Bytes 12..19 of the patch, read as one
 little-endian 64-bit word:
 
     bits  0- 4 chorus rate      bits 32-36 chorus delay time

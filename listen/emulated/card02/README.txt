@@ -1,4 +1,4 @@
-SN-U110-02 (Latin & F.X. Percussions) im emulierten Kartenslot: alle 52 Tones nacheinander auf C4, Vel. 100, je 2 s (ab 4,2 s), P-02 Part 1, mit Hall. Kein Hardware-Vergleich; nur Plausibilitaet.
+SN-U110-02 (Latin & F.X. Percussions) in an emulated card slot: all 52 tones in turn at C4, velocity 100, 2 s each (from 4.2 s), P-02 part 1, with reverb. No hardware comparison; a plausibility check (judged plausible by ear).
 01    0:04.2  LATIN 1
 02    0:06.2  LATIN 2
 03    0:08.2  LATIN 3

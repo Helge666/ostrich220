@@ -4,7 +4,7 @@
 
     U220Chorus -- the U-220's chorus block, approximated from measurements
 
-    Not an emulation of IC25 (ROADMAP.md, Phase 3): a model of what a held sawtooth
+    Not an emulation of IC25 (analysis/U220-EFFECTS.md): a model of what a held sawtooth
     through the hardware shows (tools/make_chorus_probe.py, tools/chorus_analyse.py,
     25.10.2026).  Per side one delayed copy of the chorus send:
 

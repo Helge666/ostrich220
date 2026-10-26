@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Ostrich -- the panel.  A plain first version (ROADMAP.md, Phase 4 step 4): the 24 x 2
-// LCD, the twelve keys where the U-220 has them, a volume knob and a status line.  The
-// drawn panel comes later; the layout here already follows Helge's photo of the unit.
+// Ostrich 220 -- the panel: the unit's front (the 24 x 2 LCD, the twelve keys where the
+// U-220 has them, the volume knob, the two PCM card slots) and under it a bar for what the
+// unit does not have (status line, HW-EQ, SysEx files).  The layout follows a photo of the
+// unit.
 
 #include "DistrhoUI.hpp"
 #include "OstrichShared.hpp"

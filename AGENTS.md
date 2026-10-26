@@ -1,31 +1,38 @@
-# emu110
+# Ostrich 220
 
 ## About the project
-We are working on an emulator of a 1980s synth, the Roland U-110, similar to the Roland U-220 and U-20.
 
-The emulator runs in mame and will ultimately become a DAW plugin. 
+An emulation of the Roland U-220 RS-PCM Sound Module (1989): a MAME driver and a DAW plugin
+(VST3, CLAP, standalone) running the unit's original firmware. Based on emu110, the U-110
+emulation by Elliott H. Liggett. README.md says what it does, BUILDING.md how to build it,
+ROADMAP.md what is open, analysis/ what is known about the hardware.
 
-## Requests for agent work methods:
-Do not remove any products in the analys directory. Keep the README-ANALYSIS.md file up to date, note if an analysis is obsolete but never remove it. 
+## Rules
 
-Do not remove items in the listen directory, unless: 1. created by the agent, and 2. created in or with error significant enough to be confusing if left around. 
+- **Never commit Roland data**: no firmware, wave ROM, card dump, SysEx dump, manual or
+  service notes, not even briefly. Recordings of a real unit stay out of the repository too.
+  `.gitignore` covers the known formats; check `git status` before every commit.
+- Make commits; do not push to the public repository. Pushing is done together with the
+  owner, step by step.
+- Do not contact other developers or projects. Pull requests to MAME or emu110 only after
+  checking their policy on LLM-written contributions, and only with the owner.
+- Compile with at most `-j5` and `nice -n 19`; the build host stays responsive.
+- On the build host change no audio or video settings and open no audio device (it streams
+  its desktop); listening and DAW tests happen on the owner's Windows machine.
+- Ask before drawing windows on the owner's desktop.
+- Do not remove anything in `analysis/` or `listen/`; mark what is obsolete instead. A new
+  folder in `listen/` gets a short `README.txt` (one or two sentences: what was rendered or
+  recorded, how).
+- Record what is learnt about the hardware in `analysis/U220-HARDWARE.md` or
+  `analysis/U220-EFFECTS.md`, and keep `analysis/README-ANALYSIS.md` up to date.
+- Before a listening test, measure the pitch over the whole note, release included, against
+  the hardware.
+- Do not offer to run commands as root; say what needs installing.
 
-Write a very very brief text file about what you are creating when you make a directory in the listen directory, ie, "Ran emulator with different sample rate" etc. Don't write much more than one or two sentences.
+## Facts that are easy to get wrong
 
-Reference the reference/ material when needed. Ask the human to transcribe data which is absent but needed. The old PDFs aren't OCR'd, but many have markdown versions. 
-
-Look at the U-110's programmable parameters and sysex support to understand the parameters better. 
-
-Document what is found about the design of the hardware synth in the markdown document (analysis/SYSTEM-DESIGN.md) 
-
-Document plans and methods as appropriate. 
-
-Do not push to the repo. But do make commits. 
-
-Do not offer to run commands as root; tell the user what you need installed and it will generally be done for you. 
-
-## Compiling: 
-
-Please limit concurrent compile threads to -j5, this keeps the desktop responsive. 
-
-Please ask the user first if you want to draw windows on the desktop. 
+- The core runs at 32 kHz; the plugin resamples. The core and the MAME driver are
+  BSD-3-Clause, the plugin and the tools GPL-3.0-or-later.
+- DPF is patched at build time (`plugin/patches`); `plugin/dpf` always shows as modified.
+- On Windows, files written by tools inside a packaged (MSIX) app under `%LOCALAPPDATA%` are
+  invisible to the DAW; use `C:\ProgramData`.

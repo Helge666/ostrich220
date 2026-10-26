@@ -66,7 +66,7 @@ constexpr u32 CARD_PLACE[kNumCardSlots] = { 0x280000, 0x380000 };
 using roland_u110::MIDI_BAUD;
 
 // The output stage, MEASURED rather than taken from a schematic: Helge's U-220 against the
-// unfiltered core, all 127 sounding timbres averaged (ROADMAP.md, Phase 4).  What separates
+// unfiltered core, all 127 sounding timbres averaged (analysis/U220-HARDWARE.md).  What separates
 // them below 15 kHz is a gentle high shelf, about -3 dB above 5 kHz; an RBJ shelf at
 // 5.2 kHz, -3.3 dB, Q 0.5 fits it within 0.8 dB from 1 to 14 kHz.  The U-110's Sallen-Key
 // values that stood here first cut far too steeply: the hardware has real content up to

@@ -4,7 +4,7 @@
 
     U220Reverb -- the U-220's reverb/delay block, approximated from measurements
 
-    Not an emulation of IC25: an algorithmic stand-in (ROADMAP.md, Phase 3), tuned to
+    Not an emulation of IC25: an algorithmic stand-in (analysis/U220-EFFECTS.md), tuned to
     recordings of Helge's U-220 through its own reverb (tools/make_reverb_probe.py):
 
       Room1-3, Hall1-2  an 8-line feedback delay network after four input diffusers; the

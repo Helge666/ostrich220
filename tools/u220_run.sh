@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Phase 1 loop on the build host: take the pushed MAME branch, build the U-220 driver,
+# The MAME loop on the build host: take the pushed MAME branch, build the U-220 driver,
 # run the firmware headless for a while, and summarise what it did.
 #
 #   tools/u220_run.sh [SECONDS] [-- extra MAME options]

@@ -1,68 +1,106 @@
-# Ostrich — eine Emulation des Roland U-220
+# Ostrich 220 (O-220)
 
-Ein nicht-kommerzielles Fan-Projekt: Der Roland U-220 (RS-PCM Sound Module, 1989) soll als
-Standalone-Programm und als Plugin (CLAP/VST3) weiterleben, wenn die Hardware einmal versagt.
+An emulation of the **Roland U-220 RS-PCM Sound Module** (1989) as a VST3/CLAP plugin and a
+standalone program, plus a U-220 driver for MAME. A non-commercial fan project.
 
-**Stand:** Der U-220 läuft emuliert in MAME und als Plugin „Ostrich“ (VST3/CLAP) und ist im
-Prinzip schon nutzbar: Klangerzeugung und Bedienung sind die echte Firmware, Hall/Delay und
-Chorus sind an einem echten Gerät gemessen und nachgebaut. Was wann kommt, steht in
+The emulation runs the U-220's **original firmware** on an emulated CPU, with the sound chips
+emulated after the hardware. Everything the firmware does comes along by itself: voice
+allocation, the six parts and the rhythm part, MIDI, SysEx, the menus, the display.
+
+You need your own ROM images. **This repository contains no Roland data and never will.**
+
+![Ostrich 220](docs/ostrich220.png)
+
+## What it does
+
+- **The U-220 itself.** All 128 tones and 64 patches (with the factory data), the 24×2 display
+  and the twelve panel keys, played by mouse. The battery-backed memory is saved with the
+  host session.
+- **Reverb/delay and chorus**, measured on a real U-220 and rebuilt (see below).
+- **Outputs as on the unit:** MIX OUT, DIRECT OUT 1 and DIRECT OUT 2 as three stereo pairs.
+  A part assigned to Dir1/Dir2 sounds there, without effect, once the host's output is
+  switched on; otherwise it joins MIX, as on the unit with nothing plugged in.
+- **Two PCM card slots** for SN-U110 card dumps. Click a slot to insert a card, the eject
+  button takes it out; the firmware notices either while running ("Checking PCM Card...").
+  Only the file's path is saved with the session.
+- **SysEx files:** SAVE SYSEX writes the unit's own bulk dump (Data > Bulk > All) to a
+  `.syx`; LOAD SYSEX sends a `.syx` into the machine.
+- **MIDI OUT:** what the firmware sends appears on the plugin's MIDI output.
+- **HW-EQ:** the measured analogue output stage (default on); off gives the raw core.
+
+Formats: VST3, CLAP and a standalone program on Windows (64-bit); VST3, CLAP and a JACK
+standalone on Linux. No macOS build.
+
+## Installing (Windows)
+
+1. Copy `Ostrich220.vst3` to `C:\Program Files\Common Files\VST3\` (or
+   `%LOCALAPPDATA%\Programs\Common\VST3\`), or `Ostrich220.clap` to the CLAP folder.
+2. Put the ROM images in `C:\ProgramData\Ostrich 220\roms\`. File names do not matter: the
+   images are recognised by their SHA-1. Which ones you need: [roms/README.md](roms/README.md).
+3. Optional: put a U-220 factory SysEx dump whose name starts with `U220Factory` (`.syx`)
+   next to the ROMs. A new instance then starts like a unit fresh from the factory, with
+   the 64 factory patches. Without it the memory starts empty ("Memory Initialize").
+
+The status line under the panel says which ROMs were found and where, or which are missing
+and where they were looked for. Folders searched, in this order, for "Ostrich 220" and then
+"Ostrich": `%PROGRAMDATA%\…\roms`, `%LOCALAPPDATA%\…\roms`, `Documents\…\roms`; on Linux
+`$XDG_DATA_HOME/…/roms`, `~/.local/share/…/roms`, `/usr/share/…/roms`. The environment
+variable `OSTRICH_ROMS` names a folder searched first.
+
+## The effects are an approximation
+
+The U-220's reverb, delay and chorus come from a dedicated effect processor (IC25, Toshiba
+TC23SC140AF) whose program nobody has documented. Ostrich 220 does not emulate it: it
+replaces it with a model fitted to measurements of a real U-220 (decay per octave band,
+levels, delay times, chorus modulation) and checked by ear in A/B tests. It is close, but
+it is not the chip. The effect model is one module behind a narrow interface, to be
+replaced if the chip is ever understood. See [analysis/U220-EFFECTS.md](analysis/U220-EFFECTS.md).
+
+Individual units may also differ a little, from ageing analogue parts.
+
+## Known limitations
+
+- **SysEx out of the VST3 does not reach Cubase.** The plugin hands the messages to the
+  host; Cubase 15 neither records nor forwards them. Use SAVE SYSEX instead. Other hosts
+  and CLAP are untested.
+- **No SysEx into the VST3.** DPF's VST3 wrapper does not accept SysEx input. Use LOAD
+  SYSEX instead.
+- The Windows standalone builds and starts, but has seen little use.
+- In MAME the display exists only as text in the log (the LCD controller's character ROM
+  has never been dumped).
+
+## Building
+
+[BUILDING.md](BUILDING.md). The U-220 in MAME: [RUNNING.md](RUNNING.md). What is known
+about the hardware: [analysis/](analysis/README-ANALYSIS.md). What is planned:
 [ROADMAP.md](ROADMAP.md).
 
-## Die Effekte sind eine Annäherung
+## Origin
 
-Hall, Delay und Chorus des U-220 entstehen in einem eigenen Effektchip (IC25, Toshiba
-TC23SC140), dessen Innenleben niemand dokumentiert hat. Ostrich emuliert diesen Chip
-**nicht**, sondern ersetzt ihn durch einen Nachbau, der an einem echten U-220 vermessen und
-abgeglichen ist (Messfolgen, automatischer Abgleich, Hörvergleiche). Im Hörvergleich liegt
-das sehr nah am Original – es bleibt aber eine **vorläufige Annäherung**, bis jemand den
-Effektchip und sein Programm analysiert. Dann wird nur dieses eine Modul ausgetauscht; der
-Rest von Ostrich bleibt, wie er ist.
+Ostrich 220 is based on **[emu110 / Voltaire 110](https://github.com/eliggett/emu110)** by
+Elliott H. Liggett, an emulation of the Roland U-110. The U-110 and U-220 share the PCM
+chips (MB87419/MB87420), wave ROMs A–D and the card format, so this project builds directly
+on emu110's work: its MAME device work, its plugin core and its analyses. The starting point
+was emu110 commit `5990a16` ([`.upstream-base`](.upstream-base)).
 
-Einzelgeräte können außerdem durch Alterung der analogen Bauteile voneinander abweichen.
+The history was started afresh rather than forked, because emu110 carries Roland ROM images
+in its history; Ostrich 220 contains no Roland file, not even in the past.
+[`tools/sync_upstream.sh`](tools/sync_upstream.sh) brings in emu110 updates.
 
-## Bekannte Abweichungen und offene Punkte
+Submodules:
 
-- **Chorus2 „Growl“ (gelöst, 25.10.2026):** Chorus2 hat eine zweite, schneller modulierte
-  Kopie, und bei „Chorus Out = Pre Rev“ kommt der rechte Kanal der Chorus-Parts ein Sample
-  später. Beides ist jetzt nachgebaut; an einer Syn-Bass-Line nach Helges Urteil „nahezu
-  ununterscheidbar“.
-- **Panel reagiert nicht auf Klicks (behoben 26.10.2026, unter Beobachtung):** Bei einer
-  Windows-Skalierung über 100 % wurden Mausklicks falsch umgerechnet und trafen keine Taste;
-  das Panel wirkte eingefroren. Die Diagnose schreibt weiterhin nach
-  `%PROGRAMDATA%\Ostrich\ostrich-ui.log`.
-
-## Herkunft
-
-Ostrich basiert auf **[emu110 / Voltaire 110](https://github.com/eliggett/emu110)** von
-Elliott H. Liggett, einem Emulator des Roland U-110. U-110 und U-220 verwenden dieselben
-PCM-Chips (MB87419/MB87420) und dieselben Wave-ROMs A–D. Übernommen ist der Stand von
-emu110-Commit `5990a16` (siehe [`.upstream-base`](.upstream-base)); die ursprüngliche
-README liegt unter [README-emu110.md](README-emu110.md).
-
-Die Historie wurde **neu begonnen** statt geforkt, weil emu110 die Roland-ROMs in seiner
-Git-Historie trägt. Ostrich enthält keine einzige Roland-Datei, auch nicht in der
-Vergangenheit. Updates von emu110 kommen per `tools/sync_upstream.sh` herein.
-
-Dazu kommen zwei Submodule:
-
-| Pfad | Quelle | Zweck |
+| Path | Source | What for |
 |---|---|---|
-| `mame/` | [eliggett/mame](https://github.com/eliggett/mame), Branch `u110`; lokal Branch `u220` | CPU, PCM-Chip, LCD, später unser `roland_u220.cpp` |
-| `plugin/dpf/` | [DISTRHO/DPF](https://github.com/DISTRHO/DPF) | Plugin-Framework (CLAP, VST3, LV2) |
+| `mame/` | MAME fork, branch `u220` | CPU, PCM chip, the `roland_u220` driver, IC25 mixer |
+| `plugin/dpf/` | [DISTRHO/DPF](https://github.com/DISTRHO/DPF), with the patches in `plugin/patches/` | plugin framework |
 
-## ROMs
+## Licences
 
-**Dieses Repository enthält keine ROMs und wird nie welche enthalten.** Du brauchst
-Dumps deines eigenen Geräts. Welche Dateien es gibt, wie sie in den verschiedenen
-Namensschemata heißen und wohin sie gehören, steht in [roms/README.md](roms/README.md).
-Die [.gitignore](.gitignore) schließt alle bekannten ROM-, Wave- und Handbuch-Formate aus.
+- The plugin (`plugin/ostrich`), the tools (`plugin/tools`, `tools/`): GPL-3.0-or-later, as
+  emu110.
+- The emulation core (`plugin/core`), the MAME devices and drivers: BSD-3-Clause, so that
+  findings can flow back into MAME.
+- Third-party code and its licences: [THIRD-PARTY.md](THIRD-PARTY.md). See [LICENSE](LICENSE).
 
-## Lizenzen
-
-- `plugin/src`, `plugin/tools`, `tools/`: GPL-3.0-or-later (wie emu110)
-- `plugin/core`, die MAME-Geräte und MAME-Treiber: BSD-3-Clause, damit Erkenntnisse zurück
-  in MAME fließen können
-- Siehe [LICENSE](LICENSE)
-
-„Roland“, „U-220“ und „U-110“ sind Marken der Roland Corporation. Dieses Projekt steht in
-keiner Verbindung zu Roland.
+"Roland", "U-220" and "U-110" are trademarks of Roland Corporation. This project is not
+affiliated with Roland.

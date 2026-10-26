@@ -1,4 +1,19 @@
-# Roland U-110 Emulator Analysis TOC
+# Analysis
+
+## Roland U-220 (Ostrich 220)
+
+1. U220-HARDWARE.md: the board, the memory map and IC12's window, the keys and the card
+   detect lines, the PCM chip and where the wave ROMs and cards sit, IC25's mixer and the
+   output routing, the analogue output stage, MIDI and SysEx addresses, the data in RAM and
+   ROM, the menus, and what was checked against a real unit.
+2. U220-EFFECTS.md: the reverb/delay and chorus — what the unit has, how they were measured,
+   the models and how close they are, what is open.
+
+## Roland U-110 (from emu110)
+
+Everything below is emu110's analysis of the U-110, kept as it was. Much of it holds for the
+U-220 as well: the PCM chip, the wave-ROM data format, the card format and the scrambling
+of address and data lines.
 
 ## PDFs:
 

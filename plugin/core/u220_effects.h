@@ -5,7 +5,7 @@
     EffectsModule -- the U-220's effect processor (IC25, TC23SC140AF-007), as a part
     that can be swapped out
 
-    The chip is not understood yet.  The plan (ROADMAP.md, Phase 3) is to approximate
+    The chip is not understood yet.  The plan (analysis/U220-EFFECTS.md) is to approximate
     chorus and reverb by ear first and to replace that with an emulation if the chip and
     its program are ever analysed -- so the rest of the core talks to this interface and
     to nothing more specific.
