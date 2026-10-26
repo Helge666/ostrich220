@@ -1,29 +1,102 @@
 diff --git a/distrho/src/DistrhoPluginVST3.cpp b/distrho/src/DistrhoPluginVST3.cpp
 --- a/distrho/src/DistrhoPluginVST3.cpp
 +++ b/distrho/src/DistrhoPluginVST3.cpp
-@@ -2701,7 +2701,9 @@
+@@ -55,6 +55,10 @@
+ #include "travesty/host.h"
+ 
+ #include <atomic>
++#include <cstdarg>
++#include <cstdio>
++#include <cstdlib>
++#include <ctime>
+ #include <cstring>
+ #include <map>
+ #include <string>
+@@ -62,6 +66,30 @@
+ 
+ START_NAMESPACE_DISTRHO
+ 
++// What the host does with the audio buses, to %PROGRAMDATA%/Ostrich/ostrich-dsp.log
++// (Ostrich, patches/0011).
++static void busTrace(const char* const format, ...)
++{
++    const char* const base = std::getenv("PROGRAMDATA");
++    if (base == nullptr)
++        return;
++    char path[512];
++    std::snprintf(path, sizeof(path), "%s/Ostrich/ostrich-dsp.log", base);
++    if (FILE* const f = std::fopen(path, "a"))
++    {
++        const std::time_t now = std::time(nullptr);
++        char stamp[32];
++        std::strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
++        std::fprintf(f, "%s vst3 ", stamp);
++        va_list args;
++        va_start(args, format);
++        std::vfprintf(f, format, args);
++        va_end(args);
++        std::fputc('\n', f);
++        std::fclose(f);
++    }
++}
++
+ // --------------------------------------------------------------------------------------------------------------------
+ 
+ #if ! DISTRHO_PLUGIN_WANT_MIDI_OUTPUT
+@@ -895,6 +923,9 @@
+         DISTRHO_SAFE_ASSERT_INT_RETURN(busIndex >= 0, busIndex, V3_INVALID_ARG);
+ 
+         if (mediaType == V3_AUDIO)
++            busTrace("activateBus %s %d %s", busDirection == V3_INPUT ? "in" : "out", busIndex, state ? "on" : "off");
++
++        if (mediaType == V3_AUDIO)
+         {
+            #if DISTRHO_PLUGIN_NUM_INPUTS+DISTRHO_PLUGIN_NUM_OUTPUTS > 0
+             const uint32_t busId = static_cast<uint32_t>(busIndex);
+@@ -2701,7 +2732,9 @@
              {
                  port.busId = std::find(vpgStart, vpgEnd, port.groupId) - vpgStart;
  
 -                if (busInfo.audio == 0 && (port.hints & kAudioPortIsSidechain) == 0x0)
-+                // Only the first group starts enabled: the others are extra outputs the
-+                // user switches on in the host (Ostrich, patches/0011).
++                // Only the first group starts on: the others are extra outputs the user
++                // switches on in the host (Ostrich, patches/0011).
 +                if (busInfo.audio == 0 && (port.hints & kAudioPortIsSidechain) == 0x0 && port.busId == 0)
                      enabledPorts[i] = true;
              }
              else
-@@ -2778,6 +2780,14 @@
-                         busType = V3_AUX;
-                         flags = 0;
+@@ -2780,8 +2813,12 @@
                      }
-+                    else if (busId != 0)
-+                    {
-+                        // A second or third group is an extra output, off until the user
-+                        // switches it on -- for Ostrich, a DIRECT OUT jack with a plug in
-+                        // it (Ostrich, patches/0011).
-+                        busType = V3_AUX;
-+                        flags = 0;
-+                    }
                      else
                      {
++                        // A second or third group is an extra output: a main bus too (as
++                        // Steinberg's own multi-output instruments have it; Cubase will not
++                        // switch an aux bus on), but off until the user switches it on --
++                        // for Ostrich, a DIRECT OUT jack with a plug in it (patches/0011).
                          busType = V3_MAIN;
+-                        flags = busInfo.audio == 0 ? V3_DEFAULT_ACTIVE : 0;
++                        flags = busInfo.audio == 0 && busId == 0 ? V3_DEFAULT_ACTIVE : 0;
+                     }
+                     break;
+                 }
+@@ -2967,6 +3004,8 @@
+         for (uint32_t busId=0; busId<numBuses; ++busId)
+         {
+             const v3_speaker_arrangement arr = speakers[busId];
++            busTrace("setBusArrangements %s bus %u of %u: %llx", isInput ? "in" : "out", busId, numBuses,
++                     static_cast<unsigned long long>(arr));
+ 
+             // d_debug("setAudioBusArrangement %d %d | %d %lx", (int)isInput, numBuses, busId, arr);
+ 
+@@ -2991,7 +3030,11 @@
+                     continue;
+                 }
+ 
+-                enabledPorts[i] = arr != 0;
++                // An arrangement does not switch a bus on -- activateBus() does; Cubase
++                // arranges every bus, also the extra outputs it leaves off, and the sound
++                // meant for MIX went to an output nobody hears (Ostrich, patches/0011).
++                if (arr == 0)
++                    enabledPorts[i] = false;
+             }
+         }
+ 
