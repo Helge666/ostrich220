@@ -15,8 +15,10 @@ For MAME (only to work on the driver; see RUNNING.md) add
 `libsdl2-dev libsdl2-ttf-dev libfontconfig-dev libpulse-dev qtbase5-dev qtbase5-dev-tools
 qtchooser qt5-qmake`. The measurement tools in `tools/` need `python3-numpy python3-scipy`.
 
-`g++-mingw-w64-x86-64` brings both threading flavours; DPF builds `-posix`, and so does the
-core, or libstdc++ ends up with two opinions about `std::mutex`.
+`g++-mingw-w64-x86-64` brings two thread models, chosen with `update-alternatives`. Builds
+here and in CI use **win32** (the default on Ubuntu 24.04): the binaries then need no mingw
+runtime DLL. Objects from the two models must not be mixed, or libstdc++ ends up with two
+opinions about `std::mutex`.
 
 ## 2. Clone
 

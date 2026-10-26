@@ -26,6 +26,8 @@ Done and checked against a real U-220 (details in [analysis/](analysis/README-AN
       and `.gitmodules` pointing to it; check that both submodule pins are pushed
       (BUILDING.md §6). Pushing is done together with Helge, step by step.
 - [ ] CI: build Linux and Windows on GitHub, no ROMs needed; release zips on a `v*` tag.
+      Written (`.github/workflows/build.yml`), smoke test checked on the build host; not
+      yet run on GitHub.
 - [ ] The plugin's home page (`getHomePage`) to the repository's URL.
 - [ ] Release 0.1: Windows zip (VST3, CLAP, standalone) and Linux zip, no ROMs.
 - [ ] Make the repository public.

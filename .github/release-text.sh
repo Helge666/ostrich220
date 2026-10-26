@@ -1,182 +1,81 @@
-#!/bin/bash
-# Copyright (c) 2026 Elliott H. Liggett
+#!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# The install instructions, in ONE place.
+# The install instructions, in one place: INSTALL.txt in each zip, and the release notes.
 #
-# The same words go in two different destinations -- the GitHub release page, and an
-# INSTALL.txt inside each zip -- and the two must not drift.  Someone reading the release
-# page and someone who has already downloaded the zip need to be told the same paths.
-# The paths themselves come from README.md, and this file is the only copy of them the
-# build system carries.
-#
-# usage: release-text.sh <section> [version]
-#   linux-lv2 | linux-clap | windows-clap   the one platform, for INSTALL.txt
-#   notes                                   the whole release body, markdown
+#   .github/release-text.sh windows|linux
+#   .github/release-text.sh notes VERSION
+
 set -euo pipefail
 
-TAGLINE="Voltaire110, a plugin emulation of the classic Roland U-110 rompler for modern DAWs"
+roms() {
+	cat <<'EOF'
+You need your own ROM images: one U-220 firmware (v1.02 recommended) and the six wave ROMs
+A-F. They are recognised by their SHA-1, so the file names do not matter. The list, with
+checksums: roms/README.md in the source repository. No ROMs are included, and none ever
+will be.
 
-# ROMs are the user's to supply and this says so in both places.  Shipping them is not a
-# thing we could do even if it were convenient.
-roms_note() {
-    cat <<'EOF'
-ROMs are NOT included and cannot be: they are Roland's.  Dump your own U-110 EPROMs or
-obtain the files some other way.  You need:
+Optional: a U-220 factory SysEx dump whose name starts with "U220Factory" (.syx) next to
+the ROMs. A new instance then starts with the 64 factory patches.
 
-  U110v203.BIN                            the program ROM, version 2.03, exactly 65536 bytes
-  roland_t110_u110_u220_waverom0.bin      the four wave ROMs
-  roland_t110_u110_u220_waverom1.bin
-  roland_t110_u110_u220_waverom2.bin
-  roland_t110_u110_u220_waverom3.bin
-
-Any SN-U110-xx card images you have are optional; drop them in the same directory and
-they appear in the card slots.
+The status line under the panel says which images were found, or which are missing and
+where they were looked for.
 EOF
 }
 
-linux_lv2() {
-    cat <<'EOF'
-Linux, LV2
-==========
+windows() {
+	cat <<'EOF'
+Ostrich 220 for Windows (64-bit)
 
-  mkdir -p ~/.lv2
-  unzip Voltaire110-Linux-LV2.zip
-  cp -r Voltaire110.lv2 ~/.lv2/
+VST3: copy the folder Ostrich220.vst3 to
+  C:\Program Files\Common Files\VST3\
+CLAP: copy Ostrich220.clap to
+  C:\Program Files\Common Files\CLAP\
+Standalone: Ostrich220.exe, anywhere.
 
-Then put the ROMs in ~/.local/share/Voltaire110/roms/ :
+ROMs go in
+  C:\ProgramData\Ostrich 220\roms\
 
-  mkdir -p ~/.local/share/Voltaire110/roms
-  cp U110v203.BIN roland_t110_u110_u220_waverom*.bin ~/.local/share/Voltaire110/roms/
-
-Now tell your DAW to rescan for plugins.
-If the plugin does not boot, click the LCD screen for the self-check report.
 EOF
+	roms
 }
 
-linux_clap() {
-    cat <<'EOF'
-Linux, CLAP
-===========
+linux() {
+	cat <<'EOF'
+Ostrich 220 for Linux (x86-64)
 
-  mkdir -p ~/.clap
-  unzip Voltaire110-Linux-CLAP.zip
-  cp Voltaire110.clap ~/.clap/
+VST3: copy the folder Ostrich220.vst3 to ~/.vst3/
+CLAP: copy Ostrich220.clap to ~/.clap/
+Standalone: Ostrich220 (JACK), anywhere.
 
-Then put the ROMs in ~/.local/share/Voltaire110/roms/ :
+ROMs go in
+  ~/.local/share/Ostrich 220/roms/
 
-  mkdir -p ~/.local/share/Voltaire110/roms
-  cp U110v203.BIN roland_t110_u110_u220_waverom*.bin ~/.local/share/Voltaire110/roms/
-
-Now tell your DAW to rescan for plugins.
-If the plugin does not boot, click the LCD screen for the self-check report.
 EOF
+	roms
 }
 
-windows_clap() {
-    cat <<'EOF'
-Windows, CLAP
-=============
-
-Copy Voltaire110.clap to:
-
-  C:\Program Files\Common Files\CLAP\Voltaire110.clap
-
-Then put the ROMs in:
-
-  C:\Users\<your username>\AppData\Local\Voltaire110\roms\
-
-Now tell your DAW to rescan for plugins.
-If the plugin does not boot, click the LCD screen for the self-check report.
-EOF
-}
-
-# The release body.  GitHub lists a release's assets as one flat, alphabetical list --
-# there is no such thing as an asset category -- so the platform split is done twice over:
-# in these headings, and in the file names, which sort the Linux ones together and the
-# Windows ones together.
 notes() {
-    local version="${1:-}"
-    cat <<EOF
-**$TAGLINE**
+	local version="$1"
+	cat <<EOF
+Ostrich 220 ${version}: an emulation of the Roland U-220 RS-PCM Sound Module, running its
+original firmware.
 
-Version \`$version\`.  Linux and Windows, 64-bit.
-
-## What is in this release
-
-| Download | Platform | Format |
+| File | Platform | Contents |
 |---|---|---|
-| \`Voltaire110-Linux-LV2.zip\` | Linux x86-64 | LV2 |
-| \`Voltaire110-Linux-CLAP.zip\` | Linux x86-64 | CLAP |
-| \`Voltaire110-Windows-CLAP.zip\` | Windows x86-64 | CLAP |
+| \`Ostrich220-Windows.zip\` | Windows x86-64 | VST3, CLAP, standalone |
+| \`Ostrich220-Linux.zip\` | Linux x86-64 | VST3, CLAP, standalone (JACK) |
 
-## You supply the ROMs
+Each zip has an INSTALL.txt. You need your own ROM images; none are included.
 
-\`\`\`
-$(roms_note)
-\`\`\`
-
----
-
-# Linux
-
-### \`Voltaire110-Linux-LV2.zip\`
-
-\`\`\`bash
-mkdir -p ~/.lv2
-unzip Voltaire110-Linux-LV2.zip
-cp -r Voltaire110.lv2 ~/.lv2/
-\`\`\`
-
-### \`Voltaire110-Linux-CLAP.zip\`
-
-\`\`\`bash
-mkdir -p ~/.clap
-unzip Voltaire110-Linux-CLAP.zip
-cp Voltaire110.clap ~/.clap/
-\`\`\`
-
-### ROMs, either format
-
-\`\`\`bash
-mkdir -p ~/.local/share/Voltaire110/roms
-cp U110v203.BIN roland_t110_u110_u220_waverom*.bin ~/.local/share/Voltaire110/roms/
-cp *sn-u110* ~/.local/share/Voltaire110/roms/     # cards, if you have any
-\`\`\`
-
----
-
-# Windows
-
-### \`Voltaire110-Windows-CLAP.zip\`
-
-Copy the plugin to:
-
-\`\`\`
-C:\\Program Files\\Common Files\\CLAP\\Voltaire110.clap
-\`\`\`
-
-Copy the ROM files (all of them) to:
-
-\`\`\`
-C:\\Users\\<your username>\\AppData\\Local\\Voltaire110\\roms\\
-\`\`\`
-
----
-
-Now tell your DAW to rescan for plugins.
-
-**If the plugin does not boot, click the LCD screen.**  It shows a self-check report
-naming every directory it looked in and what it found there, which answers nearly every
-"it loads but makes no sound" question on its own.
+The reverb, delay and chorus are a model fitted to measurements of a real U-220, not an
+emulation of its effect chip. Known limitations: see the README.
 EOF
 }
 
 case "${1:-}" in
-    linux-lv2)    linux_lv2 ;;
-    linux-clap)   linux_clap ;;
-    windows-clap) windows_clap ;;
-    roms)         roms_note ;;
-    notes)        notes "${2:-}" ;;
-    *) echo "usage: $0 {linux-lv2|linux-clap|windows-clap|roms|notes [version]}" >&2; exit 2 ;;
+	windows) windows ;;
+	linux)   linux ;;
+	notes)   notes "${2:?version}" ;;
+	*) echo "usage: $0 windows|linux|notes VERSION" >&2; exit 2 ;;
 esac
