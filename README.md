@@ -9,6 +9,9 @@ allocation, the six parts and the rhythm part, MIDI, SysEx, the menus, the displ
 
 You need your own ROM images. **This repository contains no Roland data and never will.**
 
+**[Download Ostrich 220](https://github.com/Helge666/ostrich220/releases/latest)** (Windows
+and Linux; see [Download](#download) below).
+
 ![Ostrich 220](docs/ostrich220.png)
 
 ## What it does
@@ -30,6 +33,16 @@ You need your own ROM images. **This repository contains no Roland data and neve
 
 Formats: VST3, CLAP and a standalone program on Windows (64-bit); VST3, CLAP and a JACK
 standalone on Linux. No macOS build.
+
+## Download
+
+**[Download the latest version](https://github.com/Helge666/ostrich220/releases/latest)** —
+no compiling needed.
+
+On that page, under **Assets**, click `Ostrich220-Windows.zip` (or `Ostrich220-Linux.zip`)
+to download it, then unzip it. The zip contains the plugin, the standalone program and an
+`INSTALL.txt` with the same steps as below. (The "Source code" links there are only needed
+for building it yourself.)
 
 ## Installing (Windows)
 
