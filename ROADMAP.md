@@ -22,14 +22,14 @@ Done and checked against a real U-220 (details in [analysis/](analysis/README-AN
 
 ## Before the first public release (0.1)
 
-- [x] GitHub: [Helge666/ostrich220](https://github.com/Helge666/ostrich220) (private for now),
+- [x] GitHub: [Helge666/ostrich220](https://github.com/Helge666/ostrich220),
       the MAME fork [Helge666/mame](https://github.com/Helge666/mame), branch `u220`; both
       submodule pins are pushed.
 - [x] CI: builds Linux and Windows on GitHub without ROMs, smoke test, zips (~4 min);
       a `v*` tag publishes a release.
 - [x] The plugin's home page (`getHomePage`): https://github.com/Helge666/ostrich220
 - [x] Release 0.1.0 (26.10.2026): Windows zip (VST3, CLAP, standalone) and Linux zip, no ROMs.
-- [ ] Make the repository public.
+- [x] The repository is public (26.10.2026).
 
 Not before the release, and only after checking each project's policy on LLM-written
 contributions (if unknown: offer and let them decide; if unwanted: note it here and skip):
