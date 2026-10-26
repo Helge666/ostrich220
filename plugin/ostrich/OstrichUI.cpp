@@ -5,9 +5,11 @@
 // drawn panel comes later; the layout here already follows Helge's photo of the unit.
 
 #include "DistrhoUI.hpp"
+#include "OstrichFrameWatch.hpp"
 #include "OstrichShared.hpp"
 
 #include <chrono>
+#include <memory>
 
 #ifdef _WIN32
 // pugl's paint-path counters (patches/0008), for the freeze diagnostics below.
@@ -70,6 +72,7 @@ public:
 	{
 		loadSharedResources();
 		std::memset(&m_panel, 0, sizeof(m_panel));
+		m_frameWatch = std::make_unique<FrameWatch>(getWindow().getNativeWindowHandle());
 	}
 
 protected:
@@ -372,11 +375,12 @@ private:
 	void uiIdle() override
 	{
 		m_dbgIdles ++;
+		m_frameWatch->idle();
 		const auto now = std::chrono::steady_clock::now();
 		if (now - m_dbgLast >= std::chrono::seconds(1))
 		{
 			m_dbgLast = now;
-			char line[512], lcd[56], pugl[200] = "";
+			char line[768], lcd[56], pugl[200] = "", frame[120];
 			lcdText(m_panel.lcd, lcd);
 #ifdef _WIN32
 			const unsigned long *d = DGL_NAMESPACE::puglWinDebug;
@@ -385,9 +389,10 @@ private:
 					" update %lu/%lu invfail %lu state %lu stage %lu visible %lu emptyrect %lu",
 					d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12]);
 #endif
-			std::snprintf(line, sizeof(line), "ui %p idles %lu panels %lu bad %lu draws %lu exc %lu keys %lu vis %d %ux%u lcd %s%s",
+			m_frameWatch->status(frame, sizeof(frame));
+			std::snprintf(line, sizeof(line), "ui %p idles %lu panels %lu bad %lu draws %lu exc %lu keys %lu vis %d %ux%u lcd %s%s%s",
 					(void *)this, m_dbgIdles, m_dbgPanels, m_dbgPanelBad, m_dbgDraws, m_dbgExc, m_dbgKeys,
-					getWindow().isVisible() ? 1 : 0, getWidth(), getHeight(), lcd, pugl);
+					getWindow().isVisible() ? 1 : 0, getWidth(), getHeight(), lcd, pugl, frame);
 			debugLog("ostrich-ui", line);
 		}
 		if (m_panel.cursor_flags & 1)
@@ -457,6 +462,7 @@ private:
 	std::string m_status;
 	unsigned long m_dbgIdles = 0, m_dbgPanels = 0, m_dbgPanelBad = 0, m_dbgDraws = 0, m_dbgKeys = 0, m_dbgExc = 0;
 	std::chrono::steady_clock::time_point m_dbgLast {};
+	std::unique_ptr<FrameWatch> m_frameWatch;   // the host frame around the panel (freeze)
 	float m_volumeDb = 0.0f;
 	bool m_hwEq = true;
 	bool m_keyLit[kNumKeys] = {};
