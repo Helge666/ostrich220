@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Compile MAME's U-220 device sources against plugin/compat/emu.h into libu220core.a,
-# and build the u220_render tool.  build_core.sh does the same for the U-110 and explains
+# and build the u220_render tool.  emu110's build_core.sh does the same for the U-110 and explains
 # the choices (no copies of MAME sources, mame/src/emu NOT on the include path, separate
 # object directories per target); this is that script with the U-220's file list.
 set -u

@@ -3,7 +3,7 @@
 /*
     Fixed-ratio polyphase resampler, 32 kHz core -> host rate.
 
-    PLUGIN-PLAN.md section 11 asks for a windowed-sinc polyphase and warns specifically
+    emu110's PLUGIN-PLAN.md section 11 asks for a windowed-sinc polyphase and warns specifically
     against linear interpolation, which "would quietly undo a lot" of the accuracy work.
     That is why this file exists: the emulation is bit-identical to MAME, and throwing
     that away in the last stage of the signal path would be absurd.

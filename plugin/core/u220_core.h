@@ -7,10 +7,10 @@
     The U-220 counterpart of U110Core, and built the same way: MAME's device sources
     (the P8098 CPU, the MB87419/MB87420 tone generator) compiled against plugin/compat,
     with the machine wiring of mame/src/mame/roland/roland_u220.cpp written a second time
-    here.  u110_core.h explains why the framework is replaced and the devices are not;
+    here.  emu110's u110_core.h explains why the framework is replaced and the devices are not;
     all of that applies unchanged.
 
-    LICENCE, THREADING and SAMPLE RATE as in u110_core.h: BSD-3-Clause, render() is
+    LICENCE, THREADING and SAMPLE RATE as in emu110's u110_core.h: BSD-3-Clause, render() is
     real-time safe, the load* methods are not, and the core produces 32000 Hz only.
 
     WHAT IS NOT HERE YET.  The effect processor (IC25) is not emulated.  The firmware's
@@ -71,7 +71,7 @@ inline constexpr unsigned kLcdRows    = 2;
 
 /***************************************************************************************
     What the UI needs to draw the panel.  Fixed layout, versioned, fire and forget --
-    see PanelState in u110_core.h for why it must never be in the emulation's path.
+    see PanelState in emu110's u110_core.h for why it must never be in the emulation's path.
 ***************************************************************************************/
 struct PanelState
 {

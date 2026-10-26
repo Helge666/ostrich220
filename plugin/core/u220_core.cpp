@@ -4,7 +4,7 @@
 
     U220Core -- the machine, assembled from MAME's devices with no MAME around them
 
-    The machine wiring of roland_u220.cpp, written a second time on purpose (u110_core.cpp
+    The machine wiring of roland_u220.cpp, written a second time on purpose (emu110's u110_core.cpp
     says why).  Everything that touches the emulation must behave exactly like the driver
     -- the null test against MAME renders proves it -- so where a line looks arbitrary,
     check the driver before changing it.  The scheduling (run_block, the MIDI queue, the
@@ -655,7 +655,7 @@ LoadResult U220Core::prepareCard(const uint8_t *data, size_t len, std::vector<ui
 	if (!data || len == 0 || len > kCardBytes)
 		return LoadResult::WrongSize;
 	// Undersized dumps are mirrored up in pages of 128 KB at least, as on the U-110
-	// (u110_core.cpp: the address descrambling allows nothing finer).
+	// (emu110's u110_core.cpp: the address descrambling allows nothing finer).
 	std::vector<u8> image(kCardBytes, 0xff);
 	std::memcpy(image.data(), data, len);
 	if (len < kCardBytes)
