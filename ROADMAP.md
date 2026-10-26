@@ -612,7 +612,9 @@ ausgetauscht (Schritt 4).
      Kartendaten. `cardinfo` meldet dem Panel Kartenname oder Fehler („File not found“,
      „Not a PCM card“). Ein Wechsel zieht erst die alte Karte und steckt die neue 200 ms
      (emuliert) später, damit die Firmware die Änderung sieht.
-   - **Panel:** 1350 x 250 Designeinheiten (vorher 1150), Standard 1404 x 260. Rechts zwei
+   - **Panel:** 1350 x 250 Designeinheiten (vorher 1150) für die Front des Geräts, darunter
+     eine schmale Leiste für alles, was das Gerät nicht hat (Statuszeile, HW-EQ, LOAD/SAVE
+     SYSEX; Helges Idee nach Arturias Plugins, 26.10.2026). Standard 1404 x 288. Rechts zwei
      Slots: Klick öffnet den Dateidialog, das Auswurf-Symbol zieht die Karte. Alte Projekte
      behalten ihre Höhe, die Breite passt sich an.
    - MAME-Treiber: dieselben zwei Slots (`-cart1`, `-cart2`, Softwareliste `u110_card`),

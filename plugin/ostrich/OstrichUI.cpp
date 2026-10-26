@@ -26,7 +26,12 @@ namespace {
 
 using namespace ostrich;
 
-constexpr float kW = 1350.0f, kH = 250.0f;          // design units
+// Design units: the unit's front is 1350 x 250, and under it a bar for what the unit does
+// not have (SysEx files, the HW-EQ switch, the status line) -- kept off the front so that
+// it stays the U-220's.  The total keeps DISTRHO_UI_DEFAULT_WIDTH/HEIGHT's ratio.
+constexpr float kW = 1350.0f, kPanelH = 250.0f;
+constexpr float kH = kW * DISTRHO_UI_DEFAULT_HEIGHT / DISTRHO_UI_DEFAULT_WIDTH;
+constexpr float kBarY = kPanelH, kBarH = kH - kPanelH;
 
 struct Rect { float x, y, w, h; bool contains(float px, float py) const
 	{ return px >= x && px < x + w && py >= y && py < y + h; } };
@@ -57,7 +62,6 @@ const char *const kKeyLabels[kNumKeys] = {
 const Rect kLcd    { 176.0f, 76.0f, 448.0f, 118.0f };     // the glass
 constexpr float kLcdPadX = 18.0f, kLcdPadY = 8.0f;          // glass around the dots
 const Rect kKnob   { 62.0f, 96.0f, 64.0f, 64.0f };
-const Rect kHwEq   { 60.0f, 192.0f, 68.0f, 20.0f };
 
 // The two PCM card slots, right of the keys and level with their rows; a click on a slot
 // opens a file dialog, the eject button at its right end takes the card out.
@@ -68,9 +72,12 @@ const Rect kSlots[kCardSlots] = {
 };
 inline Rect ejectRect(const Rect &slot) { return { slot.x + slot.w - 30, slot.y + 8, 24, slot.h - 16 }; }
 
-// SysEx files, above the slots: a bulk dump of the whole machine to a .syx, or a .syx in.
-const Rect kSyxLoad { kSlotX, 26.0f, 87.0f, 22.0f };
-const Rect kSyxSave { kSlotX + kSlotW - 87.0f, 26.0f, 87.0f, 22.0f };
+// The bar, from the right: SysEx files (a bulk dump of the whole machine to a .syx, or a
+// .syx in), then the HW-EQ switch; the status line takes the rest.
+constexpr float kBarBtnH = 18.0f, kBarBtnY = kBarY + (kBarH - kBarBtnH) / 2;
+const Rect kSyxSave { kW - 16.0f - 87.0f, kBarBtnY, 87.0f, kBarBtnH };
+const Rect kSyxLoad { kSyxSave.x - 8.0f - 87.0f, kBarBtnY, 87.0f, kBarBtnH };
+const Rect kHwEq    { kSyxLoad.x - 28.0f - 68.0f, kBarBtnY, 68.0f, kBarBtnH };
 
 } // anonymous namespace
 
@@ -180,7 +187,7 @@ protected:
 
 		// The body: black front, as the unit.
 		beginPath();
-		rect(0, 0, kW, kH);
+		rect(0, 0, kW, kPanelH);
 		fillColor(Color(24, 24, 26));
 		fill();
 		beginPath();
@@ -198,17 +205,33 @@ protected:
 		text(140, 44, "RS-PCM SOUND MODULE  \xc2\xb7  U-220 EMULATION", nullptr);
 
 		drawKnob();
-		drawHwEq();
 		drawLcd();
 		drawKeys();
 		drawSlots();
+		drawBar();
+	}
+
+	// What the unit does not have, under its front.
+	void drawBar()
+	{
+		beginPath();
+		rect(0, kBarY, kW, kBarH);
+		fillColor(Color(14, 14, 16));
+		fill();
+		beginPath();
+		rect(0, kBarY, kW, 1);
+		fillColor(Color(52, 52, 56));
+		fill();
+
+		drawHwEq();
 		drawSyxButtons();
 
-		// Status line.
+		// The status line, one line, cut where the controls begin.
+		const float w = kHwEq.x - 24 - 16;
 		fontSize(11);
-		textAlign(ALIGN_LEFT | ALIGN_BASELINE);
+		textAlign(ALIGN_LEFT | ALIGN_MIDDLE);
 		fillColor(m_panel.flags & 1 ? Color(140, 140, 140) : Color(240, 170, 60));
-		textBox(24, 234, kW - 48, m_status.empty() ? " " : m_status.c_str(), nullptr);
+		text(16, kBarY + kBarH / 2 + 1, fit(m_status, w, 11).c_str(), nullptr);
 	}
 
 	bool onMouse(const MouseEvent &ev) override
@@ -369,20 +392,24 @@ private:
 
 	void drawSyxButtons()
 	{
-		for (const Rect *r : { &kSyxLoad, &kSyxSave })
-		{
-			beginPath();
-			roundedRect(r->x, r->y, r->w, r->h, 3);
-			fillColor(Color(70, 70, 76));
-			fill();
-			strokeColor(Color(110, 110, 116));
-			strokeWidth(1);
-			stroke();
-			fontSize(10);
-			textAlign(ALIGN_CENTER | ALIGN_MIDDLE);
-			fillColor(Color(220, 220, 220));
-			text(r->x + r->w / 2, r->y + r->h / 2 + 1, r == &kSyxLoad ? "LOAD SYSEX" : "SAVE SYSEX", nullptr);
-		}
+		barButton(kSyxLoad, "LOAD SYSEX", false);
+		barButton(kSyxSave, "SAVE SYSEX", false);
+	}
+
+	// A control in the bar: dark with a thin edge, as a host's own; lit when on.
+	void barButton(const Rect &r, const char *label, bool lit)
+	{
+		beginPath();
+		roundedRect(r.x + 0.5f, r.y + 0.5f, r.w - 1, r.h - 1, 3);
+		fillColor(lit ? Color(150, 190, 60) : Color(30, 30, 33));
+		fill();
+		strokeColor(lit ? Color(150, 190, 60) : Color(84, 84, 90));
+		strokeWidth(1);
+		stroke();
+		fontSize(10);
+		textAlign(ALIGN_CENTER | ALIGN_MIDDLE);
+		fillColor(lit ? Color(30, 45, 20) : Color(200, 200, 204));
+		text(r.x + r.w / 2, r.y + r.h / 2 + 1, label, nullptr);
 	}
 
 	void setCardInfo(const char *value)
@@ -505,14 +532,7 @@ private:
 
 	void drawHwEq()
 	{
-		beginPath();
-		roundedRect(kHwEq.x, kHwEq.y, kHwEq.w, kHwEq.h, 3);
-		fillColor(m_hwEq ? Color(150, 190, 60) : Color(60, 60, 64));
-		fill();
-		fontSize(10);
-		textAlign(ALIGN_CENTER | ALIGN_MIDDLE);
-		fillColor(m_hwEq ? Color(30, 45, 20) : Color(170, 170, 170));
-		text(kHwEq.x + kHwEq.w / 2, kHwEq.y + kHwEq.h / 2 + 1, "HW-EQ", nullptr);
+		barButton(kHwEq, "HW-EQ", m_hwEq);
 	}
 
 	void drawKnob()
@@ -619,9 +639,10 @@ private:
 		unsigned w = 0, h = 0;
 		if (std::sscanf(value, "%u %u", &w, &h) != 2 || w < 100 || h < 20)
 			return;
-		// A size saved by the narrower panel before the card slots: keep its height.
+		// A size saved by an earlier panel (before the card slots, before the bar): keep
+		// its width, the height follows.
 		if (std::fabs(double(w) / h - kW / kH) > 0.05)
-			w = unsigned(std::lround(h * kW / kH));
+			h = unsigned(std::lround(w * kH / kW));
 		m_sizeSaved = value;
 		const double scale = getWindow().getScaleFactor();
 		const uint pw = uint(std::lround(w * scale)), ph = uint(std::lround(h * scale));
