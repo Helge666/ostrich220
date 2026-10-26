@@ -614,7 +614,8 @@ ausgetauscht (Schritt 4).
      (emuliert) später, damit die Firmware die Änderung sieht.
    - **Panel:** 1350 x 250 Designeinheiten (vorher 1150) für die Front des Geräts, darunter
      eine schmale Leiste für alles, was das Gerät nicht hat (Statuszeile, HW-EQ, LOAD/SAVE
-     SYSEX; Helges Idee nach Arturias Plugins, 26.10.2026). Standard 1404 x 288. Rechts zwei
+     SYSEX; Helges Idee nach Arturias Plugins, 26.10.2026, in Cubase von ihm bestätigt).
+     Standard 1404 x 288. Rechts zwei
      Slots: Klick öffnet den Dateidialog, das Auswurf-Symbol zieht die Karte. Alte Projekte
      behalten ihre Höhe, die Breite passt sich an.
    - MAME-Treiber: dieselben zwei Slots (`-cart1`, `-cart2`, Softwareliste `u110_card`),
