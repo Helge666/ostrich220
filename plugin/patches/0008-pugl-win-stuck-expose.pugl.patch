@@ -44,7 +44,7 @@ index 7179193..3a0a3ee 100644
  
  /// Opaque surface used by graphics backend
 diff --git a/src/win.c b/src/win.c
-index c56cc44..bc05fbb 100644
+index c56cc44..d1dc3c2 100644
 --- a/src/win.c
 +++ b/src/win.c
 @@ -19,6 +19,9 @@
@@ -70,7 +70,15 @@ index c56cc44..bc05fbb 100644
      event.expose.type   = PUGL_EXPOSE;
      event.expose.x      = (PuglCoord)rect.left;
      event.expose.y      = (PuglCoord)rect.top;
-@@ -1131,9 +1138,11 @@ puglUpdate(PuglWorld* world, double timeout)
+@@ -863,6 +870,7 @@ handleMessage(PuglView* view, UINT message, WPARAM wParam, LPARAM lParam)
+     view->impl->mouseTracked = false;
+     break;
+   case WM_LBUTTONDOWN:
++    ++puglWinDebug[13];
+     initMouseEvent(&event, view, 0, true, lParam);
+     break;
+   case WM_MBUTTONDOWN:
+@@ -1131,9 +1139,11 @@ puglUpdate(PuglWorld* world, double timeout)
    const PuglWorldState startState = world->state;
    PuglStatus           st         = PUGL_SUCCESS;
  
@@ -82,7 +90,7 @@ index c56cc44..bc05fbb 100644
      return PUGL_BAD_CALL;
    }
  
-@@ -1197,9 +1206,38 @@ puglGetTime(const PuglWorld* world)
+@@ -1197,9 +1207,40 @@ puglGetTime(const PuglWorld* world)
            world->startTime);
  }
  
@@ -91,7 +99,9 @@ index c56cc44..bc05fbb 100644
 +   4 obscures refused (EXPOSING), 5 stale exposes healed, 6 puglUpdate calls,
 +   7 puglUpdate refused, 8 InvalidateRect failed, 9 world state at the last
 +   obscure, 10 view stage at the last WM_PAINT, 11 window visible at the last
-+   obscure, 12 WM_PAINT with an empty update rect. */
++   obscure, 12 WM_PAINT with an empty update rect, 13 WM_LBUTTONDOWN received,
++   14 button presses reaching DGL, 15 of them dropped by DGL (clipboard wait,
++   modal child; dgl/src/WindowPrivateData.cpp, patches/0009). */
 +unsigned long puglWinDebug[16];
 +
 +/* The world stuck in EXPOSING -- a draw that never returned (an exception the
@@ -121,7 +131,7 @@ index c56cc44..bc05fbb 100644
    return view->world->state == PUGL_WORLD_EXPOSING
             ? PUGL_BAD_CALL
             : puglWinStatus(InvalidateRect(view->impl->hwnd, NULL, false));
-@@ -1212,6 +1250,7 @@ puglObscureRegion(PuglView* const view,
+@@ -1212,6 +1253,7 @@ puglObscureRegion(PuglView* const view,
                    const unsigned  width,
                    const unsigned  height)
  {

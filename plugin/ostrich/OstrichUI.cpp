@@ -162,10 +162,20 @@ protected:
 
 	bool onMouse(const MouseEvent &ev) override
 	{
+		m_dbgMouse ++;
 		if (ev.button != 1)
 			return false;
-		const float s = getWidth() / kW;
+		const float s = mouseScale();
 		const float x = float(ev.pos.getX()) / s, y = float(ev.pos.getY()) / s;
+		if (ev.press && m_dbgMouseLines < 200)
+		{
+			m_dbgMouseLines ++;
+			char line[200];
+			std::snprintf(line, sizeof(line), "ui %p press at %.0f,%.0f -> %.0f,%.0f (widget %ux%u, window %ux%u)",
+					(void *)this, ev.pos.getX(), ev.pos.getY(), double(x), double(y),
+					getWidth(), getHeight(), getWindow().getWidth(), getWindow().getHeight());
+			debugLog("ostrich-ui", line);
+		}
 
 		if (ev.press)
 		{
@@ -222,7 +232,7 @@ protected:
 	{
 		if (!m_dragKnob)
 			return false;
-		const float s = getWidth() / kW;
+		const float s = mouseScale();
 		const float y = float(ev.pos.getY()) / s;
 		float db = m_dragStartDb + (m_dragY - y) * 0.3f;
 		db = std::fmax(-40.0f, std::fmin(12.0f, db));
@@ -234,7 +244,7 @@ protected:
 
 	bool onScroll(const ScrollEvent &ev) override
 	{
-		const float s = getWidth() / kW;
+		const float s = mouseScale();
 		if (!kKnob.contains(float(ev.pos.getX()) / s, float(ev.pos.getY()) / s))
 			return false;
 		const float db = std::fmax(-40.0f, std::fmin(12.0f, m_volumeDb + float(ev.delta.getY())));
@@ -364,6 +374,15 @@ private:
 		}
 	}
 
+	// Mouse events come in the window's own pixels.  The panel is drawn in design units
+	// scaled by getWidth() / kW on top of DGL's automatic scaling (the window is larger than
+	// the minimum size), so the full factor is the window width over the design width --
+	// getWidth() / kW alone is only right while the window is at its minimum size.
+	float mouseScale() const
+	{
+		return float(getWindow().getWidth()) / kW;
+	}
+
 	// The HD44780 blinks its block cursor at about 1.9 Hz.
 	bool blinkPhase() const
 	{
@@ -380,19 +399,24 @@ private:
 		if (now - m_dbgLast >= std::chrono::seconds(1))
 		{
 			m_dbgLast = now;
-			char line[768], lcd[56], pugl[200] = "", frame[120];
+			char line[900], lcd[56], pugl[240] = "", frame[120];
 			lcdText(m_panel.lcd, lcd);
 #ifdef _WIN32
 			const unsigned long *d = DGL_NAMESPACE::puglWinDebug;
 			std::snprintf(pugl, sizeof(pugl),
 					" | pugl paint %lu exposed %lu enterfail %lu obscure %lu refused %lu healed %lu"
-					" update %lu/%lu invfail %lu state %lu stage %lu visible %lu emptyrect %lu",
-					d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12]);
+					" update %lu/%lu invfail %lu state %lu stage %lu visible %lu emptyrect %lu"
+					" lbutton %lu dgl %lu dropped %lu",
+					d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12],
+					d[13], d[14], d[15]);
 #endif
 			m_frameWatch->status(frame, sizeof(frame));
-			std::snprintf(line, sizeof(line), "ui %p idles %lu panels %lu bad %lu draws %lu exc %lu keys %lu vis %d %ux%u lcd %s%s%s",
-					(void *)this, m_dbgIdles, m_dbgPanels, m_dbgPanelBad, m_dbgDraws, m_dbgExc, m_dbgKeys,
-					getWindow().isVisible() ? 1 : 0, getWidth(), getHeight(), lcd, pugl, frame);
+			std::snprintf(line, sizeof(line), "ui %p idles %lu panels %lu bad %lu draws %lu exc %lu keys %lu mouse %lu vis %d %ux%u win %ux%u"
+					" cursor %u/%u lcd %s%s%s",
+					(void *)this, m_dbgIdles, m_dbgPanels, m_dbgPanelBad, m_dbgDraws, m_dbgExc, m_dbgKeys, m_dbgMouse,
+					getWindow().isVisible() ? 1 : 0, getWidth(), getHeight(),
+					getWindow().getWidth(), getWindow().getHeight(),
+					unsigned(m_panel.cursor_pos), unsigned(m_panel.cursor_flags), lcd, pugl, frame);
 			debugLog("ostrich-ui", line);
 		}
 		if (m_panel.cursor_flags & 1)
@@ -461,6 +485,7 @@ private:
 	PanelBlob m_panel;
 	std::string m_status;
 	unsigned long m_dbgIdles = 0, m_dbgPanels = 0, m_dbgPanelBad = 0, m_dbgDraws = 0, m_dbgKeys = 0, m_dbgExc = 0;
+	unsigned long m_dbgMouse = 0, m_dbgMouseLines = 0;
 	std::chrono::steady_clock::time_point m_dbgLast {};
 	std::unique_ptr<FrameWatch> m_frameWatch;   // the host frame around the panel (freeze)
 	float m_volumeDb = 0.0f;

@@ -1,0 +1,28 @@
+diff --git a/dgl/src/WindowPrivateData.cpp b/dgl/src/WindowPrivateData.cpp
+index d7a3c934..a12c80c8 100644
+--- a/dgl/src/WindowPrivateData.cpp
++++ b/dgl/src/WindowPrivateData.cpp
+@@ -933,9 +933,23 @@ void Window::PrivateData::onClipboardData(const uint32_t typeId)
+ static int printEvent(const PuglEvent* event, const char* prefix, const bool verbose);
+ #endif
+ 
++#ifdef _WIN32
++// Ostrich panel diagnostics, defined in pugl's win.c (patches/0008): 14 button presses
++// reaching DGL, 15 of them dropped here.
++extern unsigned long puglWinDebug[16];
++#endif
++
+ PuglStatus Window::PrivateData::puglEventCallback(PuglView* const view, const PuglEvent* const event)
+ {
+     Window::PrivateData* const pData = (Window::PrivateData*)puglGetHandle(view);
++#ifdef _WIN32
++    if (event->type == PUGL_BUTTON_PRESS)
++    {
++        ++puglWinDebug[14];
++        if (pData->waitingForClipboardEvents || pData->modal.child != nullptr)
++            ++puglWinDebug[15];
++    }
++#endif
+ #if defined(DEBUG) && defined(DGL_DEBUG_EVENTS)
+     if (event->type != PUGL_TIMER && event->type != PUGL_EXPOSE && event->type != PUGL_MOTION) {
+         printEvent(event, "pugl event: ", true);
