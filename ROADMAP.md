@@ -583,7 +583,7 @@ ausgetauscht (Schritt 4).
    internen Waves E/F sitzen auf den ersten beiden Kartenplätzen, Phase 2), wie die Firmware
    eine Karte erkennt (ID/Kopfdaten) und ob die Karte auch Timbre-Daten trägt;
    SHA1-Erkennung bekannter Dumps wie bei den ROMs. Keine Card-Dateien im Repo.
-8. **MIDI OUT** aus dem Plugin (umgesetzt 26.10.2026, offline geprüft, in Cubase noch nicht):
+8. **MIDI OUT** aus dem Plugin (umgesetzt 26.10.2026, offline geprüft; in Cubase kommt SysEx nicht an):
    was die Firmware an MIDI OUT sendet, als MIDI-Ausgang des Plugins – für Librarian-Arbeit
    in der DAW. Das Plugin zerlegt den Bytestrom wie die Leitung (Running Status, SysEx über
    Blockgrenzen, Echtzeitbytes) und gibt jede Nachricht zum passenden Sample aus.
@@ -592,8 +592,8 @@ ausgetauscht (Schritt 4).
    - Prüfung: `ostrich_clap_render` mit `Data → Bulk → Temp` per Tastendruck
      (`2@2,9@2.5,9@3,10@3.5,6@4,9@4.5,9@5,10@5.5,10@6,6@6.5,6@7`): 21 DT1-Pakete,
      2322 Byte, alle Prüfsummen gültig, bei 44,1 und 48 kHz.
-   - In Cubase prüfen: MIDI-Spur mit Eingang „Ostrich“ aufnehmen und Bulk Dump auslösen.
-     Ob Cubase SysEx aus einem VST3-Instrument annimmt, ist offen.
+   - In Cubase 15 von Helge geprüft: kommt nicht an, weder in der Aufnahme noch am U-220,
+     auch ohne SysEx-Filter. Ungelöst, siehe „Offene Fragen und Risiken“.
    - Offen: DPF nimmt unter VST3 auch kein SysEx **an** (Eingang ist auskommentiert). Für
      SysEx-Import aus der DAW (Punkt 5) wäre das der nächste Patch.
 
@@ -697,6 +697,7 @@ außerhalb, z. B. `../recordings/`. Ins Repo gehören nur die Auswertungen (CSV,
 | emu110 ändert sich schnell (seit Aug. 2026, ein Autor) | hoch | `sync_upstream.sh`, Kontakt zum Autor, Änderungen klein und rückführbar halten |
 | U-220-Firmware braucht Timing, das die MCS-96-Emulation nicht trifft | gering | beim U-110 hat es mit kleinen CPU-Fixes funktioniert |
 | Plugin-Panel des U-110 trägt Roland-Gestaltung | sicher | in Phase 4 durch eigene Grafik ersetzen |
+| **Ungelöst: SysEx aus dem VST3 kommt in Cubase nicht an** (26.10.2026). Ostrich übergibt die Pakete (`out 331 (dropped 0)` im `ostrich-dsp.log`, Data-Events F0…F7), Cubase 15 nimmt sie nicht auf und leitet sie nicht weiter, auch mit abgeschaltetem SysEx-Filter (Aufnahme und Thru). Vermutlich nimmt Cubase von VST3-Plugins kein SysEx an; Berichte im JUCE-Forum widersprechen sich. | offen | später: prüfen, ob Cubase überhaupt MIDI aus dem Plugin weitergibt (Testversion, die Noten/CCs sendet); CLAP-Host (z. B. Reaper, Bitwig) gegenprüfen; Ausweg wäre Export als .syx-Datei aus dem Plugin |
 
 ## Quellen
 
