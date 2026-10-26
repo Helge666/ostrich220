@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "clap/entry.h"
 #include "clap/plugin-factory.h"
@@ -50,6 +51,12 @@ static int64_t ostream_write(const clap_ostream_t *s, const void *d, uint64_t n)
 	if (b->n + n > b->cap) { b->cap = (b->n + n) * 2; b->p = realloc(b->p, b->cap); }
 	memcpy(b->p + b->n, d, n); b->n += n; return (int64_t)n;
 }
+static int64_t istream_read(const clap_istream_t *s, void *d, uint64_t n)
+{
+	buf_t *b = (buf_t *)s->ctx;
+	const uint64_t left = b->cap - b->n, k = n < left ? n : left;
+	memcpy(d, b->p + b->n, k); b->n += k; return (int64_t)k;
+}
 
 int main(int argc, char **argv)
 {
@@ -59,6 +66,7 @@ int main(int argc, char **argv)
 	const int channel = argc > 6 ? atoi(argv[6]) - 1 : 0;    // 1-based on the command line
 	const double seconds = argc > 8 ? atof(argv[8]) : 6.0;
 	const double note_on = argc > 9 ? atof(argv[9]) : 1.0;
+	const bool realtime = getenv("OSTRICH_RENDER_REALTIME") != NULL;
 
 	// Presses ("id@sec,...", a bare id at 2.0 s) and starting values ("id=value,...").
 	struct { int id; double at; } presses[32]; int npress = 0;
@@ -88,6 +96,22 @@ int main(int argc, char **argv)
 	printf("plugin: %s (%s)\n", d->name, d->id);
 	const clap_plugin_t *p = f->create_plugin(f, &host, d->id);
 	p->init(p);
+	// OSTRICH_RENDER_LOAD: a state saved by OSTRICH_RENDER_SAVE (perhaps with another
+	// machine memory put in), loaded before the first note -- a session reopened.
+	if (getenv("OSTRICH_RENDER_LOAD"))
+	{
+		const clap_plugin_state_t *st = p->get_extension(p, CLAP_EXT_STATE);
+		FILE *sf = fopen(getenv("OSTRICH_RENDER_LOAD"), "rb");
+		if (!st || !sf) { fprintf(stderr, "cannot load state\n"); return 1; }
+		buf_t b = { 0 };
+		fseek(sf, 0, SEEK_END); b.cap = (size_t)ftell(sf); fseek(sf, 0, SEEK_SET);
+		b.p = malloc(b.cap);
+		if (fread(b.p, 1, b.cap, sf) != b.cap) { fprintf(stderr, "short state file\n"); return 1; }
+		fclose(sf);
+		clap_istream_t is = { &b, istream_read };
+		printf("state: %s\n", st->load(p, &is) ? "loaded" : "LOAD FAILED");
+		free(b.p);
+	}
 	if (!p->activate(p, rate, 1, FRAMES)) { fprintf(stderr, "activate failed\n"); return 1; }
 	p->start_processing(p);
 
@@ -155,6 +179,10 @@ int main(int argc, char **argv)
 		}
 		clap_process_t proc = { (int64_t)pos, FRAMES, NULL, NULL, ob, 0, 3, &in, &oev };
 		p->process(p, &proc);
+		// OSTRICH_RENDER_REALTIME: as slow as playback, so that the plugin's once-a-second
+		// debug log (PROGRAMDATA/Ostrich/ostrich-dsp.log) shows the display step by step.
+		if (realtime)
+			usleep((useconds_t)(1e6 * FRAMES / rate));
 	}
 
 	const clap_plugin_state_t *st = p->get_extension(p, CLAP_EXT_STATE);
@@ -165,6 +193,11 @@ int main(int argc, char **argv)
 		const bool ok = st->save(p, &os);
 		printf("state: %s, %zu bytes, nvram %s\n", ok ? "saved" : "FAILED", b.n,
 		       memmem(b.p, b.n, "nvram", 5) ? "present" : "MISSING");
+		if (getenv("OSTRICH_RENDER_SAVE"))
+		{
+			FILE *sf = fopen(getenv("OSTRICH_RENDER_SAVE"), "wb");
+			if (sf) { fwrite(b.p, 1, b.n, sf); fclose(sf); }
+		}
 		free(b.p);
 	}
 	p->stop_processing(p);
