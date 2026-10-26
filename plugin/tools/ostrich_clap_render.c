@@ -224,6 +224,10 @@ int main(int argc, char **argv)
 			usleep((useconds_t)(1e6 * FRAMES / rate));
 	}
 
+	// OSTRICH_RENDER_SETTLE: seconds to wait before saving the state, for work the plugin
+	// does on a thread of its own (a SysEx file).
+	if (getenv("OSTRICH_RENDER_SETTLE"))
+		usleep((useconds_t)(atof(getenv("OSTRICH_RENDER_SETTLE")) * 1e6));
 	const clap_plugin_state_t *st = p->get_extension(p, CLAP_EXT_STATE);
 	if (st)
 	{

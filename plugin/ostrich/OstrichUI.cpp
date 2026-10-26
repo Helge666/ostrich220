@@ -68,6 +68,10 @@ const Rect kSlots[kCardSlots] = {
 };
 inline Rect ejectRect(const Rect &slot) { return { slot.x + slot.w - 30, slot.y + 8, 24, slot.h - 16 }; }
 
+// SysEx files, above the slots: a bulk dump of the whole machine to a .syx, or a .syx in.
+const Rect kSyxLoad { kSlotX, 26.0f, 87.0f, 22.0f };
+const Rect kSyxSave { kSlotX + kSlotW - 87.0f, 26.0f, 87.0f, 22.0f };
+
 } // anonymous namespace
 
 
@@ -130,12 +134,25 @@ protected:
 
 	void uiFileBrowserSelected(const char *filename) override
 	{
-		if (m_browseSlot < 0)
-			return;
-		const unsigned s = unsigned(m_browseSlot);
+		const int what = m_browseSlot;
 		m_browseSlot = -1;
-		if (filename == nullptr || filename[0] == '\0')
+		if (what < 0 || filename == nullptr || filename[0] == '\0')
 			return;                         // cancelled
+		if (what == kBrowseSyxLoad || what == kBrowseSyxSave)
+		{
+			std::string path = filename;
+			m_syxDir = dirOf(path);
+			if (what == kBrowseSyxSave)
+			{
+				const size_t dot = path.find_last_of('.'), cut = path.find_last_of("/\\");
+				if (dot == std::string::npos || (cut != std::string::npos && dot < cut))
+					path += ".syx";
+			}
+			const std::string msg = std::to_string(++ m_syxSeq) + (what == kBrowseSyxSave ? " save " : " load ") + path;
+			setState("sysex", msg.c_str());
+			return;
+		}
+		const unsigned s = unsigned(what);
 		m_cardPath[s] = filename;
 		setState(kCardStateKeys[s], filename);
 	}
@@ -185,6 +202,7 @@ protected:
 		drawLcd();
 		drawKeys();
 		drawSlots();
+		drawSyxButtons();
 
 		// Status line.
 		fontSize(11);
@@ -221,6 +239,19 @@ protected:
 					repaint();
 					return true;
 				}
+			if (kSyxLoad.contains(x, y) || kSyxSave.contains(x, y))
+			{
+				const bool save = kSyxSave.contains(x, y);
+				FileBrowserOptions opts;
+				opts.saving = save;
+				opts.defaultName = save ? "U-220 bulk dump.syx" : nullptr;
+				opts.title = save ? "Save a bulk dump of the whole machine (.syx)" : "Load SysEx into the machine (.syx)";
+				opts.startDir = m_syxDir.empty() ? nullptr : m_syxDir.c_str();
+				m_browseSlot = save ? kBrowseSyxSave : kBrowseSyxLoad;
+				if (!openFileBrowser(opts))
+					m_browseSlot = -1;
+				return true;
+			}
 			for (unsigned s = 0; s < kCardSlots; s ++)
 				if (kSlots[s].contains(x, y))
 				{
@@ -319,11 +350,8 @@ private:
 		// Start where the slot's card came from, or where the other slot's did.
 		std::string dir;
 		for (const std::string &p : { m_cardPath[s], m_cardPath[s ^ 1] })
-			if (!p.empty())
-			{
-				const size_t cut = p.find_last_of("/\\");
-				if (cut != std::string::npos) { dir = p.substr(0, cut); break; }
-			}
+			if (!(dir = dirOf(p)).empty())
+				break;
 		const std::string title = "Insert a PCM card into slot " + std::to_string(s + 1) + " (SN-U110 card dump)";
 		FileBrowserOptions opts;
 		opts.title = title.c_str();
@@ -331,6 +359,30 @@ private:
 		m_browseSlot = int(s);
 		if (!openFileBrowser(opts))
 			m_browseSlot = -1;
+	}
+
+	static std::string dirOf(const std::string &p)
+	{
+		const size_t cut = p.find_last_of("/\\");
+		return cut == std::string::npos ? std::string() : p.substr(0, cut);
+	}
+
+	void drawSyxButtons()
+	{
+		for (const Rect *r : { &kSyxLoad, &kSyxSave })
+		{
+			beginPath();
+			roundedRect(r->x, r->y, r->w, r->h, 3);
+			fillColor(Color(70, 70, 76));
+			fill();
+			strokeColor(Color(110, 110, 116));
+			strokeWidth(1);
+			stroke();
+			fontSize(10);
+			textAlign(ALIGN_CENTER | ALIGN_MIDDLE);
+			fillColor(Color(220, 220, 220));
+			text(r->x + r->w / 2, r->y + r->h / 2 + 1, r == &kSyxLoad ? "LOAD SYSEX" : "SAVE SYSEX", nullptr);
+		}
 	}
 
 	void setCardInfo(const char *value)
@@ -728,7 +780,11 @@ private:
 	std::string m_status;
 	CardView m_card[kCardSlots];
 	std::string m_cardPath[kCardSlots];
+	// What the open file dialog is for: a card slot (0, 1) or a SysEx file.
+	static constexpr int kBrowseSyxLoad = 10, kBrowseSyxSave = 11;
 	int m_browseSlot = -1;
+	unsigned m_syxSeq = 0;
+	std::string m_syxDir;
 	unsigned long m_dbgIdles = 0, m_dbgPanels = 0, m_dbgPanelBad = 0, m_dbgDraws = 0, m_dbgKeys = 0, m_dbgExc = 0;
 	unsigned long m_dbgMouse = 0, m_dbgMouseLines = 0;
 	std::chrono::steady_clock::time_point m_dbgLast {};

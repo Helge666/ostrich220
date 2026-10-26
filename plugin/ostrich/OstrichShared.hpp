@@ -73,6 +73,7 @@ enum States : uint32_t
 	kStateCard1,                ///< host session and UI -> DSP: the card file in slot 1, "" = empty
 	kStateCard2,                ///< the same for slot 2
 	kStateCardInfo,             ///< DSP -> UI: what each slot shows, see cardInfo below
+	kStateSysex,                ///< UI -> DSP, "<n> save|load <path>": a .syx file
 	kStateCount
 };
 

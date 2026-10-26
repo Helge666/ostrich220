@@ -552,6 +552,19 @@ ausgetauscht (Schritt 4).
 4. Formate: CLAP und VST3 unter Windows. Bei emu110 aktualisiert sich das VST3-Panel noch
    nicht, das müssen wir beheben. Standalone; macOS später.
 5. Patch-Bibliothek, SysEx-Import und -Export (U-220-Bulk-Dumps).
+   **SysEx als Datei (umgesetzt 26.10.2026, offline geprüft, in Cubase noch nicht):** zwei
+   Knöpfe über den Kartenslots, LOAD SYSEX und SAVE SYSEX, je mit Dateidialog. Beides läuft
+   auf einer Kopie der Maschine in einem eigenen Thread, so schnell die Emulation kann
+   (ein Bulk Dump All in ~1,4 s statt ~16 s); die spielende Maschine wartet nicht.
+   - Speichern: auf der Kopie `Data → Bulk → All` per Tastendruck, ihr MIDI OUT wird die
+     Datei -- der Dump der Firmware selbst. 247 Pakete, 33 398 Byte; die ersten 31 084 Byte
+     gleich dem Werks-Dump (danach Temp-Bereich und die Wiederholungen am Ende des Werks-Dumps).
+   - Laden: die .syx in den MIDI IN der Kopie, im Leitungstempo mit 20 ms Pause je Paket,
+     dann ihr Speicher in die Maschine (Neustart wie beim Laden einer Session). Nimmt die
+     Firmware nichts an (kein „Receiving SysEx.“: Rx SysEx aus, andere Device ID), sagt die
+     Statuszeile das. Geprüft: P-01 per Datei umbenannt, geladen, wieder gespeichert, Name da.
+   - Damit unabhängig vom Cubase-Problem mit SysEx aus VST3 (siehe „Offene Fragen“).
+   - Offen: Patch-Bibliothek, einzelne Patches statt des ganzen Speichers.
 6. **Mehrfachausgänge (umgesetzt 26.10.2026, in Cubase von Helge bestätigt: Ausgänge zuschaltbar, Dir1/Dir2-Parts klingen dort ohne Effekt).** Drei Stereopaare wie
    am Gerät: MIX OUT (1/2), DIRECT OUT 1 (3/4), DIRECT OUT 2 (5/6). Laut Owner's Manual (S. 27,
    61): Output Assign pro Part Dry/Rev/Cho (→ MIX) oder Dir1/Dir2 (→ DIRECT, ohne Effekt);

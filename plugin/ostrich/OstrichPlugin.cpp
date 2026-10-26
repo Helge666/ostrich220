@@ -197,6 +197,8 @@ public:
 		m_dbgStop.store(true);
 		if (m_dbgThread.joinable())
 			m_dbgThread.join();
+		if (m_sysexThread.joinable())
+			m_sysexThread.join();
 	}
 
 protected:
@@ -388,6 +390,12 @@ protected:
 			state.label = "PCM cards";
 			state.hints = kStateIsOnlyForUI;
 			break;
+		case kStateSysex:
+			// "<n> save|load <path>": a .syx file, see requestSysex.
+			state.key = "sysex";
+			state.label = "SysEx file";
+			state.hints = kStateIsOnlyForDSP;
+			break;
 		}
 		state.defaultValue = "";
 	}
@@ -395,7 +403,10 @@ protected:
 	String getState(const char *key) const override
 	{
 		if (std::strcmp(key, "status") == 0)
+		{
+			std::lock_guard<std::mutex> lock(m_statusLock);
 			return String(m_status.c_str());
+		}
 		if (std::strcmp(key, "uisize") == 0)
 		{
 			std::lock_guard<std::mutex> lock(m_uiSizeLock);
@@ -451,6 +462,12 @@ protected:
 				setCard(s, value);
 				return;
 			}
+		if (std::strcmp(key, "sysex") == 0)
+		{
+			if (value[0] != '\0')
+				requestSysex(value);
+			return;
+		}
 		if (std::strcmp(key, "nvram") != 0 || value[0] == '\0')
 			return;
 		std::vector<uint8_t> raw(std::strlen(value) / 2);
@@ -486,8 +503,16 @@ protected:
 		float *const outL = outputs[0];
 		float *const outR = outputs[1];
 
-		if (m_statusPending.exchange(false))
-			updateStateValue("status", m_status.c_str());
+		if (m_statusPending.load())
+		{
+			// Set on other threads too (the SysEx work): never wait for it here.
+			std::unique_lock<std::mutex> sl(m_statusLock, std::try_to_lock);
+			if (sl.owns_lock())
+			{
+				m_statusPending.store(false);
+				updateStateValue("status", m_status.c_str());
+			}
+		}
 		if (m_cardInfoPending.load())
 		{
 			std::unique_lock<std::mutex> cl(m_cardLock, std::try_to_lock);
@@ -615,6 +640,190 @@ private:
 				}
 			}
 		}
+	}
+
+	// ---- SysEx files -------------------------------------------------------------------
+
+	// From the panel: "<n> save <path>" or "<n> load <path>"; the counter makes the same
+	// file twice two requests.  The work runs on a thread of its own, on a copy of the
+	// machine and as fast as the emulation goes, so the one playing is not held up.
+	void requestSysex(const char *value)
+	{
+		unsigned n = 0;
+		char verb[8] = {};
+		int used = 0;
+		if (std::sscanf(value, "%u %7s %n", &n, verb, &used) < 2 || used == 0 || value[used] == '\0')
+			return;
+		const std::string path = value + used;
+		const bool save = std::strcmp(verb, "save") == 0;
+		if (!save && std::strcmp(verb, "load") != 0)
+			return;
+		if (!m_romsLoaded)
+		{
+			setStatus("SysEx: no machine to work with -- the ROM images are missing.");
+			return;
+		}
+		if (m_sysexBusy.exchange(true))
+		{
+			setStatus("SysEx: still busy with the last file.");
+			return;
+		}
+		if (m_sysexThread.joinable())
+			m_sysexThread.join();
+		m_sysexThread = std::thread([this, save, path] {
+			if (save)
+				saveSysex(path);
+			else
+				loadSysex(path);
+			m_sysexBusy.store(false);
+		});
+	}
+
+	// The machine as it is now -- its memory -- in a second core, booted.
+	std::unique_ptr<U220Core> cloneMachine()
+	{
+		auto c = std::make_unique<U220Core>();
+		c->loadProgramRom(m_romImages[kSlotProgram].data(), m_romImages[kSlotProgram].size());
+		for (unsigned w = 0; w < kNumWaveRoms; w ++)
+			c->loadWaveRom(w, m_romImages[w].data(), m_romImages[w].size());
+		std::vector<uint8_t> st;
+		{
+			std::lock_guard<std::mutex> lock(m_machine);
+			st.resize(m_core.saveState(nullptr, 0));
+			m_core.saveState(st.data(), st.size());
+		}
+		c->loadState(st.data(), st.size());
+		return c;
+	}
+
+	// What the unit sends for Data > Bulk > All, keys pressed on the copy and its MIDI OUT
+	// written to the file as it came: the dump is the firmware's own.
+	void saveSysex(const std::string &path)
+	{
+		setStatus("SysEx: making a bulk dump (Data > Bulk > All) ...");
+		auto c = cloneMachine();
+		std::vector<uint8_t> out;
+		auto run = [&](double seconds) {
+			c->runUntilIdle(uint32_t(seconds * 1000.0));
+			uint8_t buf[4096];
+			while (const size_t got = c->midiOut(buf, sizeof(buf), nullptr))
+				out.insert(out.end(), buf, buf + got);
+		};
+		auto press = [&](Button b) {
+			c->setButton(b, true);
+			run(0.2);
+			c->setButton(b, false);
+			run(0.3);
+			if (s_debug)
+			{
+				char r0[kLcdColumns + 1], r1[kLcdColumns + 1];
+				c->lcdText(r0, r1);
+				d_stdout("Ostrich: SysEx copy, key %d, LCD [%s][%s]", int(b), r0, r1);
+			}
+		};
+		auto title = [&]() {
+			char r0[kLcdColumns + 1], r1[kLcdColumns + 1];
+			c->lcdText(r0, r1);
+			std::string t(r0);
+			while (!t.empty() && t.back() == ' ')
+				t.pop_back();
+			return t;
+		};
+		// Just after power-on the firmware takes no keys yet: wait, and press DATA until the
+		// display says so.  The menus remember their last choice: to the leftmost first,
+		// then counted.
+		run(1.0);
+		for (int i = 0; i < 4 && title() != "Data"; i ++)
+			press(kButtonData);
+		for (int i = 0; i < 3; i ++)
+			press(kButtonCursorLeft);
+		press(kButtonCursorRight);
+		press(kButtonEnter);
+		for (int i = 0; i < 3; i ++)
+			press(kButtonCursorLeft);
+		press(kButtonEnter);
+		if (title() != "Data/Bulk/All")
+		{
+			setStatus("SysEx: the bulk dump menu did not open as expected (display: " + title() + "), nothing saved.");
+			return;
+		}
+		out.clear();
+		press(kButtonEnter);
+		// Until the line has been quiet for two seconds: the dump has pauses of its own.
+		size_t last = 0;
+		int quiet = 0;
+		for (int i = 0; i < 240 && quiet < 4; i ++)
+		{
+			run(0.5);
+			quiet = (!out.empty() && out.size() == last) ? quiet + 1 : 0;
+			last = out.size();
+		}
+		const size_t packets = parseDump(out).size();
+		if (packets == 0)
+		{
+			setStatus("SysEx: the machine sent no bulk dump, nothing saved.");
+			return;
+		}
+		FILE *f = nullptr;
+#ifdef _WIN32
+		f = _wfopen(fs::u8path(path).c_str(), L"wb");
+#else
+		f = std::fopen(path.c_str(), "wb");
+#endif
+		if (f == nullptr || std::fwrite(out.data(), 1, out.size(), f) != out.size())
+		{
+			if (f)
+				std::fclose(f);
+			setStatus("SysEx: cannot write " + path);
+			return;
+		}
+		std::fclose(f);
+		setStatus("SysEx: saved the bulk dump, " + std::to_string(packets) + " packets, "
+				+ std::to_string(out.size()) + " bytes, to " + path);
+	}
+
+	// A .syx into the copy's MIDI IN, at the wire's pace with a gap after each message
+	// as a sequencer would leave, then the copy's memory into the machine (a reboot, as
+	// after a session load).  What the unit takes from MIDI it takes here; what it does
+	// not -- another device ID, Rx SysEx off -- changes nothing, and the status says so.
+	void loadSysex(const std::string &path)
+	{
+		const auto msgs = parseDump(readFile(fs::u8path(path), 0x200000));
+		if (msgs.empty())
+		{
+			setStatus("SysEx: " + path + " holds no Roland SysEx with a good checksum.");
+			return;
+		}
+		setStatus("SysEx: sending " + std::to_string(msgs.size()) + " packets ...");
+		auto c = cloneMachine();
+		double t = c->emulatedSeconds() + 1.0;                  // just booted: let it settle
+		for (const auto &m : msgs)
+		{
+			c->midiInAtTime(m.data(), m.size(), t);
+			t += double(m.size()) * 10.0 / 31250.0 + 0.020;     // wire time + 20 ms
+		}
+		// The unit says "Receiving SysEx." while it takes data: that is the sign it did.
+		bool received = false;
+		while (c->emulatedSeconds() < t + 1.0)
+		{
+			c->runUntilIdle(100);
+			char r0[kLcdColumns + 1], r1[kLcdColumns + 1];
+			c->lcdText(r0, r1);
+			received = received || std::strstr(r0, "Receiving") || std::strstr(r1, "Receiving");
+		}
+		if (!received)
+		{
+			setStatus("SysEx: the machine took nothing from " + path + " (Rx SysEx off, or another device ID?).");
+			return;
+		}
+		std::vector<uint8_t> after(c->saveState(nullptr, 0));
+		c->saveState(after.data(), after.size());
+		{
+			std::lock_guard<std::mutex> lock(m_machine);
+			m_core.loadState(after.data(), after.size());
+			m_needFirstBoot = false;
+		}
+		setStatus("SysEx: loaded " + std::to_string(msgs.size()) + " packets from " + path);
 	}
 
 	// ---- PCM cards ---------------------------------------------------------------------
@@ -886,8 +1095,11 @@ private:
 
 	void setStatus(const std::string &s)
 	{
-		m_status = s;
-		m_statusPending.store(true);
+		{
+			std::lock_guard<std::mutex> lock(m_statusLock);
+			m_status = s;
+			m_statusPending.store(true);
+		}
 		d_stdout("Ostrich: %s", s.c_str());
 	}
 
@@ -949,6 +1161,8 @@ private:
 		for (unsigned w = 0; w < kNumWaveRoms; w ++)
 			m_core.loadWaveRom(w, images[w].data(), images[w].size());
 		m_core.reset();
+		for (int s = 0; s < 7; s ++)
+			m_romImages[s] = std::move(images[s]);
 		m_romsLoaded = true;
 		setStatus("ROMs from " + where + (m_factoryPath.empty()
 				? ".  No U220Factory.syx found: a new instance starts with empty memory."
@@ -1035,6 +1249,7 @@ private:
 	fs::path m_factoryPath;
 
 	std::string m_status;
+	mutable std::mutex m_statusLock;
 	std::atomic<bool> m_statusPending { false };
 	std::string m_uiSize;           // "<w> <h>", the panel's, saved with the session
 	mutable std::mutex m_uiSizeLock;
@@ -1058,6 +1273,11 @@ private:
 	uint32_t m_publishPeriod = 1920, m_publishAccum = 0, m_publishesSame = 0;
 	PanelBlob m_lastBlob {};
 	char m_blobHex[sizeof(PanelBlob) * 2 + 1] = {};
+
+	// SysEx files (requestSysex).  The ROM images stay for the machine's copies.
+	std::vector<uint8_t> m_romImages[7];
+	std::thread m_sysexThread;
+	std::atomic<bool> m_sysexBusy { false };
 
 	// PCM cards.  Paths and what the panel shows under m_cardLock; the images and the
 	// insertion waiting for its moment under m_machine.
