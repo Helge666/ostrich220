@@ -72,8 +72,17 @@ diff --git a/distrho/src/DistrhoUIVST3.cpp b/distrho/src/DistrhoUIVST3.cpp
          fIsResizingFromHost = true;
          fUI.setWindowSizeFromHost(rect.right - rect.left, rect.bottom - rect.top);
          return V3_OK;
-@@ -366,7 +400,9 @@
+@@ -364,9 +398,18 @@
+         const double scaleFactor = fUI.getScaleFactor();
+         minimumWidth /= scaleFactor;
          minimumHeight /= scaleFactor;
++       #else
++        // The host speaks physical pixels here, the constraints are unscaled: at 125 %
++        // Cubase was told 1150x250 for a view whose least size is 1438x313, and asked
++        // again and again (Ostrich, patches/0010).
++        const double scaleFactor = fUI.getScaleFactor();
++        minimumWidth = d_roundToUnsignedInt(minimumWidth * scaleFactor);
++        minimumHeight = d_roundToUnsignedInt(minimumHeight * scaleFactor);
         #endif
  
 +        const int32_t inW = rect->right - rect->left, inH = rect->bottom - rect->top;
@@ -82,7 +91,7 @@ diff --git a/distrho/src/DistrhoUIVST3.cpp b/distrho/src/DistrhoUIVST3.cpp
          return V3_TRUE;
      }
  
-@@ -530,6 +566,7 @@
+@@ -530,6 +573,7 @@
  
      v3_result setContentScaleFactor(const float factor)
      {
@@ -90,7 +99,7 @@ diff --git a/distrho/src/DistrhoUIVST3.cpp b/distrho/src/DistrhoUIVST3.cpp
          if (d_isEqual(fScaleFactor, factor))
              return V3_OK;
  
-@@ -778,6 +815,7 @@
+@@ -778,6 +822,7 @@
              else
              {
                  d_debug("plugin->host setSize %u %u (IGNORED, host resize active)", width, height);
@@ -98,7 +107,7 @@ diff --git a/distrho/src/DistrhoUIVST3.cpp b/distrho/src/DistrhoUIVST3.cpp
                  return;
              }
          }
-@@ -793,6 +831,7 @@
+@@ -793,6 +838,7 @@
          rect.right = width;
          rect.bottom = height;
          fNextPluginRect = rect;
