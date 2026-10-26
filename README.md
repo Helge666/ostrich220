@@ -26,10 +26,10 @@ Einzelgeräte können außerdem durch Alterung der analogen Bauteile voneinander
   Kopie, und bei „Chorus Out = Pre Rev“ kommt der rechte Kanal der Chorus-Parts ein Sample
   später. Beides ist jetzt nachgebaut; an einer Syn-Bass-Line nach Helges Urteil „nahezu
   ununterscheidbar“.
-- **Panel friert ein (unter Beobachtung):** In Cubase hörte das Plugin-Fenster mehrmals auf,
-  sich neu zu zeichnen, während der Klang weiterlief. Eine Absicherung ist eingebaut, und die
-  Diagnose schreibt nach `%PROGRAMDATA%\Ostrich\ostrich-dsp.log` und `ostrich-ui.log`; seither
-  ist es nicht wieder aufgetreten.
+- **Panel reagiert nicht auf Klicks (behoben 26.10.2026, unter Beobachtung):** Bei einer
+  Windows-Skalierung über 100 % wurden Mausklicks falsch umgerechnet und trafen keine Taste;
+  das Panel wirkte eingefroren. Die Diagnose schreibt weiterhin nach
+  `%PROGRAMDATA%\Ostrich\ostrich-ui.log`.
 
 ## Herkunft
 

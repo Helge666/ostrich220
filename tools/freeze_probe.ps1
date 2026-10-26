@@ -8,9 +8,14 @@
 #   freeze_probe.ps1 -Freeze            WM_SETREDRAW(FALSE) on the frame (the bug, by hand)
 #   freeze_probe.ps1 -Watch [-Heal]     log every change of the chain (and thaw it)
 #   freeze_probe.ps1 -Stress [-Count n] resize the frame n times, report any freeze
+#   freeze_probe.ps1 -Press CUR>,CUR<   click panel keys (posted, works in the background)
+#
+# Key names: EDIT DATA MARK JUMP EXIT ENTER PART< PART> CUR< CUR> VAL- VAL+.  -Press
+# prints the UI's key count after each click (ostrich-ui.log), so a click the panel did
+# not take shows at once.
 
 param([switch]$Status, [switch]$Thaw, [switch]$Freeze, [switch]$Watch, [switch]$Heal,
-      [switch]$Stress, [int]$Count = 20, [int]$IntervalMs = 250,
+      [switch]$Stress, [int]$Count = 20, [int]$IntervalMs = 250, [string[]]$Press,
       [string]$Log = "$env:ProgramData\Ostrich\freeze-probe.log")
 
 Add-Type -TypeDefinition @'
@@ -32,6 +37,7 @@ public class FP {
   [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
   [DllImport("user32.dll")] public static extern bool RedrawWindow(IntPtr h, IntPtr r, IntPtr g, uint f);
   [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr a, int x, int y, int cx, int cy, uint f);
+  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L,T,R,B; }
   public static string Cls(IntPtr h){var s=new StringBuilder(256);GetClassName(h,s,256);return s.ToString();}
   public static string Txt(IntPtr h){var s=new StringBuilder(256);GetWindowText(h,s,256);return s.ToString();}
@@ -66,7 +72,30 @@ function Frozen($frame) { -not [FP]::Styled($frame) -and -not [FP]::IsIconic($fr
 $views = [FP]::Views()
 if ($views.Count -eq 0) { "no Ostrich view open"; exit 1 }
 
-if ($Status -or -not ($Thaw -or $Freeze -or $Watch -or $Stress)) {
+if ($Press) {
+    # Key centres in the panel's design units (1150 wide, OstrichUI.cpp kKeyRects).
+    $keys = @{ 'EDIT' = 699, 110; 'DATA' = 771, 110; 'MARK' = 699, 182; 'JUMP' = 771, 182;
+               'EXIT' = 871, 110; 'ENTER' = 943, 110; 'PART<' = 1015, 110; 'PART>' = 1087, 110;
+               'CUR<' = 871, 182; 'CUR>' = 943, 182; 'VAL-' = 1015, 182; 'VAL+' = 1087, 182 }
+    $v = $views[0]
+    $r = New-Object FP+RECT; [void][FP]::GetWindowRect($v, [ref]$r)
+    # Physical pixels: this thread is per-monitor DPI aware (above).  A DPI-unaware sender
+    # would see its posted coordinates scaled up by the window's DPI on the way in.
+    $s = ($r.R - $r.L) / 1150.0
+    foreach ($name in $Press) {
+        $k = $keys[$name.ToUpper()]
+        if (-not $k) { "unknown key $name"; continue }
+        $x = [int]($k[0] * $s); $y = [int]($k[1] * $s)
+        $lp = [IntPtr](($y -shl 16) -bor $x)
+        [void][FP]::PostMessage($v, 0x0200, [IntPtr]0, $lp)
+        [void][FP]::PostMessage($v, 0x0201, [IntPtr]1, $lp); Start-Sleep -Milliseconds 120
+        [void][FP]::PostMessage($v, 0x0202, [IntPtr]0, $lp); Start-Sleep -Milliseconds 1200
+        $last = Get-Content "$env:ProgramData\Ostrich\ostrich-ui.log" -Tail 1
+        "$name -> " + ($last -replace '.*(keys \d+).*lcd (\[.*?\]\[.*?\]).*', '$1 $2')
+    }
+}
+
+if ($Status -or -not ($Thaw -or $Freeze -or $Watch -or $Stress -or $Press)) {
     foreach ($v in $views) { Chain $v }
     $f = [FP]::GetForegroundWindow(); "foreground: " + [FP]::Txt($f)
 }

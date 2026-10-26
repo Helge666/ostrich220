@@ -595,13 +595,25 @@ ausgetauscht (Schritt 4).
    P-02, 80/80 Bytes). Das Gerät tut dasselbe. Ostrich könnte den Temp-Bereich vor ROM Play
    sichern und danach zurückschreiben – bewusst besser als das Gerät.
 
-**Panel-Freeze (Stand 25.10.2026, unter Beobachtung):** Logs zeigten: Maschine läuft, das Panel
-bekommt alle Displaydaten, aber das Fenster wird nicht mehr neu gezeichnet (draws stehen, idles
-laufen). Ausnahme beim Zeichnen ausgeschlossen (exc 0), Selbstheilung eines hängenden
-pugl-EXPOSING-Status (Patch 0008) half beim zweiten Mal nicht. Seit dem Build mit den
-pugl-Zählern (Patch 0008: WM_PAINT, exposes, enter-Fehler, obscure/refused, Fensterzustand im
-`ostrich-ui.log`) nicht wieder aufgetreten. Beim nächsten Mal zeigen die Zähler die Stelle.
-Diagnose bleibt drin, bis das geklärt ist.
+**Panel-Freeze (Ursache gefunden 26.10.2026, Fix unter Beobachtung):** Es war kein
+Zeichenproblem, sondern die Maus. Klicks kommen in Fensterpixeln an, `onMouse` teilte durch
+`getWidth() / kW` -- das stimmt nur, solange das Fenster genau die Mindestgröße hat. Bei 125 %
+Skalierung (Fenster 1428-1437 px, DGL skaliert automatisch) landete jeder Klick ein Viertel zu
+weit rechts unten und traf keine Taste: das Panel wirkte eingefroren, obwohl es zeichnete.
+Cubase speichert die Fenstergröße im Projekt, daher "merkte" sich das Plugin den Freeze. Fix:
+`mouseScale()` = Fensterbreite / Designbreite (cc98339); per Skript und von Helge geprüft.
+
+Irrweg dabei, festgehalten: Die Phasen mit stehenden draws und `visible 0` sind normales
+Verhalten -- Cubase versteckt Plugin-Fenster, solange es im Hintergrund ist (HIDE/SHOW im
+Mitschnitt). Die Vermutung "Cubase lässt WM_SETREDRAW aus" war falsch.
+
+Diagnose, die vorerst drin bleibt: `FrameWatch` (WM_SETREDRAW/Show/Hide an den Vorfahren,
+Selbstheilung nach SETREDRAW), Klick-Zähler in pugl/DGL (Patches 0008/0009) und jede
+Klick-Abbildung im `ostrich-ui.log`. Nach einigen Tagen ohne Freeze ausbauen.
+`tools/freeze_probe.ps1 -Press CUR>,CUR<` drückt Panel-Tasten per Skript, auch im Hintergrund.
+
+Noch offen: Beim Öffnen handeln Cubase und DPF die Größe in einer schrumpfenden Kette aus
+(1438x313 -> 1428x308; Seitenverhältnis 4,6 bei 125 % nicht ganzzahlig).
 
 **Meilenstein 4:** Ostrich 0.1 läuft in der DAW.
 
