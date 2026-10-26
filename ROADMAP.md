@@ -575,8 +575,8 @@ ausgetauscht (Schritt 4).
    - Offen: In der Werkseinstellung (P-01) blieb der klingende Part trotz Asgn=Dir1/Dir2
      auf Rev geroutet; mit Helges Gerätespeicher folgt das Routing sofort. Ursache unklar
      (welcher Part klingt? Patch-Eigenheit?), am Gerät gegenprüfen, falls es auffällt.
-7. **PCM-Card-Slots (umgesetzt 26.10.2026; Klang von Helge als plausibel bestätigt, Panel in
-   Cubase noch ungeprüft).** Zwei Slots für Karten der Serie SN-U110, wie beim Gerät.
+7. **PCM-Card-Slots (umgesetzt 26.10.2026; von Helge in Cubase bestätigt: Panel, Stecken und
+   Ziehen im Betrieb mit Meldung, Karten-Tones danach spielbar).** Zwei Slots für SN-U110-Karten.
    - **Lage:** Slot 1 bei `0x280000`, Slot 2 bei `0x380000` im 4-MB-Raum des PCM-Chips (die
      Kartenplätze 2 und 3 des U-110; E/F belegen 0 und 1). Dumps werden wie die Wave-ROMs
      entwürfelt.
