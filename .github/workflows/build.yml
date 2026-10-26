@@ -38,6 +38,9 @@ jobs:
   build:
     name: Linux + Windows (cross-compiled)
     runs-on: ubuntu-24.04
+    # A normal run takes ~15 min. A stalled package mirror once held a run for 40 min in
+    # apt; without a limit GitHub would let it run for 6 hours.
+    timeout-minutes: 60
     outputs:
       version: ${{ steps.version.outputs.version }}
 
@@ -70,8 +73,11 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
+          # Short timeouts and retries: a stalled mirror connection is dropped and tried
+          # again instead of waiting minutes per package.
+          APT="-o Acquire::Retries=5 -o Acquire::http::Timeout=30"
+          sudo apt-get $APT update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get $APT install -y --no-install-recommends \
             build-essential git python3 pkg-config ccache zip \
             libjack-jackd2-dev libgl1-mesa-dev libx11-dev libxext-dev libxcursor-dev \
             libcairo2-dev libdbus-1-dev g++-mingw-w64-x86-64
