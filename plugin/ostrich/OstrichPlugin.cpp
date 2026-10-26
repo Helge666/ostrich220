@@ -130,16 +130,21 @@ std::vector<fs::path> romDirs()
 		if (const char *v = std::getenv(name))
 			if (*v) dirs.push_back(fs::u8path(v) / fs::u8path(tail));
 	};
+	// "Ostrich 220", and the "Ostrich" of the test builds before the first release.
 	env("OSTRICH_ROMS", "");
+	for (const char *name : { "Ostrich 220", "Ostrich" })
+	{
+		const std::string roms = std::string(name) + "/roms";
 #ifdef _WIN32
-	env("PROGRAMDATA", "Ostrich/roms");
-	env("LOCALAPPDATA", "Ostrich/roms");
-	env("USERPROFILE", "Documents/Ostrich/roms");
+		env("PROGRAMDATA", roms.c_str());
+		env("LOCALAPPDATA", roms.c_str());
+		env("USERPROFILE", ("Documents/" + roms).c_str());
 #else
-	env("XDG_DATA_HOME", "Ostrich/roms");
-	env("HOME", ".local/share/Ostrich/roms");
-	dirs.push_back("/usr/share/Ostrich/roms");
+		env("XDG_DATA_HOME", roms.c_str());
+		env("HOME", (".local/share/" + roms).c_str());
+		dirs.push_back("/usr/share/" + roms);
 #endif
+	}
 	return dirs;
 }
 
@@ -198,12 +203,12 @@ public:
 	}
 
 protected:
-	const char *getLabel() const override { return "Ostrich"; }
-	const char *getMaker() const override { return "Ostrich project"; }
+	const char *getLabel() const override { return "Ostrich220"; }
+	const char *getMaker() const override { return "Ostrich 220 project"; }
 	const char *getLicense() const override { return "GPL-3.0-or-later"; }
 	const char *getHomePage() const override { return "https://example.invalid/ostrich"; }
 	uint32_t getVersion() const override { return d_version(0, 1, 0); }
-	int64_t getUniqueId() const override { return d_cconst('U', '2', '2', '0'); }
+	int64_t getUniqueId() const override { return d_cconst('O', '2', '2', '0'); }
 	const char *getDescription() const override
 	{
 		return "An emulation of the Roland U-220 RS-PCM sound module, running its original "
@@ -440,7 +445,7 @@ protected:
 			if (std::sscanf(value, "%u %u", &k, &down) == 2 && k < kNumKeys)
 			{
 				if (s_debug)
-					d_stdout("Ostrich: key %u %s (state)", k, down ? "down" : "up");
+					d_stdout("Ostrich 220: key %u %s (state)", k, down ? "down" : "up");
 				setKey(k, down != 0);
 			}
 			return;
@@ -472,7 +477,7 @@ protected:
 		if (m_romsLoaded && m_core.loadState(raw.data(), raw.size()))
 		{
 			m_needFirstBoot = false;
-			d_stdout("Ostrich: restored the battery-backed memory from the session.");
+			d_stdout("Ostrich 220: restored the battery-backed memory from the session.");
 		}
 	}
 
@@ -611,7 +616,7 @@ private:
 				m_keyHeldFrames[k] = 0;
 				m_core.setButton(Button(kKeyBits[k]), true);
 				if (s_debug)
-					d_stdout("Ostrich: machine key %u pressed", k);
+					d_stdout("Ostrich 220: machine key %u pressed", k);
 				continue;
 			}
 			if (m_keyHeld[k])
@@ -625,7 +630,7 @@ private:
 					{
 						char r0[kLcdColumns + 1], r1[kLcdColumns + 1];
 						m_core.lcdText(r0, r1);
-						d_stdout("Ostrich: machine key %u released, LCD [%s][%s]", k, r0, r1);
+						d_stdout("Ostrich 220: machine key %u released, LCD [%s][%s]", k, r0, r1);
 					}
 				}
 			}
@@ -708,7 +713,7 @@ private:
 			{
 				char r0[kLcdColumns + 1], r1[kLcdColumns + 1];
 				c->lcdText(r0, r1);
-				d_stdout("Ostrich: SysEx copy, key %d, LCD [%s][%s]", int(b), r0, r1);
+				d_stdout("Ostrich 220: SysEx copy, key %d, LCD [%s][%s]", int(b), r0, r1);
 			}
 		};
 		auto title = [&]() {
@@ -883,7 +888,7 @@ private:
 		m_cardInfo[slot] = info;
 		m_cardInfoSent = cardInfoText();
 		m_cardInfoPending.store(true);
-		d_stdout("Ostrich: card slot %u: %s", slot + 1, path.empty() ? "empty" : path.c_str());
+		d_stdout("Ostrich 220: card slot %u: %s", slot + 1, path.empty() ? "empty" : path.c_str());
 	}
 
 	// The audio thread, under m_machine: a card waiting for its slot to have been seen empty.
@@ -1078,7 +1083,7 @@ private:
 			m_status = s;
 			m_statusPending.store(true);
 		}
-		d_stdout("Ostrich: %s", s.c_str());
+		d_stdout("Ostrich 220: %s", s.c_str());
 	}
 
 	// ---- ROMs ------------------------------------------------------------------------

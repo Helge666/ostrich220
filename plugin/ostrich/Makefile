@@ -7,7 +7,7 @@
 #   make          Linux: VST3, CLAP, standalone (JACK)
 #   make win      Windows, cross-compiled with mingw-w64: VST3, CLAP, standalone
 
-NAME = Ostrich
+NAME = Ostrich220
 
 FILES_DSP = OstrichPlugin.cpp
 FILES_UI  = OstrichUI.cpp

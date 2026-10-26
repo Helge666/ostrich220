@@ -184,10 +184,10 @@ protected:
 		fillColor(Color(235, 235, 235));
 		textAlign(ALIGN_LEFT | ALIGN_BASELINE);
 		fontSize(26);
-		text(24, 44, "OSTRICH", nullptr);
+		text(24, 44, "OSTRICH 220", nullptr);
 		fontSize(11);
 		fillColor(Color(170, 170, 170));
-		text(140, 44, "RS-PCM SOUND MODULE  \xc2\xb7  U-220 EMULATION", nullptr);
+		text(196, 44, "RS-PCM SOUND MODULE  \xc2\xb7  U-220 EMULATION", nullptr);
 
 		drawKnob();
 		drawLcd();

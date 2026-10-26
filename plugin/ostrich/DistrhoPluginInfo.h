@@ -3,13 +3,14 @@
 #ifndef DISTRHO_PLUGIN_INFO_H_INCLUDED
 #define DISTRHO_PLUGIN_INFO_H_INCLUDED
 
-// "Ostrich" for now; the project may become "Ostrich 220" later (ROADMAP.md, Phase 5).
-#define DISTRHO_PLUGIN_BRAND   "Ostrich"
-#define DISTRHO_PLUGIN_NAME    "Ostrich"
-#define DISTRHO_PLUGIN_URI     "urn:ostrich:u220"
-#define DISTRHO_PLUGIN_CLAP_ID "org.ostrich.u220"
+// Ostrich 220 (O-220).  Its IDs are its own: a host takes it for another plugin than the
+// "Ostrich" of the test builds before the first public version.
+#define DISTRHO_PLUGIN_BRAND   "Ostrich 220"
+#define DISTRHO_PLUGIN_NAME    "Ostrich 220"
+#define DISTRHO_PLUGIN_URI     "urn:ostrich220:u220"
+#define DISTRHO_PLUGIN_CLAP_ID "org.ostrich220.u220"
 
-#define DISTRHO_PLUGIN_BRAND_ID  Ostr
+#define DISTRHO_PLUGIN_BRAND_ID  O220
 #define DISTRHO_PLUGIN_UNIQUE_ID U220
 
 #define DISTRHO_PLUGIN_HAS_UI           1
