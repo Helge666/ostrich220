@@ -551,7 +551,7 @@ ausgetauscht (Schritt 4).
 4. Formate: CLAP und VST3 unter Windows. Bei emu110 aktualisiert sich das VST3-Panel noch
    nicht, das müssen wir beheben. Standalone; macOS später.
 5. Patch-Bibliothek, SysEx-Import und -Export (U-220-Bulk-Dumps).
-6. **Mehrfachausgänge (umgesetzt 26.10.2026, Cubase-Blick steht aus).** Drei Stereopaare wie
+6. **Mehrfachausgänge (umgesetzt 26.10.2026, in Cubase von Helge bestätigt).** Drei Stereopaare wie
    am Gerät: MIX OUT (1/2), DIRECT OUT 1 (3/4), DIRECT OUT 2 (5/6). Laut Owner's Manual (S. 27,
    61): Output Assign pro Part Dry/Rev/Cho (→ MIX) oder Dir1/Dir2 (→ DIRECT, ohne Effekt);
    Einzelausgänge entstehen allein über Assign + Pan (7< / >7), einen eigenen
@@ -565,7 +565,8 @@ ausgetauscht (Schritt 4).
      Lautsprecher (wie ohne Kabel). Kern: `U220Core::render(mix, dir1, dir2)`, nullptr = ohne
      Kabel. Plugin: sechs Ausgänge in drei Gruppen; ein Paar ist "gesteckt", wenn der Host
      ihm eigene Puffer gibt -- in VST3, wenn der Ausgang im Instrument-Rack aktiviert ist
-     (Patch 0011: anfangs nur MIX aktiv; DPF gibt abgeschalteten Ausgängen einen gemeinsamen
+     (Patch 0011: zusätzliche Main-Busse, anfangs nur MIX aktiv -- als Aux-Busse liess Cubase
+     sie nicht zuschalten; DPF gibt abgeschalteten Ausgängen einen gemeinsamen
      Dummy-Puffer). Parameter "Direct outs" (aus = immer über MIX, für CLAP/LV2-Hosts, die
      alle Ports belegen). Volume nur auf MIX, DIRECT mit festem Pegel wie am Gerät.
    - Geprüft mit `ostrich_clap_render` (Demo-Speicher per `tools/swap_nvram.py`): Part 6 auf
