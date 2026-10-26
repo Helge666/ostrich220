@@ -101,6 +101,8 @@ protected:
 			else
 				m_dbgPanelBad ++;
 		}
+		else if (std::strcmp(key, "uisize") == 0)
+			restoreSize(value);
 		else if (std::strcmp(key, "status") == 0)
 		{
 			m_status = value;
@@ -374,6 +376,57 @@ private:
 		}
 	}
 
+	// The panel's size lives in the plugin's state, so the host saves it with the session.
+	// Unscaled -- window pixels over the desktop scale factor -- so that it opens the same on
+	// a screen with other scaling.
+	void restoreSize(const char *value)
+	{
+		unsigned w = 0, h = 0;
+		if (std::sscanf(value, "%u %u", &w, &h) != 2 || w < 100 || h < 20)
+			return;
+		m_sizeSaved = value;
+		const double scale = getWindow().getScaleFactor();
+		const uint pw = uint(std::lround(w * scale)), ph = uint(std::lround(h * scale));
+		char line[160];
+		std::snprintf(line, sizeof(line), "ui %p restore size %ux%u -> %ux%u (window %ux%u)",
+				(void *)this, w, h, pw, ph, getWindow().getWidth(), getWindow().getHeight());
+		debugLog("ostrich-ui", line);
+		if (std::abs(int(pw) - int(getWindow().getWidth())) > 2 || std::abs(int(ph) - int(getWindow().getHeight())) > 2)
+			getWindow().setSize(pw, ph);
+	}
+
+	// Sends the size once it has stood still for a second -- not while the user drags, and
+	// not in the first seconds, while the host still settles the window and the saved size
+	// is on its way (restoreSize).
+	void saveSizeWhenSettled()
+	{
+		const auto now = std::chrono::steady_clock::now();
+		const uint pw = getWindow().getWidth(), ph = getWindow().getHeight();
+		if (pw != m_sizeSeenW || ph != m_sizeSeenH)
+		{
+			m_sizeSeenW = pw;
+			m_sizeSeenH = ph;
+			m_sizeSeenSince = now;
+			return;
+		}
+		if (now - m_created < std::chrono::seconds(3) || now - m_sizeSeenSince < std::chrono::seconds(1))
+			return;
+		const double scale = getWindow().getScaleFactor();
+		char value[32];
+		std::snprintf(value, sizeof(value), "%u %u", unsigned(std::lround(pw / scale)), unsigned(std::lround(ph / scale)));
+		if (m_sizeSaved == value)
+			return;
+		unsigned sw = 0, sh = 0;
+		if (std::sscanf(m_sizeSaved.c_str(), "%u %u", &sw, &sh) == 2
+				&& std::abs(int(sw * scale) - int(pw)) <= 2 && std::abs(int(sh * scale) - int(ph)) <= 2)
+			return;                     // the host's rounding, not a resize
+		m_sizeSaved = value;
+		setState("uisize", value);
+		char line[96];
+		std::snprintf(line, sizeof(line), "ui %p save size %s (window %ux%u)", (void *)this, value, pw, ph);
+		debugLog("ostrich-ui", line);
+	}
+
 	// Mouse events come in the window's own pixels.  The panel is drawn in design units
 	// scaled by getWidth() / kW on top of DGL's automatic scaling (the window is larger than
 	// the minimum size), so the full factor is the window width over the design width --
@@ -395,6 +448,7 @@ private:
 	{
 		m_dbgIdles ++;
 		m_frameWatch->idle();
+		saveSizeWhenSettled();
 		const auto now = std::chrono::steady_clock::now();
 		if (now - m_dbgLast >= std::chrono::seconds(1))
 		{
@@ -488,6 +542,10 @@ private:
 	unsigned long m_dbgMouse = 0, m_dbgMouseLines = 0;
 	std::chrono::steady_clock::time_point m_dbgLast {};
 	std::unique_ptr<FrameWatch> m_frameWatch;   // the host frame around the panel (freeze)
+	const std::chrono::steady_clock::time_point m_created = std::chrono::steady_clock::now();
+	std::string m_sizeSaved;                    // "<w> <h>" unscaled, as in the plugin state
+	uint m_sizeSeenW = 0, m_sizeSeenH = 0;
+	std::chrono::steady_clock::time_point m_sizeSeenSince {};
 	float m_volumeDb = 0.0f;
 	bool m_hwEq = true;
 	bool m_keyLit[kNumKeys] = {};

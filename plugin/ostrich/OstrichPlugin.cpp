@@ -320,6 +320,13 @@ protected:
 			state.label = "Panel key";
 			state.hints = kStateIsOnlyForDSP;
 			break;
+		case kStateUiSize:
+			// Kept here only so that the host saves it with the session: the panel sets it
+			// when the user resizes it, and gets it back when it opens (OstrichUI.cpp).
+			state.key = "uisize";
+			state.label = "Panel size";
+			state.hints = 0;
+			break;
 		}
 		state.defaultValue = "";
 	}
@@ -328,6 +335,11 @@ protected:
 	{
 		if (std::strcmp(key, "status") == 0)
 			return String(m_status.c_str());
+		if (std::strcmp(key, "uisize") == 0)
+		{
+			std::lock_guard<std::mutex> lock(m_uiSizeLock);
+			return String(m_uiSize.c_str());
+		}
 		if (std::strcmp(key, "nvram") != 0 || !m_romsLoaded)
 			return String();
 		std::lock_guard<std::mutex> lock(m_machine);
@@ -353,6 +365,12 @@ protected:
 					d_stdout("Ostrich: key %u %s (state)", k, down ? "down" : "up");
 				setKey(k, down != 0);
 			}
+			return;
+		}
+		if (std::strcmp(key, "uisize") == 0)
+		{
+			std::lock_guard<std::mutex> lock(m_uiSizeLock);
+			m_uiSize = value;
 			return;
 		}
 		if (std::strcmp(key, "nvram") != 0 || value[0] == '\0')
@@ -691,6 +709,8 @@ private:
 
 	std::string m_status;
 	std::atomic<bool> m_statusPending { false };
+	std::string m_uiSize;           // "<w> <h>", the panel's, saved with the session
+	mutable std::mutex m_uiSizeLock;
 
 	double m_hostRate = 48000.0;
 	DacStage m_dac[2];              // 32 kHz -> host, with the DAC's images (DacStage.hpp)
