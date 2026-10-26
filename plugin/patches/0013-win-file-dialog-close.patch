@@ -1,0 +1,62 @@
+diff --git a/distrho/extra/FileBrowserDialogImpl.cpp b/distrho/extra/FileBrowserDialogImpl.cpp
+--- a/distrho/extra/FileBrowserDialogImpl.cpp
++++ b/distrho/extra/FileBrowserDialogImpl.cpp
+@@ -213,7 +213,8 @@
+ #ifdef DISTRHO_OS_WINDOWS
+     OPENFILENAMEW ofn;
+     volatile bool threadCancelled;
+-    uintptr_t threadHandle;
++    volatile uintptr_t threadHandle;   // set to 0 by the dialog thread when it ends
++    uint threadId;
+     std::vector<WCHAR> fileNameW;
+     std::vector<WCHAR> startDirW;
+     std::vector<WCHAR> titleW;
+@@ -224,6 +225,7 @@
+         : selectedFile(nullptr),
+           threadCancelled(false),
+           threadHandle(0),
++          threadId(0),
+           fileNameW(32768),
+           saving(save),
+           isEmbed(false)
+@@ -266,7 +268,6 @@
+         if (MultiByteToWideChar(CP_UTF8, 0, windowTitle, -1, titleW.data(), static_cast<int>(titleW.size())))
+             ofn.lpstrTitle = titleW.data();
+ 
+-        uint threadId;
+         threadCancelled = false;
+         threadHandle = _beginthreadex(nullptr, 0, _run, this, 0, &threadId);
+     }
+@@ -278,19 +279,20 @@
+         if (threadHandle == 0)
+             return true;
+ 
+-        // if previous dialog running, carefully close its window
+-        const HWND owner = isEmbed ? GetParent(ofn.hwndOwner) : ofn.hwndOwner;
+-
+-        if (owner != nullptr && owner != INVALID_HANDLE_VALUE)
++        // If the previous dialog still runs, close its window -- the windows of the thread
++        // that runs it.  GetWindow(owner, GW_HWNDFIRST) was a window next to the owner: for
++        // a plugin view, the host's own wrapper, which then closed the editor (Ostrich,
++        // patches/0013).  Posted, and the wait keeps taking sent messages: closing the
++        // dialog re-enables its owner, a window of this thread.
++        const HANDLE thread = (HANDLE)threadHandle;
++        EnumThreadWindows(threadId, [](HWND window, LPARAM) -> BOOL {
++            PostMessage(window, WM_CLOSE, 0, 0);
++            return TRUE;
++        }, 0);
++        for (int i = 0; i < 100 && threadHandle != 0 && WaitForSingleObject(thread, 50) == WAIT_TIMEOUT; ++i)
+         {
+-            const HWND window = GetWindow(owner, GW_HWNDFIRST);
+-
+-            if (window != nullptr && window != INVALID_HANDLE_VALUE)
+-            {
+-                SendMessage(window, WM_SYSCOMMAND, SC_CLOSE, 0);
+-                SendMessage(window, WM_CLOSE, 0, 0);
+-                WaitForSingleObject((HANDLE)threadHandle, 5000);
+-            }
++            MSG msg;
++            PeekMessage(&msg, nullptr, 0, 0, PM_NOREMOVE);
+         }
+ 
+         if (threadHandle == 0)

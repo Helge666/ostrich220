@@ -564,6 +564,13 @@ ausgetauscht (Schritt 4).
      Firmware nichts an (kein „Receiving SysEx.“: Rx SysEx aus, andere Device ID), sagt die
      Statuszeile das. Geprüft: P-01 per Datei umbenannt, geladen, wieder gespeichert, Name da.
    - Damit unabhängig vom Cubase-Problem mit SysEx aus VST3 (siehe „Offene Fragen“).
+   - **Fehler in Cubase (26.10.2026, behoben):** SAVE bei noch offenem LOAD-Dialog (er war
+     hinter Cubase gerutscht) entfernte die Plugin-Ansicht. DPF schließt unter Windows einen
+     laufenden Dialog per `WM_CLOSE` an `GetWindow(Parent, GW_HWNDFIRST)` -- eingebettet ist
+     das Cubases eigener Plugin-Wrapper. Patch 0013 schließt die Fenster des Dialog-Threads.
+     Im Standalone nachgestellt (LOAD offen, SAVE geklickt: LOAD zu, SAVE auf, gespeichert,
+     wieder geladen). Dabei gefunden: DGL wurde nach einem neuen Patch nicht neu gebaut;
+     `make patches` wirft jetzt DGLs Objekte weg, wenn es einen Patch anwendet.
    - Offen: Patch-Bibliothek, einzelne Patches statt des ganzen Speichers.
 6. **Mehrfachausgänge (umgesetzt 26.10.2026, in Cubase von Helge bestätigt: Ausgänge zuschaltbar, Dir1/Dir2-Parts klingen dort ohne Effekt).** Drei Stereopaare wie
    am Gerät: MIX OUT (1/2), DIRECT OUT 1 (3/4), DIRECT OUT 2 (5/6). Laut Owner's Manual (S. 27,

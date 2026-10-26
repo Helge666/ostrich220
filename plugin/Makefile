@@ -49,7 +49,9 @@ all:
 # CLAP, whose implementation was a stub that answered true and dropped the value.  Without
 # them the panel is drawn but never updated.  tools/clap_check.sh is what now notices.
 # Idempotent: --check tells us whether they are already in.  *.pugl.patch go to DPF's own
-# pugl submodule (dgl/src/pugl-upstream), the rest to DPF.
+# pugl submodule (dgl/src/pugl-upstream), the rest to DPF.  A patch newly applied throws
+# DGL's objects away: its build does not see a change in a file pugl.cpp includes (the
+# file dialog, patches/0013), and the old library would be linked as it was.
 patches:
 	@for p in patches/*.patch; do \
 		case "$$p" in *.pugl.patch) d=dpf/dgl/src/pugl-upstream ;; *) d=dpf ;; esac; \
@@ -57,6 +59,7 @@ patches:
 			:; \
 		elif git -C $$d apply "$(CURDIR)/$$p" 2>/dev/null; then \
 			echo "  applied $$(basename $$p) to $$d"; \
+			rm -rf dpf/build*/dgl dpf/build*/libdgl*.a; \
 		else \
 			echo "  WARNING: $$(basename $$p) does not apply to $$d -- check the submodule"; \
 		fi; \
