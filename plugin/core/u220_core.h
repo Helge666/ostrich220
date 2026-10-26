@@ -141,6 +141,10 @@ public:
 	/// The stereo output at kCoreSampleRate.  Deterministic and allocation free.
 	void renderStereo(float *left, float *right, uint32_t nframes);
 
+	/// MIX OUT and the two DIRECT OUT pairs, each {left, right}.  A direct pair given as
+	/// nullptr has no plug in its jack: its sound joins MIX, without effect, as on the unit.
+	void render(float *const mix[2], float *const dir1[2], float *const dir2[2], uint32_t nframes);
+
 	/// Send edges, and hold a press for ~100 ms of emulated time: the key scan runs on
 	/// the firmware's 10 ms tick and debounces.
 	void setButton(Button sw, bool down);

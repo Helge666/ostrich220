@@ -92,7 +92,7 @@ struct U220Core::Impl
 	mb87419_mb87420_device    pcm;
 	// The output stage: one biquad per channel, direct form I.
 	double shelf_b[3] = {}, shelf_a[3] = {};
-	double shelf_x[2][2] = {}, shelf_y[2][2] = {};
+	double shelf_x[6][2] = {}, shelf_y[6][2] = {};   // MIX, DIRECT 1, DIRECT 2; left, right
 	void shelf_setup();
 	void shelf_process(float *buf, int ch, uint32_t n);
 
@@ -276,8 +276,9 @@ void U220Core::Impl::apply_voice_gains(int voice)
 	for (int b = 0; b < roland_u220::NUM_BUSES; b ++)
 		pcm.set_voice_gain(u8(voice), b, g[b]);
 	if (trace_gain())
-		std::fprintf(stderr, "GAIN %f v%02d dry %.3f %.3f rev %.3f %.3f cho %.3f %.3f\n", machine.time().as_double(),
-				voice, g[0], g[1], g[2], g[3], g[4], g[5]);
+		std::fprintf(stderr, "GAIN %f v%02d dry %.3f %.3f rev %.3f %.3f cho %.3f %.3f dir1 %.3f %.3f dir2 %.3f %.3f"
+				" words %06x %06x\n", machine.time().as_double(), voice, g[0], g[1], g[2], g[3], g[4], g[5],
+				g[6], g[7], g[8], g[9], ic25.voice_word(unsigned(voice), 0), ic25.voice_word(unsigned(voice), 1));
 }
 
 // The effect fields of the temp patch, bytes 12-19 at 0x1430 (IC10 0x743C), read as one
@@ -706,11 +707,20 @@ size_t U220Core::midiOut(uint8_t *buf, size_t cap, uint32_t *offsets)
 
 void U220Core::renderStereo(float *left, float *right, uint32_t nframes)
 {
+	float *const mix[2] = { left, right };
+	render(mix, nullptr, nullptr, nframes);
+}
+
+void U220Core::render(float *const mix[2], float *const dir1[2], float *const dir2[2], uint32_t nframes)
+{
 	Impl &m = *m_impl;
+	float *const *const outs[3] = { mix, dir1, dir2 };
 	if (!m.started || !m.have_program || nframes == 0)
 	{
-		std::fill_n(left, nframes, 0.0f);
-		std::fill_n(right, nframes, 0.0f);
+		for (float *const *o : outs)
+			if (o)
+				for (int c = 0; c < 2; c ++)
+					std::fill_n(o[c], nframes, 0.0f);
 		return;
 	}
 	m.run_block(nframes);
@@ -719,20 +729,41 @@ void U220Core::renderStereo(float *left, float *right, uint32_t nframes)
 	const auto &dl = st.output(BUS_DRY_L), &dr = st.output(BUS_DRY_R);
 	const auto &rl = st.output(BUS_REV_L), &rr = st.output(BUS_REV_R);
 	const auto &cl = st.output(BUS_CHO_L), &cr = st.output(BUS_CHO_R);
+	const auto &d1l = st.output(BUS_DIR1_L), &d1r = st.output(BUS_DIR1_R);
+	const auto &d2l = st.output(BUS_DIR2_L), &d2r = st.output(BUS_DIR2_R);
 	// Every bus reaches the output dry; the reverb and chorus buses also feed the effects,
-	// which add their returns.  Then the analogue stage, which follows the DAC.
+	// which add their returns.  A direct pair with nowhere of its own to go (nullptr: no
+	// plug in its jack) joins MIX, without effect.  Then the analogue stage, which follows
+	// the DAC, on every pair.
+	float *const left = mix[0], *const right = mix[1];
 	for (uint32_t i = 0; i < nframes; i ++)
 	{
 		left[i]  = dl[i] + rl[i] + cl[i];
 		right[i] = dr[i] + rr[i] + cr[i];
+		if (!dir1) { left[i] += d1l[i]; right[i] += d1r[i]; }
+		if (!dir2) { left[i] += d2l[i]; right[i] += d2r[i]; }
 	}
 	m.fx->setParams(m.effect_params());
 	m.fx->process(&rl[0], &rr[0], &cl[0], &cr[0], left, right, nframes);
+	if (dir1)
+		for (uint32_t i = 0; i < nframes; i ++)
+		{
+			dir1[0][i] = d1l[i];
+			dir1[1][i] = d1r[i];
+		}
+	if (dir2)
+		for (uint32_t i = 0; i < nframes; i ++)
+		{
+			dir2[0][i] = d2l[i];
+			dir2[1][i] = d2r[i];
+		}
 	if (m.output_filter)
-	{
-		m.shelf_process(left, 0, nframes);
-		m.shelf_process(right, 1, nframes);
-	}
+		for (int k = 0; k < 3; k ++)
+			if (outs[k])
+			{
+				m.shelf_process(outs[k][0], 2 * k, nframes);
+				m.shelf_process(outs[k][1], 2 * k + 1, nframes);
+			}
 }
 
 void U220Core::setButton(Button sw, bool down)
