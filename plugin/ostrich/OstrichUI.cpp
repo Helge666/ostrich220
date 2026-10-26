@@ -26,7 +26,7 @@ namespace {
 
 using namespace ostrich;
 
-constexpr float kW = 1150.0f, kH = 250.0f;          // design units
+constexpr float kW = 1350.0f, kH = 250.0f;          // design units
 
 struct Rect { float x, y, w, h; bool contains(float px, float py) const
 	{ return px >= x && px < x + w && py >= y && py < y + h; } };
@@ -58,6 +58,15 @@ const Rect kLcd    { 176.0f, 76.0f, 448.0f, 118.0f };     // the glass
 constexpr float kLcdPadX = 18.0f, kLcdPadY = 8.0f;          // glass around the dots
 const Rect kKnob   { 62.0f, 96.0f, 64.0f, 64.0f };
 const Rect kHwEq   { 60.0f, 192.0f, 68.0f, 20.0f };
+
+// The two PCM card slots, right of the keys and level with their rows; a click on a slot
+// opens a file dialog, the eject button at its right end takes the card out.
+constexpr float kSlotX = 1146.0f, kSlotW = 182.0f, kSlotH = 40.0f;
+const Rect kSlots[kCardSlots] = {
+	{ kSlotX, kRow0 + kKeyH / 2 - kSlotH / 2, kSlotW, kSlotH },
+	{ kSlotX, kRow1 + kKeyH / 2 - kSlotH / 2, kSlotW, kSlotH },
+};
+inline Rect ejectRect(const Rect &slot) { return { slot.x + slot.w - 30, slot.y + 8, 24, slot.h - 16 }; }
 
 } // anonymous namespace
 
@@ -108,6 +117,27 @@ protected:
 			m_status = value;
 			repaint();
 		}
+		else if (std::strcmp(key, "cardinfo") == 0)
+		{
+			setCardInfo(value);
+			repaint();
+		}
+		else
+			for (unsigned s = 0; s < kCardSlots; s ++)
+				if (std::strcmp(key, kCardStateKeys[s]) == 0)
+					m_cardPath[s] = value;
+	}
+
+	void uiFileBrowserSelected(const char *filename) override
+	{
+		if (m_browseSlot < 0)
+			return;
+		const unsigned s = unsigned(m_browseSlot);
+		m_browseSlot = -1;
+		if (filename == nullptr || filename[0] == '\0')
+			return;                         // cancelled
+		m_cardPath[s] = filename;
+		setState(kCardStateKeys[s], filename);
 	}
 
 	void onNanoDisplay() override
@@ -154,6 +184,7 @@ protected:
 		drawHwEq();
 		drawLcd();
 		drawKeys();
+		drawSlots();
 
 		// Status line.
 		fontSize(11);
@@ -188,6 +219,21 @@ protected:
 					m_keyLit[k] = true;
 					sendKey(k, true);
 					repaint();
+					return true;
+				}
+			for (unsigned s = 0; s < kCardSlots; s ++)
+				if (kSlots[s].contains(x, y))
+				{
+					if (ejectRect(kSlots[s]).contains(x, y))
+					{
+						if (!m_cardPath[s].empty())
+						{
+							m_cardPath[s].clear();
+							setState(kCardStateKeys[s], "");
+						}
+					}
+					else
+						browseCard(s);
 					return true;
 				}
 			if (kHwEq.contains(x, y))
@@ -266,6 +312,143 @@ private:
 		std::snprintf(msg, sizeof(msg), "%u %u", unsigned(k), down ? 1u : 0u);
 		setState("key", msg);
 		m_dbgKeys ++;
+	}
+
+	void browseCard(unsigned s)
+	{
+		// Start where the slot's card came from, or where the other slot's did.
+		std::string dir;
+		for (const std::string &p : { m_cardPath[s], m_cardPath[s ^ 1] })
+			if (!p.empty())
+			{
+				const size_t cut = p.find_last_of("/\\");
+				if (cut != std::string::npos) { dir = p.substr(0, cut); break; }
+			}
+		const std::string title = "Insert a PCM card into slot " + std::to_string(s + 1) + " (SN-U110 card dump)";
+		FileBrowserOptions opts;
+		opts.title = title.c_str();
+		opts.startDir = dir.empty() ? nullptr : dir.c_str();
+		m_browseSlot = int(s);
+		if (!openFileBrowser(opts))
+			m_browseSlot = -1;
+	}
+
+	void setCardInfo(const char *value)
+	{
+		std::string v = value, field[kCardSlots];
+		unsigned s = 0;
+		for (char c : v)
+		{
+			if (c == kCardInfoSlotSep) { if (++ s >= kCardSlots) break; continue; }
+			field[s] += c;
+		}
+		for (unsigned i = 0; i < kCardSlots; i ++)
+		{
+			CardView &cv = m_card[i];
+			cv = CardView();
+			std::string part[3];
+			unsigned k = 0;
+			for (char c : field[i])
+			{
+				if (c == kCardInfoFieldSep) { if (++ k >= 3) break; continue; }
+				part[k] += c;
+			}
+			cv.ok = part[0] == "ok";
+			cv.error = part[0] == "err";
+			cv.line1 = part[1];
+			cv.line2 = part[2];
+		}
+	}
+
+	void drawSlots()
+	{
+		for (unsigned s = 0; s < kCardSlots; s ++)
+		{
+			const Rect &r = kSlots[s];
+			const CardView &cv = m_card[s];
+			fontSize(10);
+			textAlign(ALIGN_CENTER | ALIGN_BASELINE);
+			fillColor(Color(220, 220, 220));
+			char label[24];
+			std::snprintf(label, sizeof(label), "PCM CARD %u", s + 1);
+			text(r.x + r.w / 2, r.y - 8, label, nullptr);
+
+			// The slot: a dark recess with the card's edge in it, or empty.
+			beginPath();
+			roundedRect(r.x, r.y, r.w, r.h, 3);
+			fillColor(Color(8, 8, 9));
+			fill();
+			strokeColor(Color(90, 90, 96));
+			strokeWidth(1);
+			stroke();
+			const float tx = r.x + 10, tw = r.w - 46;
+			if (cv.ok)
+			{
+				beginPath();
+				roundedRect(r.x + 4, r.y + 4, r.w - 40, r.h - 8, 2);
+				fillColor(Color(196, 200, 206));
+				fill();
+				textAlign(ALIGN_LEFT | ALIGN_BASELINE);
+				fontSize(12);
+				fillColor(Color(20, 20, 24));
+				textBox(tx, r.y + 18, tw, cv.line1.c_str(), nullptr);
+				fontSize(9);
+				fillColor(Color(60, 60, 66));
+				textBox(tx, r.y + 31, tw, fit(cv.line2, tw, 9).c_str(), nullptr);
+			}
+			else
+			{
+				beginPath();
+				rect(r.x + 8, r.y + r.h / 2 - 1, r.w - 46, 2);     // the slit
+				fillColor(Color(40, 40, 44));
+				fill();
+				textAlign(ALIGN_LEFT | ALIGN_BASELINE);
+				fontSize(cv.error ? 10 : 9);
+				fillColor(cv.error ? Color(240, 170, 60) : Color(110, 110, 116));
+				textBox(tx, r.y + 15, tw, cv.error ? cv.line1.c_str() : "empty", nullptr);
+				if (cv.error)
+				{
+					fontSize(9);
+					textBox(tx, r.y + 31, tw, fit(cv.line2, tw, 9).c_str(), nullptr);
+				}
+				else
+				{
+					fillColor(Color(90, 90, 96));
+					textBox(tx, r.y + 33, tw, "click to insert", nullptr);
+				}
+			}
+
+			// Eject: a triangle over a bar, lit while there is something to take out.
+			const Rect e = ejectRect(r);
+			const bool live = !m_cardPath[s].empty();
+			beginPath();
+			roundedRect(e.x, e.y, e.w, e.h, 3);
+			fillColor(Color(70, 70, 76));
+			fill();
+			const Color ink = live ? Color(230, 230, 230) : Color(110, 110, 116);
+			const float cx = e.x + e.w / 2, top = e.y + 5;
+			beginPath();
+			moveTo(cx, top);
+			lineTo(cx + 7, top + 7);
+			lineTo(cx - 7, top + 7);
+			closePath();
+			fillColor(ink);
+			fill();
+			beginPath();
+			rect(cx - 7, top + 10, 14, 2.5f);
+			fill();
+		}
+	}
+
+	// Cut text to a width, with an ellipsis -- the font is set by the caller.
+	std::string fit(const std::string &t, float w, float size)
+	{
+		fontSize(size);
+		std::string s = t;
+		Rectangle<float> b;
+		while (!s.empty() && textBounds(0, 0, (s + (s.size() < t.size() ? "\xe2\x80\xa6" : "")).c_str(), nullptr, b) > w)
+			s.pop_back();
+		return s.size() < t.size() ? s + "\xe2\x80\xa6" : s;
 	}
 
 	void drawHwEq()
@@ -384,6 +567,9 @@ private:
 		unsigned w = 0, h = 0;
 		if (std::sscanf(value, "%u %u", &w, &h) != 2 || w < 100 || h < 20)
 			return;
+		// A size saved by the narrower panel before the card slots: keep its height.
+		if (std::fabs(double(w) / h - kW / kH) > 0.05)
+			w = unsigned(std::lround(h * kW / kH));
 		m_sizeSaved = value;
 		const double scale = getWindow().getScaleFactor();
 		const uint pw = uint(std::lround(w * scale)), ph = uint(std::lround(h * scale));
@@ -536,8 +722,13 @@ private:
 		}
 	}
 
+	struct CardView { bool ok = false, error = false; std::string line1, line2; };
+
 	PanelBlob m_panel;
 	std::string m_status;
+	CardView m_card[kCardSlots];
+	std::string m_cardPath[kCardSlots];
+	int m_browseSlot = -1;
 	unsigned long m_dbgIdles = 0, m_dbgPanels = 0, m_dbgPanelBad = 0, m_dbgDraws = 0, m_dbgKeys = 0, m_dbgExc = 0;
 	unsigned long m_dbgMouse = 0, m_dbgMouseLines = 0;
 	std::chrono::steady_clock::time_point m_dbgLast {};

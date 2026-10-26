@@ -375,6 +375,19 @@ protected:
 			state.label = "Panel size";
 			state.hints = 0;
 			break;
+		case kStateCard1:
+		case kStateCard2:
+			// The file's path, not its bytes: a card is Roland's data and stays on the
+			// user's disk; a session moved to another machine says which file is missing.
+			state.key = kCardStateKeys[index - kStateCard1];
+			state.label = index == kStateCard1 ? "PCM card slot 1" : "PCM card slot 2";
+			state.hints = 0;
+			break;
+		case kStateCardInfo:
+			state.key = "cardinfo";
+			state.label = "PCM cards";
+			state.hints = kStateIsOnlyForUI;
+			break;
 		}
 		state.defaultValue = "";
 	}
@@ -387,6 +400,17 @@ protected:
 		{
 			std::lock_guard<std::mutex> lock(m_uiSizeLock);
 			return String(m_uiSize.c_str());
+		}
+		for (unsigned s = 0; s < kCardSlots; s ++)
+			if (std::strcmp(key, kCardStateKeys[s]) == 0)
+			{
+				std::lock_guard<std::mutex> lock(m_cardLock);
+				return String(m_cardPath[s].c_str());
+			}
+		if (std::strcmp(key, "cardinfo") == 0)
+		{
+			std::lock_guard<std::mutex> lock(m_cardLock);
+			return String(cardInfoText().c_str());
 		}
 		if (std::strcmp(key, "nvram") != 0 || !m_romsLoaded)
 			return String();
@@ -421,6 +445,12 @@ protected:
 			m_uiSize = value;
 			return;
 		}
+		for (unsigned s = 0; s < kCardSlots; s ++)
+			if (std::strcmp(key, kCardStateKeys[s]) == 0)
+			{
+				setCard(s, value);
+				return;
+			}
 		if (std::strcmp(key, "nvram") != 0 || value[0] == '\0')
 			return;
 		std::vector<uint8_t> raw(std::strlen(value) / 2);
@@ -458,6 +488,15 @@ protected:
 
 		if (m_statusPending.exchange(false))
 			updateStateValue("status", m_status.c_str());
+		if (m_cardInfoPending.load())
+		{
+			std::unique_lock<std::mutex> cl(m_cardLock, std::try_to_lock);
+			if (cl.owns_lock())
+			{
+				m_cardInfoPending.store(false);
+				updateStateValue("cardinfo", m_cardInfoSent.c_str());
+			}
+		}
 
 		// setState() reboots the machine on another thread.  Never wait for it here.
 		std::unique_lock<std::mutex> lock(m_machine, std::try_to_lock);
@@ -474,6 +513,7 @@ protected:
 
 		const uint32_t coreFrames = m_dac[0].inputsFor(frames);
 		tickKeys(coreFrames);
+		tickCards(coreFrames);
 
 		for (uint32_t i = 0; i < midiEventCount; i ++)
 		{
@@ -575,6 +615,102 @@ private:
 				}
 			}
 		}
+	}
+
+	// ---- PCM cards ---------------------------------------------------------------------
+
+	// A card file for a slot, from the panel or the session; "" takes the card out.  Not
+	// the audio thread: it reads the file.  A slot that holds a card is emptied first and
+	// the new one goes in a moment later (tickCards), so that the firmware sees the change.
+	void setCard(unsigned slot, const char *value)
+	{
+		const std::string path = value;
+		{
+			std::lock_guard<std::mutex> lock(m_cardLock);
+			if (path == m_cardPath[slot] && m_cardSettled[slot])
+				return;                     // the session or the panel saying it again
+			m_cardPath[slot] = path;
+			m_cardSettled[slot] = true;
+		}
+
+		std::vector<uint8_t> prepared;
+		std::string info;
+		if (!path.empty())
+		{
+			const fs::path p = fs::u8path(path);
+			const std::string name = pstr(p.filename());
+			const std::vector<uint8_t> raw = readFile(p);
+			std::error_code ec;
+			if (raw.empty() && !fs::exists(p, ec))
+				info = std::string("err") + kCardInfoFieldSep + "File not found" + kCardInfoFieldSep + name;
+			else if (raw.empty() || raw.size() > kCardBytes || U220Core::prepareCard(raw.data(), raw.size(), prepared) != LoadResult::Ok)
+			{
+				info = std::string("err") + kCardInfoFieldSep + "Not a PCM card" + kCardInfoFieldSep + name;
+				prepared.clear();
+			}
+			else
+			{
+				// The header is plain text in a dump: "RolandU-110 N", the card's name at
+				// 0x10, its ID at 0x20 -- what the firmware reads, through its tables.
+				std::string title(reinterpret_cast<const char *>(raw.data()) + 0x10, 16);
+				while (!title.empty() && (title.back() == ' ' || title.back() == '\0'))
+					title.pop_back();
+				const char *sub = raw.size() > 0x20 ? cardTitle(raw[0x20]) : nullptr;
+				info = std::string("ok") + kCardInfoFieldSep + title + kCardInfoFieldSep + (sub ? sub : name.c_str());
+			}
+		}
+
+		{
+			std::lock_guard<std::mutex> lock(m_machine);
+			m_cardInsertPending[slot] = false;
+			if (m_core.cardPresent(slot))
+			{
+				m_core.ejectCard(slot);
+				m_cardInsertWait[slot] = kCardSwapFrames;
+			}
+			else
+				m_cardInsertWait[slot] = 0;
+			if (!prepared.empty())
+			{
+				m_cardImage[slot].swap(prepared);
+				if (m_cardInsertWait[slot] == 0)
+					m_core.installCard(slot, m_cardImage[slot].data());
+				else
+					m_cardInsertPending[slot] = true;
+			}
+		}
+
+		std::lock_guard<std::mutex> lock(m_cardLock);
+		m_cardInfo[slot] = info;
+		m_cardInfoSent = cardInfoText();
+		m_cardInfoPending.store(true);
+		d_stdout("Ostrich: card slot %u: %s", slot + 1, path.empty() ? "empty" : path.c_str());
+	}
+
+	// The audio thread, under m_machine: a card waiting for its slot to have been seen empty.
+	void tickCards(uint32_t coreFrames)
+	{
+		for (unsigned s = 0; s < kCardSlots; s ++)
+		{
+			if (!m_cardInsertPending[s])
+				continue;
+			if (m_cardInsertWait[s] > coreFrames)
+			{
+				m_cardInsertWait[s] -= coreFrames;
+				continue;
+			}
+			m_core.installCard(s, m_cardImage[s].data());       // one memcpy of 512 KB
+			m_cardInsertPending[s] = false;
+		}
+	}
+
+	// Under m_cardLock.
+	std::string cardInfoText() const
+	{
+		std::string t;
+		for (unsigned s = 0; s < kCardSlots; s ++)
+			t += (s ? std::string(1, kCardInfoSlotSep) : std::string()) + m_cardInfo[s];
+		return t;
 	}
 
 	// ---- MIDI OUT ----------------------------------------------------------------------
@@ -922,6 +1058,17 @@ private:
 	uint32_t m_publishPeriod = 1920, m_publishAccum = 0, m_publishesSame = 0;
 	PanelBlob m_lastBlob {};
 	char m_blobHex[sizeof(PanelBlob) * 2 + 1] = {};
+
+	// PCM cards.  Paths and what the panel shows under m_cardLock; the images and the
+	// insertion waiting for its moment under m_machine.
+	static constexpr uint32_t kCardSwapFrames = kCoreSampleRate / 5;   // 200 ms emulated
+	mutable std::mutex m_cardLock;
+	std::string m_cardPath[kCardSlots], m_cardInfo[kCardSlots], m_cardInfoSent;
+	bool m_cardSettled[kCardSlots] = {};
+	std::atomic<bool> m_cardInfoPending { false };
+	std::vector<uint8_t> m_cardImage[kCardSlots];
+	bool m_cardInsertPending[kCardSlots] = {};
+	uint32_t m_cardInsertWait[kCardSlots] = {};
 
 	// MIDI OUT.  A U-220 packet is at most 256 data bytes plus 10 of frame (Roland DT1); at
 	// 31250 baud a block of 8192 frames at 44.1 kHz carries ~580 bytes.

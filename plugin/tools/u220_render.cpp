@@ -129,6 +129,7 @@ void write_f32(const std::string &path, const std::vector<float> &v)
 int main(int argc, char **argv)
 {
 	std::string roms = "roms", out, nvram, save_nvram, midi_events, presses, midi_out, send_out;
+	std::vector<std::string> cards;
 	double seconds = 10.0;
 	bool show_lcd = false, filter = true, reverb = false, no_reverb = false;
 	uint32_t blocksize = 512;
@@ -147,6 +148,7 @@ int main(int argc, char **argv)
 		else if (a == "--midi-at")    midi_events = next();
 		else if (a == "--no-filter")  filter = false;
 		else if (a == "--press")      presses = next();
+		else if (a == "--card")       cards.push_back(next());   // SLOT:FILE[@SEC], FILE "-" = eject
 		else if (a == "--midi-out")   midi_out = next();     // raw bytes the machine sends
 		else if (a == "--send-out")   send_out = next();     // reverb send bus as WAV
 		else if (a == "--reverb")     reverb = true;         // the effect module on
@@ -188,6 +190,29 @@ int main(int argc, char **argv)
 		if (d.size() != ostrich::kNvramBytes) { std::fprintf(stderr, "bad NVRAM %s\n", nvram.c_str()); return 1; }
 		core.setNvram(d.data(), d.size());
 	}
+	// PCM cards: in the slot from power-on, or put in / pulled out at a time.
+	struct CardChange { unsigned slot; double at; std::vector<uint8_t> prepared; bool eject, done = false; };
+	std::vector<CardChange> card_changes;
+	for (const std::string &c : cards)
+	{
+		const size_t colon = c.find(':'), at = c.rfind('@');
+		const std::string file = c.substr(colon + 1, (at == std::string::npos || at < colon) ? std::string::npos : at - colon - 1);
+		CardChange ch { unsigned(std::atoi(c.c_str())), (at == std::string::npos || at < colon) ? -1.0 : std::atof(c.c_str() + at + 1), {}, file == "-" };
+		if (!ch.eject)
+		{
+			auto d = read_file(file);
+			if (ostrich::U220Core::prepareCard(d.data(), d.size(), ch.prepared) != ostrich::LoadResult::Ok)
+			{ std::fprintf(stderr, "bad card image %s\n", file.c_str()); return 1; }
+		}
+		if (ch.at < 0.0)
+		{
+			if (ch.eject) core.ejectCard(ch.slot); else core.installCard(ch.slot, ch.prepared.data());
+			std::printf("card slot %u: %s at power-on\n", ch.slot, file.c_str());
+			continue;
+		}
+		card_changes.push_back(std::move(ch));
+	}
+
 	core.setOutputFilter(filter);
 	BusTap tap;
 	ostrich::U220Fx rev;
@@ -252,6 +277,13 @@ int main(int argc, char **argv)
 			if (!k.down && now >= k.at) { core.setButton(ostrich::Button(k.bit), true); k.down = true; }
 			if (k.down && !k.up && now >= k.at + k.hold) { core.setButton(ostrich::Button(k.bit), false); k.up = true; }
 		}
+		for (auto &ch : card_changes)
+			if (!ch.done && now >= ch.at)
+			{
+				if (ch.eject) core.ejectCard(ch.slot); else core.installCard(ch.slot, ch.prepared.data());
+				std::printf("card slot %u: %s at %.2f s\n", ch.slot, ch.eject ? "pulled out" : "put in", now);
+				ch.done = true;
+			}
 
 		core.renderStereo(l.data(), r.data(), n);
 		if (!midi_out.empty())

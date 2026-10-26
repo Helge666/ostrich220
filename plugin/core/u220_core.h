@@ -60,6 +60,9 @@ enum Button : int
 inline constexpr size_t   kProgramRomBytes = 0x20000;
 inline constexpr size_t   kWaveRomBytes    = 0x80000;
 inline constexpr unsigned kNumWaveRoms     = 6;
+/// The two PCM card slots (SN-U110 cards, 512 KB at most, dumped like the wave ROMs).
+inline constexpr unsigned kNumCardSlots    = 2;
+inline constexpr size_t   kCardBytes       = 0x80000;
 /// IC10, the battery-backed SRAM.  This is what persists, as on the hardware.
 inline constexpr size_t   kNvramBytes      = 0x8000;
 
@@ -111,6 +114,28 @@ public:
 
 	/// Wave ROM `index` 0..5 = A..F (IC19-IC24), as dumped; descrambled and placed here.
 	LoadResult loadWaveRom(unsigned index, const uint8_t *data, size_t len);
+
+	/// Put a PCM card in a slot, or take it out (data == nullptr).  Between render() calls.
+	LoadResult loadCard(unsigned slot, const uint8_t *data, size_t len);
+
+	// --- changing a card in a RUNNING machine ---------------------------------------
+	//
+	// The firmware learns of a card the way the hardware tells it: the slot's detect line,
+	// which it scans with the keys (bits 6/7 of the key matrix), and then reads the card's
+	// header -- the display shows "Checking PCM Card...".  So REPLACING a card means eject,
+	// let the firmware notice (a few key scans, say 100 ms of emulated time), then install.
+
+	/// Descramble a card image into a buffer of the caller's.  Touches no machine state,
+	/// so any thread may call it.  BadImage: no SN-U110 card header.
+	static LoadResult prepareCard(const uint8_t *data, size_t len, std::vector<uint8_t> &out);
+	/// Put a prepared image in a slot and raise its detect line.  A memcpy of kCardBytes;
+	/// for the audio thread, between render() calls.
+	void installCard(unsigned slot, const uint8_t *prepared);
+	/// Drop the detect line only.  The bytes stay, because voices still sounding read
+	/// them until the firmware has stopped them; clearCardData() once it has.
+	void ejectCard(unsigned slot);
+	void clearCardData(unsigned slot);
+	bool cardPresent(unsigned slot) const;
 
 	/// Hard reset.  The firmware boots from whatever the NVRAM holds.
 	void reset();

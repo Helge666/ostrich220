@@ -70,8 +70,30 @@ enum States : uint32_t
 	kStateNvram,                ///< host session: IC10, hex
 	kStateKey,                  ///< UI -> DSP, "<key> <0|1>": a panel key, see below
 	kStateUiSize,               ///< host session: the panel's size, "<w> <h>" unscaled
+	kStateCard1,                ///< host session and UI -> DSP: the card file in slot 1, "" = empty
+	kStateCard2,                ///< the same for slot 2
+	kStateCardInfo,             ///< DSP -> UI: what each slot shows, see cardInfo below
 	kStateCount
 };
+
+constexpr unsigned kCardSlots = 2;
+constexpr const char *kCardStateKeys[kCardSlots] = { "card1", "card2" };
+
+/// "cardinfo" is one field per slot, separated by '\x1e'; a field is empty (no card),
+/// "ok\x1f<title>\x1f<subtitle>" or "err\x1f<message>\x1f<file name>".
+constexpr char kCardInfoSlotSep = '\x1e', kCardInfoFieldSep = '\x1f';
+
+/// What Roland called the SN-U110 cards, by the ID byte in their header (0x20).
+inline const char *cardTitle(unsigned id)
+{
+	static const char *const names[] = {
+		nullptr, "Pipe Organ & Harpsichord", "Latin & F.X. Percussions", "Ethnic",
+		"Electric Grand & Clavi", "Orchestral Strings", "Orchestral Winds", "Electric Guitar",
+		"Synthesizer", "Guitar & Keyboards", "Rock Drums", "Sound Effects", "Sax & Trombone",
+		"Super Strings", "Super Ac Guitar", "Super Brass"
+	};
+	return id < sizeof(names) / sizeof(names[0]) ? names[id] : nullptr;
+}
 
 /// The LCD as the UI draws it.  Sent as hex, only when it changed.
 struct PanelBlob

@@ -1,0 +1,53 @@
+SN-U110-02 (Latin & F.X. Percussions) im emulierten Kartenslot: alle 52 Tones nacheinander auf C4, Vel. 100, je 2 s (ab 4,2 s), P-02 Part 1, mit Hall. Kein Hardware-Vergleich; nur Plausibilitaet.
+01    0:04.2  LATIN 1
+02    0:06.2  LATIN 2
+03    0:08.2  LATIN 3
+04    0:10.2  F.X. 1
+05    0:12.2  F.X. 2
+06    0:14.2  F.X. 3
+07    0:16.2  F.X. 4
+08    0:18.2  CONGA 1
+09    0:20.2  CONGA 2
+10    0:22.2  CONGA 3
+11    0:24.2  BONGO
+12    0:26.2  CLAVES
+13    0:28.2  TIMBALE
+14    0:30.2  TAMBOURINE
+15    0:32.2  WOOD BLOCK
+16    0:34.2  WHISTLE
+17    0:36.2  TRIANGLE
+18    0:38.2  BELLTREE
+19    0:40.2  JINGLEBELL
+20    0:42.2  VIBRASLAP
+21    0:44.2  CASTANET
+22    0:46.2  MARACAS
+23    0:48.2  AGOGO 1
+24    0:50.2  AGOGO 2
+25    0:52.2  CUICA 1
+26    0:54.2  CUICA 2
+27    0:56.2  GUIRO 1
+28    0:58.2  GUIRO 2
+29    1:00.2  GUIRO 3
+30    1:02.2  BERIMBAU
+31    1:04.2  SHEKELE
+32    1:06.2  STEEL DRUM
+33    1:08.2  LOG DRUM
+34    1:10.2  ORCH HIT
+35    1:12.2  SIREN
+36    1:14.2  TYPE 1
+37    1:16.2  TYPE 2
+38    1:18.2  CLOCK
+39    1:20.2  PINBALL
+40    1:22.2  TELEPHONE
+41    1:24.2  SMSH GLASS
+42    1:26.2  REZNO
+43    1:28.2  EERIE
+44    1:30.2  AMBIA JR
+45    1:32.2  TEMPLE BLK
+46    1:34.2  ZING !
+47    1:36.2  BOING !
+48    1:38.2  MOD ZAP
+49    1:40.2  INTERFACE
+50    1:42.2  SCRATCH
+51    1:44.2  STAKE
+52    1:46.2  ZAPPU

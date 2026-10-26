@@ -152,7 +152,8 @@ bleibt leer.
    genau an dieser Stelle +104 Cent daneben.
 3. **Wave-ROM-Lage:** Wo liegen E und F im 4-MB-Adressraum? Laut MAME „TODO“ ist das
    geraten. Prüfbar über die Tone-Tabellen der Firmware und am Klang.
-4. **Kartenslots:** zwei statt vier. Erkennung über Port-Pins wie beim U-110.
+4. **Kartenslots:** zwei statt vier. Erkennung nicht über Port-Pins wie beim U-110, sondern über
+   zwei Bits der Tastenmatrix (gelöst 26.10.2026, Phase 4 Punkt 7).
 5. 30 Stimmen und Rhythm-Part prüfen; die Firmware erledigt das, wir prüfen nur das Ergebnis.
 6. **A/B-Vergleich mit deinem echten U-220** (siehe „Referenzaufnahmen“).
 
@@ -574,15 +575,28 @@ ausgetauscht (Schritt 4).
    - Offen: In der Werkseinstellung (P-01) blieb der klingende Part trotz Asgn=Dir1/Dir2
      auf Rev geroutet; mit Helges Gerätespeicher folgt das Routing sofort. Ursache unklar
      (welcher Part klingt? Patch-Eigenheit?), am Gerät gegenprüfen, falls es auffällt.
-7. **PCM-Card-Slots (Helge, 25.10.2026, für später).** Zwei Slots für Karten der Serie
-   SN-U110 (dieselben wie beim U-110). Plan: Card-Dumps aus dem Dateisystem einstecken und
-   wieder ziehen (Menü am Panel oder Drag & Drop auf die gezeichneten Slots), Pfad im
-   Plugin-State, beim Laden des Projekts wieder eingesteckt. Laut Manual zeigt das Gerät
-   beim Stecken/Ziehen kurz „Checking PCM Card...“; fehlt die Karte eines gewählten Tons:
-   „No Card!“, kein Ton. Zu klären: wo die Karten im 4-MB-Raum des PCM-Chips liegen (die
-   internen Waves E/F sitzen auf den ersten beiden Kartenplätzen, Phase 2), wie die Firmware
-   eine Karte erkennt (ID/Kopfdaten) und ob die Karte auch Timbre-Daten trägt;
-   SHA1-Erkennung bekannter Dumps wie bei den ROMs. Keine Card-Dateien im Repo.
+7. **PCM-Card-Slots (umgesetzt 26.10.2026; Klang von Helge als plausibel bestätigt, Panel in
+   Cubase noch ungeprüft).** Zwei Slots für Karten der Serie SN-U110, wie beim Gerät.
+   - **Lage:** Slot 1 bei `0x280000`, Slot 2 bei `0x380000` im 4-MB-Raum des PCM-Chips (die
+     Kartenplätze 2 und 3 des U-110; E/F belegen 0 und 1). Dumps werden wie die Wave-ROMs
+     entwürfelt.
+   - **Erkennung:** Der P8098 hat keinen PORT1, an dem der U-110 seine Kartenkontakte liest.
+     Beim U-220 sind es die Bits 6 (Slot 1) und 7 (Slot 2) des ersten Tastenmatrix-Bytes
+     (`0x080E`, Bank `30`), low = gesteckt -- die bisher „freien“ Tastenbits. Die Firmware
+     tastet sie mit den Tasten ab und liest bei einer Änderung den Kartenkopf (`0x91EC`, mit
+     den U-110-Tabellen bei `0x1B100`/`0x1B200`); das Display zeigt „Checking PCM Card...“.
+   - **Geprüft:** Kopf korrekt gelesen („RolandU-110 N“, „SN-U110-02“, ID 02); Tone-Seite
+     zeigt `02-001 LATIN 1`, ohne Karte `No Card!` und kein Ton; Stecken/Ziehen im Betrieb
+     wie im Handbuch; alle 52 Tones von SN-U110-02 klingen (`listen/emulated/card02/`).
+   - **Plugin:** States `card1`/`card2` speichern nur den Dateipfad in der Session, nie die
+     Kartendaten. `cardinfo` meldet dem Panel Kartenname oder Fehler („File not found“,
+     „Not a PCM card“). Ein Wechsel zieht erst die alte Karte und steckt die neue 200 ms
+     (emuliert) später, damit die Firmware die Änderung sieht.
+   - **Panel:** 1350 x 250 Designeinheiten (vorher 1150), Standard 1404 x 260. Rechts zwei
+     Slots: Klick öffnet den Dateidialog, das Auswurf-Symbol zieht die Karte. Alte Projekte
+     behalten ihre Höhe, die Breite passt sich an.
+   - Offen: der MAME-Treiber kennt die Slots noch nicht; Erkennung bekannter Dumps per
+     SHA1; SN-MV30-Karten ungeprüft.
 8. **MIDI OUT** aus dem Plugin (umgesetzt 26.10.2026, offline geprüft; in Cubase kommt SysEx nicht an):
    was die Firmware an MIDI OUT sendet, als MIDI-Ausgang des Plugins – für Librarian-Arbeit
    in der DAW. Das Plugin zerlegt den Bytestrom wie die Leitung (Running Status, SysEx über

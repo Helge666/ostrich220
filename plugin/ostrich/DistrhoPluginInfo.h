@@ -27,13 +27,15 @@
 #define DISTRHO_PLUGIN_WANT_FULL_STATE  1
 
 #define DISTRHO_UI_USE_NANOVG           1
-// 4.6 : 1 like the design (OstrichUI.cpp, 1150 x 250), but both divisible by 4: at every
-// Windows scaling in quarter steps the size is whole pixels (125 %: 1495 x 325), and a host
-// that converts to its own units and back -- Cubase -- has nothing to round.  1150 x 250
-// came out as 1437.5 x 312.5 at 125 %, and Cubase shrank the view a pixel per layout pass.
-#define DISTRHO_UI_DEFAULT_WIDTH        1196
+// 5.4 : 1 like the design (OstrichUI.cpp, 1350 x 250, the card slots at the right), but
+// both divisible by 4: at every Windows scaling in quarter steps the size is whole pixels
+// (125 %: 1755 x 325), and a host that converts to its own units and back -- Cubase -- has
+// nothing to round.  1150 x 250 once came out as 1437.5 x 312.5 at 125 %, and Cubase shrank
+// the view a pixel per layout pass.
+#define DISTRHO_UI_DEFAULT_WIDTH        1404
 #define DISTRHO_UI_DEFAULT_HEIGHT       260
 #define DISTRHO_UI_USER_RESIZABLE       1
+#define DISTRHO_UI_FILE_BROWSER         1     // the PCM card slots
 
 #define DISTRHO_PLUGIN_LV2_CATEGORY "lv2:InstrumentPlugin"
 #define DISTRHO_PLUGIN_VST3_CATEGORIES "Instrument|Synth"

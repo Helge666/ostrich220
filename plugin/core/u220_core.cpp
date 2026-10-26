@@ -44,6 +44,7 @@ TRACE_FLAG(trace_midi, "U220_MIDITRACE")
 TRACE_FLAG(trace_lcd,  "U220_LCDTRACE")
 TRACE_FLAG(trace_fx,   "U220_FXTRACE")
 TRACE_FLAG(trace_gain, "U220_GAINTRACE")
+TRACE_FLAG(trace_rom,  "U220_ROMTRACE")
 #undef TRACE_FLAG
 
 constexpr u32 CPU_CLOCK = 12000000;         // 12 MHz XTAL
@@ -57,6 +58,10 @@ constexpr size_t LOW_SIZE       = 0x800;    // 0x0100-0x07FF; the driver keeps i
 // banks, E and F (the SN-U110-08/09 contents) on its first two card slots.  The driver's
 // PLACE[] table; the timbre and drum A/B against the hardware found nothing misplaced.
 constexpr u32 PLACE[kNumWaveRoms] = { 0x000000, 0x100000, 0x200000, 0x300000, 0x080000, 0x180000 };
+
+// The two card slots are the U-110's other two (bank selector 0x2C/0x3C, the firmware's
+// slots 2 and 3): what it reads after a slot's detect line drops, header included.
+constexpr u32 CARD_PLACE[kNumCardSlots] = { 0x280000, 0x380000 };
 
 using roland_u110::MIDI_BAUD;
 
@@ -114,6 +119,7 @@ struct U220Core::Impl
 	u8   pend07 = 0;                // envelope target held back until its rate
 	bool pend07_valid = false;
 	u16  keys = 0xffff;             // active low
+	u8   card_present = 0;          // bit per card slot, 1 = a card in it
 	u8   port2 = 0;
 
 	roland_u220::ic25_mixer ic25;      // IC25's voice mixer: pan and effect sends per voice
@@ -365,7 +371,11 @@ u8 U220Core::Impl::window_r(offs_t offset)
 	case 0x1:                                           // LCD
 		return (offset & 1) ? ddram[lcd_addr & 0x7f] : (lcd_addr & 0x7f);
 	case 0x3:                                           // key matrix, active low
-		if (offset == 0x0e) return u8(keys & 0xff);
+		// Bits 6 and 7 of the first byte are no keys: they are the PCM card slots' detect
+		// lines, low with a card in.  The 8098 has no PORT1, which is where the U-110 has
+		// them; the firmware scans them with the keys and on a change reads the card's
+		// header (0x91EC, the U-110's tables at 0x1B100/0x1B200).
+		if (offset == 0x0e) return u8(keys & 0xff) & u8(~(card_present << 6));
 		if (offset == 0x0d) return u8(keys >> 8) | 0xc0;
 		return 0xff;
 	case 0x4:                                           // effect processor
@@ -422,7 +432,10 @@ u8 U220Core::Impl::pcm_r(offs_t offset)
 				| (pcmreg[0x0a] << 16) | (u32(pcmreg[0x0b]) << 24);
 		const u16 bnk = pcmreg[0x02] | (pcmreg[0x03] << 8);
 		const offs_t addr = (((phase >> 14) + PCM_READ_PREFETCH) & 0x3ffff) | ((bnk & 0x3c00) << 8);
-		return pcmrom[addr & 0x3fffff];
+		const u8 v = pcmrom[addr & 0x3fffff];
+		if (trace_rom())
+			std::fprintf(stderr, "ROM %f %06X %02X\n", machine.time().as_double(), unsigned(addr), v);
+		return v;
 	}
 	default:
 		return pcmreg[offset];
@@ -635,6 +648,72 @@ LoadResult U220Core::loadWaveRom(unsigned index, const uint8_t *data, size_t len
 		return LoadResult::WrongSize;
 	descramble_pcm(&m_impl->pcmrom[PLACE[index]], data, CARD_SIZE);
 	return LoadResult::Ok;
+}
+
+LoadResult U220Core::prepareCard(const uint8_t *data, size_t len, std::vector<uint8_t> &out)
+{
+	if (!data || len == 0 || len > kCardBytes)
+		return LoadResult::WrongSize;
+	// Undersized dumps are mirrored up in pages of 128 KB at least, as on the U-110
+	// (u110_core.cpp: the address descrambling allows nothing finer).
+	std::vector<u8> image(kCardBytes, 0xff);
+	std::memcpy(image.data(), data, len);
+	if (len < kCardBytes)
+	{
+		size_t mirror = 1;
+		while (mirror * 2 <= len) mirror *= 2;
+		if (mirror < 0x20000) mirror = 0x20000;
+		for (size_t ofs = mirror; ofs < kCardBytes; ofs += mirror)
+			std::memcpy(image.data() + ofs, image.data(), mirror);
+	}
+	// A card is an SN-U110 card: "RolandU-110 N" at the start, as the firmware checks.
+	if (std::memcmp(image.data(), "RolandU-110 N", 13) != 0)
+		return LoadResult::BadImage;
+	out.resize(kCardBytes);
+	descramble_pcm(out.data(), image.data(), kCardBytes);
+	return LoadResult::Ok;
+}
+
+void U220Core::installCard(unsigned slot, const uint8_t *prepared)
+{
+	if (slot >= kNumCardSlots || !prepared)
+		return;
+	std::memcpy(&m_impl->pcmrom[CARD_PLACE[slot]], prepared, kCardBytes);
+	m_impl->card_present |= u8(1 << slot);
+}
+
+void U220Core::ejectCard(unsigned slot)
+{
+	if (slot < kNumCardSlots)
+		m_impl->card_present &= u8(~(1 << slot));
+}
+
+void U220Core::clearCardData(unsigned slot)
+{
+	if (slot < kNumCardSlots)
+		std::fill_n(&m_impl->pcmrom[CARD_PLACE[slot]], kCardBytes, u8(0xff));
+}
+
+bool U220Core::cardPresent(unsigned slot) const
+{
+	return slot < kNumCardSlots && (m_impl->card_present >> slot) & 1;
+}
+
+LoadResult U220Core::loadCard(unsigned slot, const uint8_t *data, size_t len)
+{
+	if (slot >= kNumCardSlots)
+		return LoadResult::NoSuchSlot;
+	if (!data)
+	{
+		ejectCard(slot);
+		clearCardData(slot);
+		return LoadResult::Ok;
+	}
+	std::vector<u8> prepared;
+	const LoadResult r = prepareCard(data, len, prepared);
+	if (r == LoadResult::Ok)
+		installCard(slot, prepared.data());
+	return r;
 }
 
 void U220Core::reset()
