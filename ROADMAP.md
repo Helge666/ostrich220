@@ -551,17 +551,28 @@ ausgetauscht (Schritt 4).
 4. Formate: CLAP und VST3 unter Windows. Bei emu110 aktualisiert sich das VST3-Panel noch
    nicht, das müssen wir beheben. Standalone; macOS später.
 5. Patch-Bibliothek, SysEx-Import und -Export (U-220-Bulk-Dumps).
-6. **Mehrfachausgänge (Helge, 25.10.2026, für später).** Das Gerät hat drei Stereopaare:
-   MIX OUT (1/2), DIRECT OUT 1 (3/4), DIRECT OUT 2 (5/6). Im Plugin optional als Multi-Out
-   (wie Kontakt): ein Stereo-Hauptbus plus zwei zuschaltbare Stereo-Busse. Laut Owner's
-   Manual:
-   - Output Assign pro Part: Dry, Rev, Cho (→ MIX), Dir1, Dir2 (→ DIRECT 1/2, ohne Effekte)
-   - ist keine Buchse in DIRECT OUT gesteckt, kommt deren Klang aus MIX (ohne Effekt) – das
-     Gerät erkennt die Stecker; im Plugin: sind die Zusatzbusse aus, „stecken keine Kabel“
-   - **Multi-Out-Modus** (Setup): MIX und DIRECT werden zu OUT 1–6 mit je einem Part
-   Zu klären: wie die Firmware die Stecker abfragt (Port-Bit?) und wie IC25 die Direct-Ziele
-   (Programmwort-Ziele 0x18–0x1B) und den Multi-Out-Modus ausgibt; der Mischer im Kern hat
-   bisher nur Dry/Rev/Cho als Busse.
+6. **Mehrfachausgänge (umgesetzt 26.10.2026, Cubase-Blick steht aus).** Drei Stereopaare wie
+   am Gerät: MIX OUT (1/2), DIRECT OUT 1 (3/4), DIRECT OUT 2 (5/6). Laut Owner's Manual (S. 27,
+   61): Output Assign pro Part Dry/Rev/Cho (→ MIX) oder Dir1/Dir2 (→ DIRECT, ohne Effekt);
+   Einzelausgänge entstehen allein über Assign + Pan (7< / >7), einen eigenen
+   Multi-Out-Modus gibt es nicht (frühere Notiz hier war falsch). Ist keine Buchse in DIRECT OUT
+   gesteckt, kommt der Klang aus MIX, ohne Effekt, mit dem Volume-Regler.
+   - Firmware → IC25: Zielcodes 0x18/0x19 = DIRECT 1, 0x1A/0x1B = DIRECT 2 (je L/R), per
+     Emulation bestätigt (Menü Edit/Patch/PartN/Output, `U220_GAINTRACE` zeigt die Wörter).
+     Die Firmware schreibt die Direct-Ziele unabhängig von gesteckten Buchsen -- das
+     Umleiten auf MIX ist analog (Schaltkontakte der Buchsen).
+   - Mischer (`roland_u220_ic25.h`): zehn Busse; MAME legt DIRECT weiter auf die
+     Lautsprecher (wie ohne Kabel). Kern: `U220Core::render(mix, dir1, dir2)`, nullptr = ohne
+     Kabel. Plugin: sechs Ausgänge in drei Gruppen; ein Paar ist "gesteckt", wenn der Host
+     ihm eigene Puffer gibt -- in VST3, wenn der Ausgang im Instrument-Rack aktiviert ist
+     (Patch 0011: anfangs nur MIX aktiv; DPF gibt abgeschalteten Ausgängen einen gemeinsamen
+     Dummy-Puffer). Parameter "Direct outs" (aus = immer über MIX, für CLAP/LV2-Hosts, die
+     alle Ports belegen). Volume nur auf MIX, DIRECT mit festem Pegel wie am Gerät.
+   - Geprüft mit `ostrich_clap_render` (Demo-Speicher per `tools/swap_nvram.py`): Part 6 auf
+     Dir1/Dir2 klingt gesteckt nur auf seinem Paar, ungesteckt auf MIX, gleicher Pegel.
+   - Offen: In der Werkseinstellung (P-01) blieb der klingende Part trotz Asgn=Dir1/Dir2
+     auf Rev geroutet; mit Helges Gerätespeicher folgt das Routing sofort. Ursache unklar
+     (welcher Part klingt? Patch-Eigenheit?), am Gerät gegenprüfen, falls es auffällt.
 7. **PCM-Card-Slots (Helge, 25.10.2026, für später).** Zwei Slots für Karten der Serie
    SN-U110 (dieselben wie beim U-110). Plan: Card-Dumps aus dem Dateisystem einstecken und
    wieder ziehen (Menü am Panel oder Drag & Drop auf die gezeichneten Slots), Pfad im
