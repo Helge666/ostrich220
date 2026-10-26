@@ -583,9 +583,19 @@ ausgetauscht (Schritt 4).
    internen Waves E/F sitzen auf den ersten beiden Kartenplätzen, Phase 2), wie die Firmware
    eine Karte erkennt (ID/Kopfdaten) und ob die Karte auch Timbre-Daten trägt;
    SHA1-Erkennung bekannter Dumps wie bei den ROMs. Keine Card-Dateien im Repo.
-8. **MIDI OUT** aus dem Plugin: was das Gerät sendet (Bulk Dump, ENTER schickt den
-   bearbeiteten Parameter als SysEx), als MIDI-Ausgang des Plugins – für Librarian-Arbeit in
-   der DAW.
+8. **MIDI OUT** aus dem Plugin (umgesetzt 26.10.2026, offline geprüft, in Cubase noch nicht):
+   was die Firmware an MIDI OUT sendet, als MIDI-Ausgang des Plugins – für Librarian-Arbeit
+   in der DAW. Das Plugin zerlegt den Bytestrom wie die Leitung (Running Status, SysEx über
+   Blockgrenzen, Echtzeitbytes) und gibt jede Nachricht zum passenden Sample aus.
+   - DPF konnte unter VST3 weder SysEx noch Program Change ausgeben, unter CLAP kein SysEx:
+     Patch 0012 (VST3: Data-Event bzw. Legacy-CC 130; CLAP: `CLAP_EVENT_MIDI_SYSEX`).
+   - Prüfung: `ostrich_clap_render` mit `Data → Bulk → Temp` per Tastendruck
+     (`2@2,9@2.5,9@3,10@3.5,6@4,9@4.5,9@5,10@5.5,10@6,6@6.5,6@7`): 21 DT1-Pakete,
+     2322 Byte, alle Prüfsummen gültig, bei 44,1 und 48 kHz.
+   - In Cubase prüfen: MIDI-Spur mit Eingang „Ostrich“ aufnehmen und Bulk Dump auslösen.
+     Ob Cubase SysEx aus einem VST3-Instrument annimmt, ist offen.
+   - Offen: DPF nimmt unter VST3 auch kein SysEx **an** (Eingang ist auskommentiert). Für
+     SysEx-Import aus der DAW (Punkt 5) wäre das der nächste Patch.
 
 9. **Mausbedienung im Display (Helge, 25.10.2026, für später).** Felder im LCD anklicken
    und per Mausrad/Ziehen ändern, statt CURSOR/PART/VALUE zu klicken. Die Firmware kennt das
@@ -642,6 +652,13 @@ als es meldet, und der nächste Layout-Durchgang startet von dort. Seither:
 
 ## Phase 5 — Veröffentlichung und Rückfluss
 
+- [ ] **Doku auf Englisch und auf die Fakten reduziert (Helge, 26.10.2026, für später).**
+      README, ROADMAP, Analysen: Englisch, ohne Verlaufsprosa und Irrwege, nur was gilt
+      und wie man es prüft.
+- [ ] **Aufräumen (Helge, 26.10.2026, für später):** lokale Dateien und Ordner, die nicht
+      mehr gebraucht werden (alte Builds, Proben-WAVs, Logs, Einmal-Skripte), hier unter
+      Windows und auf kellerkind2. Vorher Liste zeigen; Hörproben-Ordner und Analysen
+      bleiben nach AGENTS.md.
 - [ ] **Umbenennung in „Ostrich 220“ (kurz O-220)**, Idee von Helge, erst viel später. Der
       Bezug zum Roland U-220 steht dann in der README. Betrifft Plugin-Name, VST3/CLAP-IDs
       (neue IDs, damit Sessions mit Voltaire 110 nicht verwechselt werden), Datenordner.
@@ -649,8 +666,8 @@ als es meldet, und der nächste Layout-Durchgang startet von dort. Seither:
       Handbuch-Datei enthält (`git log --all --stat` gegen die `.gitignore`-Regeln).
 - [ ] Repo öffentlich machen, Releases nur mit Binärdateien ohne ROMs. Die
       Selbsttests in CI dürfen keine ROMs brauchen; emu110 hat sie im Repo, wir nicht.
-- [ ] Treiber `roland_u220.cpp` und Chip-Verbesserungen als PR an mamedev (BSD-3-Clause).
-- [ ] Gemeinsame Verbesserungen als PR an emu110.
+- [ ] Treiber `roland_u220.cpp` und Chip-Verbesserungen als PR an mamedev (BSD-3-Clause). Achtung! Zuvor prüfen, wie mamedev mit durch LLM erzeugten PRs umgeht. Wenn Policy unbekannt, PR erzeugen und Projekt selbst entscheiden lassen. Wenn gesichert unerwünscht, hier vermerken und Schritt überspringen. 
+- [ ] Gemeinsame Verbesserungen als PR an emu110. Auch hier prüfen, wie emu110 mit durch LLM erzeugten PRs umgeht. Wenn Policy unbekannt, PR erzeugen und Projekt selbst entscheiden lassen. Wenn gesichert unerwünscht, hier vermerken und überspringen.
 
 ---
 

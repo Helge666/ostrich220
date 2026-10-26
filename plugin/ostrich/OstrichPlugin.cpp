@@ -505,6 +505,7 @@ protected:
 			core[c] = m_coreBuf[c].data();
 		m_core.render(&core[0], plugged[0] ? &core[2] : nullptr, plugged[1] ? &core[4] : nullptr, coreFrames);
 		m_dbgEmu.store(m_core.emulatedSeconds(), std::memory_order_relaxed);
+		sendMidiOut(frames);
 		for (int c = 0; c < 6; c ++)
 			if (c < 2 || plugged[(c - 2) / 2])
 				m_dac[c].process(core[c], coreFrames, outputs[c], frames);
@@ -574,6 +575,133 @@ private:
 				}
 			}
 		}
+	}
+
+	// ---- MIDI OUT ----------------------------------------------------------------------
+
+	// What the firmware sent during this block, as the host's MIDI events: the byte stream
+	// of the jack (running status, SysEx, real-time bytes anywhere) cut into messages.  A
+	// SysEx message spans blocks as it does the wire; it goes out in the block it ends in.
+	void sendMidiOut(uint32_t frames)
+	{
+		m_sysexUsed = 0;
+		for (;;)
+		{
+			const size_t n = m_core.midiOut(m_outBytes, sizeof(m_outBytes), m_outAt);
+			for (size_t i = 0; i < n; i ++)
+			{
+				uint32_t frame = uint32_t(double(m_outAt[i]) * m_hostRate / kCoreRate);
+				if (frame >= frames)
+					frame = frames ? frames - 1 : 0;
+				midiOutByte(m_outBytes[i], frame);
+			}
+			if (n < sizeof(m_outBytes))
+				break;
+		}
+	}
+
+	void midiOutByte(uint8_t b, uint32_t frame)
+	{
+		if (b >= 0xF8)                              // real-time: on its own, anywhere
+		{
+			emitMidi(&b, 1, frame);
+			return;
+		}
+		if (b == 0xF0)
+		{
+			m_sysex[0] = b;
+			m_sysexLen = 1;
+			m_running = 0;
+			m_msgLen = 0;
+			return;
+		}
+		if (m_sysexLen)
+		{
+			if (b & 0x80)                           // F7, or a status byte cutting it short
+			{
+				if (b == 0xF7 && m_sysexLen < sizeof(m_sysex))
+				{
+					m_sysex[m_sysexLen ++] = b;
+					emitMidi(m_sysex, m_sysexLen, frame);
+				}
+				else
+					m_dbgMidiOutDropped.fetch_add(1, std::memory_order_relaxed);
+				m_sysexLen = 0;
+				if (b == 0xF7)
+					return;
+			}
+			else
+			{
+				if (m_sysexLen < sizeof(m_sysex))
+					m_sysex[m_sysexLen] = b;
+				m_sysexLen ++;                      // past the buffer: dropped at the end
+				return;
+			}
+		}
+		if (b == 0xF7)                              // an end with no start
+			return;
+		if (b & 0x80)
+		{
+			m_msg[0] = b;
+			m_msgLen = 1;
+			m_msgNeed = midiMessageLength(b);
+			m_running = b < 0xF0 ? b : 0;           // system common cancels running status
+		}
+		else if (m_msgLen == 0)
+		{
+			if (!m_running)
+				return;                             // data with no status: noise on the line
+			m_msg[0] = m_running;
+			m_msg[1] = b;
+			m_msgLen = 2;
+			m_msgNeed = midiMessageLength(m_running);
+		}
+		else if (m_msgLen < 3)
+			m_msg[m_msgLen ++] = b;
+		if (m_msgLen == m_msgNeed)
+		{
+			emitMidi(m_msg, m_msgLen, frame);
+			m_msgLen = 0;
+		}
+	}
+
+	static uint8_t midiMessageLength(uint8_t status)
+	{
+		switch (status & 0xF0)
+		{
+		case 0xC0: case 0xD0: return 2;
+		case 0xF0:
+			return status == 0xF2 ? 3 : (status == 0xF1 || status == 0xF3) ? 2 : 1;
+		default: return 3;
+		}
+	}
+
+	void emitMidi(const uint8_t *data, uint32_t size, uint32_t frame)
+	{
+		MidiEvent ev;
+		ev.frame = frame;
+		ev.size = size;
+		if (size <= MidiEvent::kDataSize)
+		{
+			std::memcpy(ev.data, data, size);
+			ev.dataExt = nullptr;
+		}
+		else
+		{
+			// The host reads the bytes when the block is done: one copy each, kept till then.
+			if (m_sysexUsed + size > sizeof(m_sysexArena))
+			{
+				m_dbgMidiOutDropped.fetch_add(1, std::memory_order_relaxed);
+				return;
+			}
+			std::memcpy(m_sysexArena + m_sysexUsed, data, size);
+			ev.dataExt = m_sysexArena + m_sysexUsed;
+			m_sysexUsed += size;
+		}
+		if (writeMidiEvent(ev))
+			m_dbgMidiOut.fetch_add(1, std::memory_order_relaxed);
+		else
+			m_dbgMidiOutDropped.fetch_add(1, std::memory_order_relaxed);
 	}
 
 	void publishPanel(uint32_t frames)
@@ -738,7 +866,7 @@ private:
 	// Counters only on the audio side; the file is written here.
 	void debugLoop()
 	{
-		char line[400], lcd[56];
+		char line[480], lcd[56];
 		uint8_t raw[48];
 		uint64_t lastRuns = 0;
 		while (!m_dbgStop.load())
@@ -749,10 +877,11 @@ private:
 			lcdText(raw, lcd);
 			const uint64_t runs = m_dbgRuns.load();
 			std::snprintf(line, sizeof(line),
-					"dsp %p runs %llu (+%llu, idle %llu) emu %.1f s midi %llu keymsgs %llu presses %llu panel ok %llu fail %llu lcd %s",
+					"dsp %p runs %llu (+%llu, idle %llu) emu %.1f s midi %llu out %llu (dropped %llu) keymsgs %llu presses %llu panel ok %llu fail %llu lcd %s",
 					(void *)this, (unsigned long long)runs, (unsigned long long)(runs - lastRuns),
 					(unsigned long long)m_dbgIdleRuns.load(), m_dbgEmu.load(),
-					(unsigned long long)m_dbgMidi.load(), (unsigned long long)m_dbgKeyMsgs.load(),
+					(unsigned long long)m_dbgMidi.load(), (unsigned long long)m_dbgMidiOut.load(),
+					(unsigned long long)m_dbgMidiOutDropped.load(), (unsigned long long)m_dbgKeyMsgs.load(),
 					(unsigned long long)m_dbgPresses.load(), (unsigned long long)m_dbgPanelOk.load(),
 					(unsigned long long)m_dbgPanelFail.load(), lcd);
 			lastRuns = runs;
@@ -794,10 +923,21 @@ private:
 	PanelBlob m_lastBlob {};
 	char m_blobHex[sizeof(PanelBlob) * 2 + 1] = {};
 
+	// MIDI OUT.  A U-220 packet is at most 256 data bytes plus 10 of frame (Roland DT1); at
+	// 31250 baud a block of 8192 frames at 44.1 kHz carries ~580 bytes.
+	uint8_t m_outBytes[512];
+	uint32_t m_outAt[512];
+	uint8_t m_msg[3] = {}, m_msgLen = 0, m_msgNeed = 0, m_running = 0;
+	uint8_t m_sysex[1024];
+	size_t m_sysexLen = 0;
+	uint8_t m_sysexArena[8192];
+	size_t m_sysexUsed = 0;
+
 	std::thread m_dbgThread;
 	std::atomic<bool> m_dbgStop { false };
 	std::atomic<uint64_t> m_dbgRuns { 0 }, m_dbgIdleRuns { 0 }, m_dbgMidi { 0 }, m_dbgKeyMsgs { 0 },
-			m_dbgPresses { 0 }, m_dbgPanelOk { 0 }, m_dbgPanelFail { 0 };
+			m_dbgPresses { 0 }, m_dbgPanelOk { 0 }, m_dbgPanelFail { 0 }, m_dbgMidiOut { 0 },
+			m_dbgMidiOutDropped { 0 };
 	std::atomic<double> m_dbgEmu { 0.0 };
 	uint8_t m_dbgLcd[48] = {};
 

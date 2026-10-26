@@ -1,0 +1,59 @@
+diff --git a/distrho/src/DistrhoPluginVST3.cpp b/distrho/src/DistrhoPluginVST3.cpp
+--- a/distrho/src/DistrhoPluginVST3.cpp
++++ b/distrho/src/DistrhoPluginVST3.cpp
+@@ -3315,10 +3315,14 @@
+             if (midiEvent.size == 4)
+                 event.midi_cc_out.value2 = data[3];
+             break;
+-        /* TODO how do we deal with program changes??
+         case 0xC0:
++            // Steinberg's controller number for a program change (kCtrlProgramChange,
++            // ivstmidicontrollers.h) (Ostrich, patches/0012).
++            event.type = V3_EVENT_LEGACY_MIDI_CC_OUT;
++            event.midi_cc_out.channel = data[0] & 0xf;
++            event.midi_cc_out.cc_number = 130;
++            event.midi_cc_out.value = data[1];
+             break;
+-        */
+         case 0xD0:
+             event.type = V3_EVENT_LEGACY_MIDI_CC_OUT;
+             event.midi_cc_out.channel = data[0] & 0xf;
+@@ -3332,6 +3336,16 @@
+             event.midi_cc_out.value = data[1];
+             event.midi_cc_out.value2 = data[2];
+             break;
++        case 0xF0:
++            // SysEx as a data event, F0 to F7 (Ostrich, patches/0012).  The host reads the
++            // bytes later: the plugin keeps them until the end of the block.
++            if (data[0] != 0xF0)
++                return true;
++            event.type = V3_EVENT_DATA;
++            event.data.size = midiEvent.size;
++            event.data.type = 0; // kMidiSysEx
++            event.data.bytes = data;
++            break;
+         default:
+             return true;
+         }
+diff --git a/distrho/src/DistrhoPluginCLAP.cpp b/distrho/src/DistrhoPluginCLAP.cpp
+--- a/distrho/src/DistrhoPluginCLAP.cpp
++++ b/distrho/src/DistrhoPluginCLAP.cpp
+@@ -2077,7 +2077,17 @@
+         DISTRHO_SAFE_ASSERT_RETURN(fOutputEvents != nullptr, false);
+ 
+         if (midiEvent.size > 3)
+-            return true;
++        {
++            // SysEx (Ostrich, patches/0012).  The host reads the bytes later: the plugin
++            // keeps them until the end of the block.
++            if (midiEvent.dataExt == nullptr || midiEvent.dataExt[0] != 0xF0)
++                return true;
++            const clap_event_midi_sysex sysexEvent = {
++                { sizeof(clap_event_midi_sysex), midiEvent.frame, 0, CLAP_EVENT_MIDI_SYSEX, CLAP_EVENT_IS_LIVE },
++                0, midiEvent.dataExt, midiEvent.size
++            };
++            return fOutputEvents->try_push(fOutputEvents, &sysexEvent.header);
++        }
+ 
+         const clap_event_midi clapEvent = {
+             { sizeof(clap_event_midi), midiEvent.frame, 0, CLAP_EVENT_MIDI, CLAP_EVENT_IS_LIVE },

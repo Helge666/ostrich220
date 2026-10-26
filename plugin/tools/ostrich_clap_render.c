@@ -12,7 +12,8 @@
     saves the plugin state and prints its size.  `presses`: parameters to press for 0.1 s,
     "id@sec,id@sec,..." (a bare id presses at 2.0 s) -- the panel keys.  `params`: values
     to set at the start, "id=value,...".  The WAV has all six outputs: MIX OUT, DIRECT OUT
-    1, DIRECT OUT 2, each given buffers of its own (plugged in).
+    1, DIRECT OUT 2, each given buffers of its own (plugged in).  What the plugin sends to
+    its MIDI output is printed, and written to $OSTRICH_RENDER_MIDI_OUT if set.
 */
 
 #define _GNU_SOURCE
@@ -42,7 +43,42 @@ typedef struct { any_event_t ev[64]; uint32_t n; } events_t;
 static uint32_t in_size(const clap_input_events_t *l) { return ((const events_t *)l->ctx)->n; }
 static const clap_event_header_t *in_get(const clap_input_events_t *l, uint32_t i)
 { return &((const events_t *)l->ctx)->ev[i].header; }
-static bool out_push(const clap_output_events_t *l, const clap_event_header_t *e) { (void)l; (void)e; return true; }
+// The plugin's MIDI OUT: counted, printed, and with OSTRICH_RENDER_MIDI_OUT set written to
+// that file as raw bytes (a .syx when it is all SysEx).
+static FILE *midi_out_file;
+static uint64_t render_pos;
+static unsigned midi_out_events, midi_out_sysex;
+static bool out_push(const clap_output_events_t *l, const clap_event_header_t *e)
+{
+	(void)l;
+	if (e->space_id != CLAP_CORE_EVENT_SPACE_ID)
+		return true;
+	const uint8_t *bytes = NULL; uint32_t n = 0;
+	if (e->type == CLAP_EVENT_MIDI)
+	{
+		const clap_event_midi_t *m = (const clap_event_midi_t *)e;
+		bytes = m->data;
+		n = (m->data[0] & 0xF0) == 0xC0 || (m->data[0] & 0xF0) == 0xD0 ? 2 : m->data[0] >= 0xF0 ? 1 : 3;
+	}
+	else if (e->type == CLAP_EVENT_MIDI_SYSEX)
+	{
+		const clap_event_midi_sysex_t *m = (const clap_event_midi_sysex_t *)e;
+		bytes = m->buffer; n = m->size;
+		midi_out_sysex ++;
+	}
+	else
+		return true;
+	if (midi_out_events ++ < 20)
+	{
+		printf("midi out @%llu:", (unsigned long long)(render_pos + e->time));
+		for (uint32_t i = 0; i < n && i < 12; i ++)
+			printf(" %02X", bytes[i]);
+		printf(n > 12 ? " ... (%u bytes)\n" : "\n", n);
+	}
+	if (midi_out_file)
+		fwrite(bytes, 1, n, midi_out_file);
+	return true;
+}
 
 typedef struct { uint8_t *p; size_t n, cap; } buf_t;
 static int64_t ostream_write(const clap_ostream_t *s, const void *d, uint64_t n)
@@ -113,6 +149,8 @@ int main(int argc, char **argv)
 		free(b.p);
 	}
 	if (!p->activate(p, rate, 1, FRAMES)) { fprintf(stderr, "activate failed\n"); return 1; }
+	if (getenv("OSTRICH_RENDER_MIDI_OUT"))
+		midi_out_file = fopen(getenv("OSTRICH_RENDER_MIDI_OUT"), "wb");
 	p->start_processing(p);
 
 	const uint32_t total = (uint32_t)(rate * seconds);
@@ -178,6 +216,7 @@ int main(int argc, char **argv)
 			ob[b] = (clap_audio_buffer_t){ chans[b], NULL, 2, 0, 0 };
 		}
 		clap_process_t proc = { (int64_t)pos, FRAMES, NULL, NULL, ob, 0, 3, &in, &oev };
+		render_pos = pos;
 		p->process(p, &proc);
 		// OSTRICH_RENDER_REALTIME: as slow as playback, so that the plugin's once-a-second
 		// debug log (PROGRAMDATA/Ostrich/ostrich-dsp.log) shows the display step by step.
@@ -200,6 +239,9 @@ int main(int argc, char **argv)
 		}
 		free(b.p);
 	}
+	printf("midi out: %u events, %u of them SysEx\n", midi_out_events, midi_out_sysex);
+	if (midi_out_file)
+		fclose(midi_out_file);
 	p->stop_processing(p);
 	p->deactivate(p);
 	p->destroy(p);

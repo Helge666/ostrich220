@@ -18,7 +18,7 @@
 #define DISTRHO_PLUGIN_NUM_INPUTS       0
 #define DISTRHO_PLUGIN_NUM_OUTPUTS      6     // MIX OUT, DIRECT OUT 1, DIRECT OUT 2
 #define DISTRHO_PLUGIN_WANT_MIDI_INPUT  1
-#define DISTRHO_PLUGIN_WANT_MIDI_OUTPUT 0
+#define DISTRHO_PLUGIN_WANT_MIDI_OUTPUT 1     // the unit's MIDI OUT (patches/0012 for SysEx)
 #define DISTRHO_PLUGIN_WANT_LATENCY     1
 
 // The panel goes to the UI as one blob through updateStateValue() (patches 0001/0003/0005
