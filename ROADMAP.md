@@ -551,7 +551,7 @@ ausgetauscht (Schritt 4).
 4. Formate: CLAP und VST3 unter Windows. Bei emu110 aktualisiert sich das VST3-Panel noch
    nicht, das müssen wir beheben. Standalone; macOS später.
 5. Patch-Bibliothek, SysEx-Import und -Export (U-220-Bulk-Dumps).
-6. **Mehrfachausgänge (umgesetzt 26.10.2026, in Cubase von Helge bestätigt).** Drei Stereopaare wie
+6. **Mehrfachausgänge (umgesetzt 26.10.2026, in Cubase von Helge bestätigt: Ausgänge zuschaltbar, Dir1/Dir2-Parts klingen dort ohne Effekt).** Drei Stereopaare wie
    am Gerät: MIX OUT (1/2), DIRECT OUT 1 (3/4), DIRECT OUT 2 (5/6). Laut Owner's Manual (S. 27,
    61): Output Assign pro Part Dry/Rev/Cho (→ MIX) oder Dir1/Dir2 (→ DIRECT, ohne Effekt);
    Einzelausgänge entstehen allein über Assign + Pan (7< / >7), einen eigenen
