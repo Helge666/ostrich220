@@ -65,6 +65,10 @@ the row's name (RX, OUT, EFT, PAN, RSV) shows the next row. Then turn the wheel 
 the value. A click on a label or between fields goes to the nearest field without leaving
 the page; any key you press yourself stops it.
 
+A click on the arrows ◀ ▶ at the ends of the second row turns the page of parameters that
+way. A click on the first row, the page's title (such as `Edit/Timbre[2]/Level`), presses
+EXIT and goes one level up.
+
 ## Download
 
 **[Download the latest version](https://github.com/Helge666/ostrich220/releases/latest)** —
