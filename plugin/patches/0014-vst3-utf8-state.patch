@@ -1,0 +1,259 @@
+diff --git a/distrho/src/DistrhoPluginVST.hpp b/distrho/src/DistrhoPluginVST.hpp
+index 461a7ec5..cad37f44 100644
+--- a/distrho/src/DistrhoPluginVST.hpp
++++ b/distrho/src/DistrhoPluginVST.hpp
+@@ -125,27 +125,59 @@ size_t strlen_utf16(const int16_t* const str)
+ 
+ // --------------------------------------------------------------------------------------------------------------------
+ 
++// UTF-16 to UTF-8 and back, for real (Ostrich patch 0014): upstream skipped every non-ASCII
++// character and left the gap uninitialised, so state values such as a file path with an
++// umlaut arrived broken.  length is dst's size, terminator included; a character that does
++// not fit whole is left out, and malformed input becomes U+FFFD.
++
+ static inline
+ void strncpy_utf8(char* const dst, const int16_t* const src, const size_t length)
+ {
+     DISTRHO_SAFE_ASSERT_RETURN(length > 0,);
+ 
+-    if (const size_t len = std::min(strlen_utf16(src), length-1U))
++    size_t o = 0;
++    for (size_t i=0; src[i] != 0; ++i)
+     {
+-        for (size_t i=0; i<len; ++i)
++        uint32_t c = static_cast<uint16_t>(src[i]);
++        const uint32_t next = static_cast<uint16_t>(src[i+1]);
++
++        if (c >= 0xD800 && c < 0xDC00 && next >= 0xDC00 && next < 0xE000)
++        {
++            c = 0x10000 + ((c - 0xD800) << 10) + (next - 0xDC00);
++            ++i;
++        }
++        else if (c >= 0xD800 && c < 0xE000)
+         {
+-            // skip non-ascii chars, unsupported
+-            if (src[i] >= 0x80)
+-                continue;
++            c = 0xFFFD;
++        }
++
++        const size_t n = c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;
++        if (o + n > length - 1U)
++            break;
+ 
+-            dst[i] = src[i];
++        switch (n)
++        {
++        case 1:
++            dst[o++] = static_cast<char>(c);
++            break;
++        case 2:
++            dst[o++] = static_cast<char>(0xC0 | (c >> 6));
++            dst[o++] = static_cast<char>(0x80 | (c & 0x3F));
++            break;
++        case 3:
++            dst[o++] = static_cast<char>(0xE0 | (c >> 12));
++            dst[o++] = static_cast<char>(0x80 | ((c >> 6) & 0x3F));
++            dst[o++] = static_cast<char>(0x80 | (c & 0x3F));
++            break;
++        default:
++            dst[o++] = static_cast<char>(0xF0 | (c >> 18));
++            dst[o++] = static_cast<char>(0x80 | ((c >> 12) & 0x3F));
++            dst[o++] = static_cast<char>(0x80 | ((c >> 6) & 0x3F));
++            dst[o++] = static_cast<char>(0x80 | (c & 0x3F));
++            break;
+         }
+-        dst[len] = 0;
+-    }
+-    else
+-    {
+-        dst[0] = 0;
+     }
++    dst[o] = 0;
+ }
+ 
+ static inline
+@@ -153,22 +185,64 @@ void strncpy_utf16(int16_t* const dst, const char* const src, const size_t lengt
+ {
+     DISTRHO_SAFE_ASSERT_RETURN(length > 0,);
+ 
+-    if (const size_t len = std::min(std::strlen(src), length-1U))
++    const uint8_t* s = reinterpret_cast<const uint8_t*>(src);
++    size_t o = 0;
++    while (*s != 0 && o < length - 1U)
+     {
+-        for (size_t i=0; i<len; ++i)
++        uint32_t c = *s++;
++        uint32_t least = 0;
++        int extra = 0;
++
++        if (c >= 0xF0 && c < 0xF5)
++        {
++            c &= 0x07;
++            extra = 3;
++            least = 0x10000;
++        }
++        else if (c >= 0xE0 && c < 0xF0)
++        {
++            c &= 0x0F;
++            extra = 2;
++            least = 0x800;
++        }
++        else if (c >= 0xC2 && c < 0xE0)
++        {
++            c &= 0x1F;
++            extra = 1;
++            least = 0x80;
++        }
++        else if (c >= 0x80)
+         {
+-            // skip non-ascii chars, unsupported
+-            if ((uint8_t)src[i] >= 0x80)
+-                continue;
++            c = 0xFFFD;
++        }
+ 
+-            dst[i] = src[i];
++        for (; extra > 0; --extra)
++        {
++            if ((*s & 0xC0) != 0x80)
++            {
++                c = 0xFFFD;
++                break;
++            }
++            c = (c << 6) | (*s++ & 0x3F);
++        }
++
++        if (c < least || c > 0x10FFFF || (c >= 0xD800 && c < 0xE000))
++            c = 0xFFFD;
++
++        if (c >= 0x10000)
++        {
++            if (o + 2 > length - 1U)
++                break;
++            c -= 0x10000;
++            dst[o++] = static_cast<int16_t>(static_cast<uint16_t>(0xD800 | (c >> 10)));
++            dst[o++] = static_cast<int16_t>(static_cast<uint16_t>(0xDC00 | (c & 0x3FF)));
++        }
++        else
++        {
++            dst[o++] = static_cast<int16_t>(static_cast<uint16_t>(c));
+         }
+-        dst[len] = 0;
+-    }
+-    else
+-    {
+-        dst[0] = 0;
+     }
++    dst[o] = 0;
+ }
+ 
+ // --------------------------------------------------------------------------------------------------------------------
+diff --git a/distrho/src/DistrhoPluginVST3.cpp b/distrho/src/DistrhoPluginVST3.cpp
+index 0a5ca3cd..ee820ef0 100644
+--- a/distrho/src/DistrhoPluginVST3.cpp
++++ b/distrho/src/DistrhoPluginVST3.cpp
+@@ -2447,17 +2447,19 @@ public:
+             DISTRHO_SAFE_ASSERT_INT2_RETURN(res == V3_OK, res, valueLength, res);
+         }
+ 
+-        // do cheap inline conversion
+-        char* const key = (char*)key16;
+-        char* const value = (char*)value16;
++        // back to UTF-8 (Ostrich patch 0014), into buffers of their own: the lengths are the
++        // sender's UTF-8 byte counts, and UTF-8 may be longer than the UTF-16 it came from
++        key16[keyLength] = 0;
++        value16[valueLength] = 0;
+ 
+-        for (int64_t i=0; i<keyLength; ++i)
+-            key[i] = key16[i];
+-        for (int64_t i=0; i<valueLength; ++i)
+-            value[i] = value16[i];
++        char* const key = (char*)std::malloc(static_cast<size_t>(keyLength) * 3 + 1);
++        DISTRHO_SAFE_ASSERT_RETURN(key != nullptr, V3_NOMEM);
+ 
+-        key[keyLength] = '\0';
+-        value[valueLength] = '\0';
++        char* const value = (char*)std::malloc(static_cast<size_t>(valueLength) * 3 + 1);
++        DISTRHO_SAFE_ASSERT_RETURN(value != nullptr, V3_NOMEM);
++
++        strncpy_utf8(key, key16, static_cast<size_t>(keyLength) * 3 + 1);
++        strncpy_utf8(value, value16, static_cast<size_t>(valueLength) * 3 + 1);
+ 
+         fPlugin.setState(key, value);
+ 
+@@ -2468,6 +2470,8 @@ public:
+             fStateMap[dkey] = value;
+         }
+ 
++        std::free(key);
++        std::free(value);
+         std::free(key16);
+         std::free(value16);
+         return V3_OK;
+@@ -2490,8 +2494,8 @@ public:
+ 
+         std::vector<int16_t> key16(static_cast<size_t>(keyLength + 1), 0);
+         std::vector<int16_t> value16(static_cast<size_t>(valueLength + 1), 0);
+-        std::vector<char> key8(static_cast<size_t>(keyLength + 1), '\0');
+-        std::vector<char> value8(static_cast<size_t>(valueLength + 1), '\0');
++        std::vector<char> key8(static_cast<size_t>(keyLength) * 3 + 1, '\0');
++        std::vector<char> value8(static_cast<size_t>(valueLength) * 3 + 1, '\0');
+ 
+         res = v3_cpp_obj(attrs)->get_string(attrs, "key", key16.data(), sizeof(int16_t)*(keyLength+1));
+         DISTRHO_SAFE_ASSERT_INT2_RETURN(res == V3_OK, res, keyLength, res);
+@@ -2502,11 +2506,11 @@ public:
+             DISTRHO_SAFE_ASSERT_INT2_RETURN(res == V3_OK, res, valueLength, res);
+         }
+ 
+-        // the same cheap conversion as notify_state: state is ASCII
+-        for (int64_t i=0; i<keyLength; ++i)
+-            key8[i] = static_cast<char>(key16[i]);
+-        for (int64_t i=0; i<valueLength; ++i)
+-            value8[i] = static_cast<char>(value16[i]);
++        // back to UTF-8, as in notify_state (patch 0014)
++        key16.back() = 0;
++        value16.back() = 0;
++        strncpy_utf8(key8.data(), key16.data(), key8.size());
++        strncpy_utf8(value8.data(), value16.data(), value8.size());
+ 
+         key = key8.data();
+         value = value8.data();
+diff --git a/distrho/src/DistrhoUIVST3.cpp b/distrho/src/DistrhoUIVST3.cpp
+index 5f8f76cf..c02055ae 100644
+--- a/distrho/src/DistrhoUIVST3.cpp
++++ b/distrho/src/DistrhoUIVST3.cpp
+@@ -513,20 +513,24 @@ public:
+                 DISTRHO_SAFE_ASSERT_INT2_RETURN(res == V3_OK, res, valueLength, res);
+             }
+ 
+-            // do cheap inline conversion
+-            char* const key = (char*)key16;
+-            char* const value = (char*)value16;
++            // back to UTF-8 (Ostrich patch 0014), into buffers of their own: the lengths are
++            // the sender's UTF-8 byte counts, and UTF-8 may be longer than its UTF-16
++            key16[keyLength] = 0;
++            value16[valueLength] = 0;
+ 
+-            for (int64_t i=0; i<keyLength; ++i)
+-                key[i] = key16[i];
+-            for (int64_t i=0; i<valueLength; ++i)
+-                value[i] = value16[i];
++            char* const key = (char*)std::malloc(static_cast<size_t>(keyLength) * 3 + 1);
++            DISTRHO_SAFE_ASSERT_RETURN(key != nullptr, V3_NOMEM);
+ 
+-            key[keyLength] = '\0';
+-            value[valueLength] = '\0';
++            char* const value = (char*)std::malloc(static_cast<size_t>(valueLength) * 3 + 1);
++            DISTRHO_SAFE_ASSERT_RETURN(value != nullptr, V3_NOMEM);
++
++            strncpy_utf8(key, key16, static_cast<size_t>(keyLength) * 3 + 1);
++            strncpy_utf8(value, value16, static_cast<size_t>(valueLength) * 3 + 1);
+ 
+             fUI.stateChanged(key, value);
+ 
++            std::free(key);
++            std::free(value);
+             std::free(key16);
+             std::free(value16);
+             return V3_OK;

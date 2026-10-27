@@ -79,6 +79,7 @@ that patch against the new tree, never force it.
 | 0011 | VST3: extra outputs are main buses, off until the host switches them on |
 | 0012 | MIDI output of SysEx (VST3, CLAP) and program change (VST3) |
 | 0013 | Windows: closing a running file dialog closes the dialog, not the host's plugin window |
+| 0014 | VST3: state strings (file paths, card names) converted between UTF-8 and UTF-16 for real; DPF kept only ASCII |
 
 Back to clean DPF: `git -C plugin/dpf checkout -- .` and
 `git -C plugin/dpf/dgl/src/pugl-upstream checkout -- .`; the next `make` re-applies.
