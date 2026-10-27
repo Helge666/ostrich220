@@ -87,7 +87,9 @@ Individual units may also differ a little, from ageing analogue parts.
   and CLAP are untested.
 - **No SysEx into the VST3.** DPF's VST3 wrapper does not accept SysEx input. Use LOAD
   SYSEX instead.
-- The Windows standalone builds and starts, but has seen little use.
+- **Tested:** the Windows VST3, in Cubase 15. The Windows standalone has seen little use.
+  The Windows CLAP and all Linux builds are **untested**: they build, and an automatic
+  test loads the Linux CLAP once, but nobody has used them yet. Reports welcome.
 - In MAME the display exists only as text in the log (the LCD controller's character ROM
   has never been dumped).
 

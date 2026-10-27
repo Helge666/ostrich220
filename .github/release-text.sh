@@ -72,6 +72,9 @@ original firmware.
 
 Each zip has an INSTALL.txt. You need your own ROM images; none are included.
 
+Tested: the Windows VST3, in Cubase 15; the Windows standalone a little. The Windows CLAP
+and all Linux builds are untested so far. Reports welcome.
+
 The reverb, delay and chorus are a model fitted to measurements of a real U-220, not an
 emulation of its effect chip. Known limitations: see the README.
 EOF
