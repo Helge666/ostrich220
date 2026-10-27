@@ -71,6 +71,19 @@ const Rect kSyxSave { kW - 16.0f - 87.0f, kBarBtnY, 87.0f, kBarBtnH };
 const Rect kSyxLoad { kSyxSave.x - 8.0f - 87.0f, kBarBtnY, 87.0f, kBarBtnH };
 const Rect kHwEq    { kSyxLoad.x - 28.0f - 68.0f, kBarBtnY, 68.0f, kBarBtnH };
 
+// While ROM images are missing they take the place of the display and the keys: what is
+// needed, a chip per image (and the optional factory dump), and a button that asks for a
+// file -- any one of them; the rest of its folder is found too.
+const Rect kRomBox    { 160.0f, 62.0f, 970.0f, 176.0f };
+const Rect kRomChoose { 180.0f, 196.0f, 150.0f, 26.0f };
+constexpr unsigned kRomCells = kRomSlots + 1;           // + the factory dump
+inline Rect romCell(unsigned i)
+{
+	// Firmware first, then A..F, then the factory dump: four to a row.
+	const unsigned pos = i == kRomSlots - 1 ? 0 : i < kRomSlots - 1 ? i + 1 : kRomSlots;
+	return { 640.0f + float(pos % 4) * 120.0f, 78.0f + float(pos / 4) * 76.0f, 112.0f, 66.0f };
+}
+
 } // anonymous namespace
 
 
@@ -114,11 +127,17 @@ protected:
 		else if (std::strcmp(key, "status") == 0)
 		{
 			m_status = value;
+			m_romChecking = false;          // the answer to a picked ROM file, if one was asked
 			repaint();
 		}
 		else if (std::strcmp(key, "cardinfo") == 0)
 		{
 			setCardInfo(value);
+			repaint();
+		}
+		else if (std::strcmp(key, "romset") == 0)
+		{
+			setRomSet(value);
 			repaint();
 		}
 		else
@@ -133,6 +152,16 @@ protected:
 		m_browseSlot = -1;
 		if (what < 0 || filename == nullptr || filename[0] == '\0')
 			return;                         // cancelled
+		if (what == kBrowseRom)
+		{
+			m_romDir = dirOf(filename);
+			m_romChecking = true;
+			m_romAskedAt = std::chrono::steady_clock::now();
+			const std::string msg = std::to_string(++ m_syxSeq) + " " + filename;
+			setState("romfile", msg.c_str());
+			repaint();
+			return;
+		}
 		if (what == kBrowseSyxLoad || what == kBrowseSyxSave)
 		{
 			std::string path = filename;
@@ -191,8 +220,13 @@ protected:
 		text(196, 44, "RS-PCM SOUND MODULE  \xc2\xb7  U-220 EMULATION", nullptr);
 
 		drawKnob();
-		drawLcd();
-		drawKeys();
+		if (romSetup())
+			drawRomSetup();
+		else
+		{
+			drawLcd();
+			drawKeys();
+		}
 		drawSlots();
 		drawBar();
 	}
@@ -229,7 +263,18 @@ protected:
 
 		if (ev.press)
 		{
-			for (unsigned k = 0; k < kNumKeys; k ++)
+			if (romSetup())
+			{
+				bool hit = kRomChoose.contains(x, y);
+				for (unsigned i = 0; i < kRomCells; i ++)
+					hit = hit || romCell(i).contains(x, y);
+				if (hit)
+				{
+					browseRom();
+					return true;
+				}
+			}
+			else for (unsigned k = 0; k < kNumKeys; k ++)
 				if (kKeyRects[k].contains(x, y))
 				{
 					m_pressed = int(k);
@@ -357,6 +402,124 @@ private:
 		m_browseSlot = int(s);
 		if (!openFileBrowser(opts))
 			m_browseSlot = -1;
+	}
+
+	void browseRom()
+	{
+		if (m_romChecking)
+			return;
+		FileBrowserOptions opts;
+		opts.title = "Pick a U-220 ROM image -- the others in its folder are found too";
+		opts.startDir = m_romDir.empty() ? nullptr : m_romDir.c_str();
+		m_browseSlot = kBrowseRom;
+		if (!openFileBrowser(opts))
+			m_browseSlot = -1;
+	}
+
+	void setRomSet(const char *value)
+	{
+		std::string part[kRomSlots + 2];
+		unsigned k = 0;
+		for (const char *c = value; *c; c ++)
+		{
+			if (*c == kCardInfoFieldSep) { if (++ k >= kRomSlots + 2) break; continue; }
+			part[k] += *c;
+		}
+		m_romsAll = k >= kRomSlots;
+		for (unsigned s = 0; s < kRomSlots; s ++)
+		{
+			m_romWhat[s] = part[s];
+			m_romsAll = m_romsAll && !part[s].empty();
+		}
+		m_romFactory = part[kRomSlots];
+		m_romTarget = part[kRomSlots + 1];
+		m_romSetSeen = k >= kRomSlots;
+		m_romChecking = false;
+	}
+
+	// Only once the plugin has said what is missing, and not once the machine runs.
+	bool romSetup() const
+	{
+		return m_romSetSeen && !m_romsAll && !(m_panel.flags & 1);
+	}
+
+	void drawRomSetup()
+	{
+		const Rect &b = kRomBox;
+		beginPath();
+		roundedRect(b.x, b.y, b.w, b.h, 4);
+		fillColor(Color(14, 14, 16));
+		fill();
+		strokeColor(Color(70, 70, 76));
+		strokeWidth(1);
+		stroke();
+
+		textAlign(ALIGN_LEFT | ALIGN_BASELINE);
+		fontSize(15);
+		fillColor(Color(240, 170, 60));
+		text(180, 92, "ROM IMAGES NEEDED", nullptr);
+		fontSize(11);
+		textLineHeight(1.35f);
+		fillColor(Color(190, 190, 194));
+		textBox(180, 114, 430,
+			"Ostrich 220 runs the U-220's own firmware and needs dumps of its ROM chips. "
+			"Click CHOOSE FILE and pick any one of the images: the others in the same folder "
+			"are found too, by their contents, whatever their names. They are copied to:", nullptr);
+		fillColor(Color(140, 140, 146));
+		text(180, 176, fit(m_romTarget, 430, 11).c_str(), nullptr);
+		textLineHeight(1.0f);
+
+		barButton(kRomChoose, m_romChecking ? "CHECKING\xe2\x80\xa6" : "CHOOSE FILE\xe2\x80\xa6", !m_romChecking);
+		fontSize(10);
+		textAlign(ALIGN_LEFT | ALIGN_MIDDLE);
+		fillColor(Color(110, 110, 116));
+		text(kRomChoose.x + kRomChoose.w + 14, kRomChoose.y + kRomChoose.h / 2 + 1,
+		     "roms/README.md on GitHub lists them all", nullptr);
+
+		for (unsigned i = 0; i < kRomCells; i ++)
+		{
+			const Rect r = romCell(i);
+			const bool factory = i == kRomSlots;
+			const std::string &what = factory ? m_romFactory : m_romWhat[i];
+			const bool ok = !what.empty();
+			// A chip: dark body, a notch, pins along both long edges.
+			fillColor(Color(120, 120, 126));
+			for (float px = r.x + 10; px < r.x + r.w - 8; px += 10)
+			{
+				beginPath();
+				rect(px, r.y - 3, 4, 3);
+				rect(px, r.y + r.h, 4, 3);
+				fill();
+			}
+			beginPath();
+			roundedRect(r.x, r.y, r.w, r.h, 2);
+			fillColor(ok ? Color(34, 44, 26) : Color(28, 28, 31));
+			fill();
+			strokeColor(ok ? Color(150, 190, 60) : factory ? Color(84, 84, 90) : Color(240, 170, 60));
+			strokeWidth(1);
+			stroke();
+			beginPath();
+			circle(r.x + 8, r.y + 8, 2.5f);
+			fillColor(Color(10, 10, 12));
+			fill();
+
+			textAlign(ALIGN_LEFT | ALIGN_BASELINE);
+			fontSize(9);
+			fillColor(Color(130, 130, 136));
+			text(r.x + 16, r.y + 15, factory ? "SYSEX \xc2\xb7 OPTIONAL" : kRomChips[i], nullptr);
+			fontSize(12);
+			fillColor(Color(225, 225, 228));
+			text(r.x + 10, r.y + 36, factory ? "Factory data" : kRomTitles[i], nullptr);
+			fontSize(10);
+			fillColor(ok ? Color(150, 190, 60) : factory ? Color(110, 110, 116) : Color(240, 170, 60));
+			std::string state;
+			if (factory)
+				state = ok ? fit(what, r.w - 20, 10) : "not found";
+			else
+				state = ok ? (i == kRomSlots - 1 ? what + " \xc2\xb7 found" : "found")
+				           : std::string(i == kRomSlots - 1 ? "128 KB" : "512 KB") + " \xc2\xb7 missing";
+			text(r.x + 10, r.y + 54, state.c_str(), nullptr);
+		}
 	}
 
 	static std::string dirOf(const std::string &p)
@@ -676,6 +839,11 @@ private:
 		saveSizeWhenSettled();
 		if (m_panel.cursor_flags & 1)
 			repaint();
+		if (m_romChecking && std::chrono::steady_clock::now() - m_romAskedAt > std::chrono::seconds(15))
+		{
+			m_romChecking = false;          // no answer: let the user try again
+			repaint();
+		}
 	}
 
 	// A CGRAM glyph as the 5 x 8 dots the firmware defined.
@@ -744,10 +912,14 @@ private:
 	CardView m_card[kCardSlots];
 	std::string m_cardPath[kCardSlots];
 	// What the open file dialog is for: a card slot (0, 1) or a SysEx file.
-	static constexpr int kBrowseSyxLoad = 10, kBrowseSyxSave = 11;
+	static constexpr int kBrowseSyxLoad = 10, kBrowseSyxSave = 11, kBrowseRom = 12;
 	int m_browseSlot = -1;
 	unsigned m_syxSeq = 0;
 	std::string m_syxDir;
+	// The ROM images, while some are missing (drawRomSetup).
+	std::string m_romWhat[kRomSlots], m_romFactory, m_romTarget, m_romDir;
+	bool m_romSetSeen = false, m_romsAll = false, m_romChecking = false;
+	std::chrono::steady_clock::time_point m_romAskedAt {};
 	const std::chrono::steady_clock::time_point m_created = std::chrono::steady_clock::now();
 	std::string m_sizeSaved;                    // "<w> <h>" unscaled, as in the plugin state
 	uint m_sizeSeenW = 0, m_sizeSeenH = 0;

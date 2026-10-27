@@ -96,7 +96,7 @@ const KnownImage kKnown[] = {
 	{ "71b6f97df6dd4e573db5743c10c77e86d67965a3", 4, "wave ROM E (IC23)" },
 	{ "aea715a0a554c071a2e912894805a8d819802e1d", 5, "wave ROM F (IC24)" },
 };
-const char *const kSlotNames[7] = { "A", "B", "C", "D", "E", "F", "firmware" };
+const char *const kSlotNames[kRomSlots] = { "A", "B", "C", "D", "E", "F", "firmware" };
 
 std::vector<uint8_t> readFile(const fs::path &p, size_t limit = 0x200000)
 {
@@ -147,6 +147,95 @@ std::vector<fs::path> romDirs()
 	}
 	return dirs;
 }
+
+/// Where images the user picks in the panel are copied to: the first of these that takes
+/// them.  romDirs() searches them all.
+std::vector<fs::path> installDirs()
+{
+	std::vector<fs::path> dirs;
+	auto env = [&](const char *name, const char *tail) {
+		if (const char *v = std::getenv(name))
+			if (*v) dirs.push_back(fs::u8path(v) / fs::u8path(tail));
+	};
+#ifdef _WIN32
+	env("PROGRAMDATA", "Ostrich 220/roms");
+	env("LOCALAPPDATA", "Ostrich 220/roms");
+	env("USERPROFILE", "Documents/Ostrich 220/roms");
+#else
+	env("XDG_DATA_HOME", "Ostrich 220/roms");
+	env("HOME", ".local/share/Ostrich 220/roms");
+#endif
+	return dirs;
+}
+
+/// What one or more folders hold: the images by slot, the first of each found, and a
+/// factory dump.
+struct RomScan
+{
+	std::vector<uint8_t> images[kRomSlots];
+	fs::path from[kRomSlots];
+	std::string what[kRomSlots];
+	fs::path factory;
+	fs::path where;             ///< the folder the first image came from
+
+	bool complete() const
+	{
+		for (const auto &i : images)
+			if (i.empty()) return false;
+		return true;
+	}
+	bool any() const
+	{
+		for (const auto &i : images)
+			if (!i.empty()) return true;
+		return false;
+	}
+	std::string missing() const
+	{
+		std::string m;
+		for (unsigned s = 0; s < kRomSlots; s ++)
+			if (images[s].empty())
+				m += std::string(m.empty() ? "" : ", ") + kSlotNames[s];
+		return m;
+	}
+
+	/// Adds what @p dir holds, by SHA-1 whatever the names; the factory dump may sit next
+	/// to the ROMs, or in a sysex folder in or beside them.
+	void scan(const fs::path &dir)
+	{
+		std::error_code ec;
+		if (!fs::is_directory(dir, ec))
+			return;
+		for (const auto &e : fs::directory_iterator(dir, ec))
+		{
+			std::error_code ec2;
+			const auto sz = e.is_regular_file(ec2) ? e.file_size(ec2) : 0;
+			if (ec2 || (sz != kProgramRomBytes && sz != kWaveRomBytes))
+				continue;
+			std::vector<uint8_t> d = readFile(e.path());
+			const std::string h = sha1(d);
+			for (const KnownImage &k : kKnown)
+				if (h == k.sha1 && images[k.slot].empty())
+				{
+					images[k.slot] = std::move(d);
+					from[k.slot] = e.path();
+					what[k.slot] = k.slot == kSlotProgram ? std::string(k.what + 9) : "found";
+					if (where.empty())
+						where = dir;
+					break;
+				}
+		}
+		for (const fs::path &sd : { dir, dir / "sysex", dir.parent_path() / "sysex" })
+			for (const auto &e : fs::directory_iterator(sd, ec))
+			{
+				std::string n = pstr(e.path().filename());
+				for (char &c : n) c = char(std::tolower(static_cast<unsigned char>(c)));
+				if (factory.empty() && n.rfind("u220factory", 0) == 0
+				    && n.size() > 4 && n.compare(n.size() - 4, 4, ".syx") == 0)
+					factory = e.path();
+			}
+	}
+};
 
 /// The factory dump: complete Roland DT1 messages with good checksums, each address
 /// once.  The dump that circulates repeats its last packets, the very last one cut off
@@ -200,6 +289,8 @@ public:
 	{
 		if (m_sysexThread.joinable())
 			m_sysexThread.join();
+		if (m_romThread.joinable())
+			m_romThread.join();
 	}
 
 protected:
@@ -397,6 +488,17 @@ protected:
 			state.label = "SysEx file";
 			state.hints = kStateIsOnlyForDSP;
 			break;
+		case kStateRomSet:
+			state.key = "romset";
+			state.label = "ROM images";
+			state.hints = kStateIsOnlyForUI;
+			break;
+		case kStateRomFile:
+			// "<n> <path>": see requestRomFile.
+			state.key = "romfile";
+			state.label = "ROM image file";
+			state.hints = kStateIsOnlyForDSP;
+			break;
 		}
 		state.defaultValue = "";
 	}
@@ -424,11 +526,24 @@ protected:
 			std::lock_guard<std::mutex> lock(m_cardLock);
 			return String(cardInfoText().c_str());
 		}
-		if (std::strcmp(key, "nvram") != 0 || !m_romsLoaded)
+		if (std::strcmp(key, "romset") == 0)
+		{
+			std::lock_guard<std::mutex> lock(m_statusLock);
+			return String(m_romSet.c_str());
+		}
+		if (std::strcmp(key, "nvram") != 0)
 			return String();
 		std::lock_guard<std::mutex> lock(m_machine);
-		std::vector<uint8_t> raw(m_core.saveState(nullptr, 0));
-		m_core.saveState(raw.data(), raw.size());
+		std::vector<uint8_t> raw;
+		if (m_romsLoaded)
+		{
+			raw.resize(m_core.saveState(nullptr, 0));
+			m_core.saveState(raw.data(), raw.size());
+		}
+		else
+			raw = m_pendingNvram;           // saved again as it came, not lost
+		if (raw.empty())
+			return String();
 		std::vector<char> hex(raw.size() * 2 + 1);
 		encodeHex(raw.data(), raw.size(), hex.data());
 		return String(hex.data());
@@ -468,13 +583,21 @@ protected:
 				requestSysex(value);
 			return;
 		}
+		if (std::strcmp(key, "romfile") == 0)
+		{
+			if (value[0] != '\0')
+				requestRomFile(value);
+			return;
+		}
 		if (std::strcmp(key, "nvram") != 0 || value[0] == '\0')
 			return;
 		std::vector<uint8_t> raw(std::strlen(value) / 2);
 		if (!decodeHex(value, raw.data(), raw.size()))
 			return;
 		std::lock_guard<std::mutex> lock(m_machine);
-		if (m_romsLoaded && m_core.loadState(raw.data(), raw.size()))
+		if (!m_romsLoaded)
+			m_pendingNvram = std::move(raw);
+		else if (m_core.loadState(raw.data(), raw.size()))
 		{
 			m_needFirstBoot = false;
 			d_stdout("Ostrich 220: restored the battery-backed memory from the session.");
@@ -511,6 +634,15 @@ protected:
 			{
 				m_statusPending.store(false);
 				updateStateValue("status", m_status.c_str());
+			}
+		}
+		if (m_romSetPending.load())
+		{
+			std::unique_lock<std::mutex> sl(m_statusLock, std::try_to_lock);
+			if (sl.owns_lock())
+			{
+				m_romSetPending.store(false);
+				updateStateValue("romset", m_romSet.c_str());
 			}
 		}
 		if (m_cardInfoPending.load())
@@ -1088,68 +1220,158 @@ private:
 
 	// ---- ROMs ------------------------------------------------------------------------
 
-	void loadRoms()
+	/// Looks in the ROM folders and starts the machine when everything is there.  From the
+	/// constructor, and again once the panel has copied images in (installRoms).
+	bool loadRoms(std::string *missing = nullptr)
 	{
-		std::vector<uint8_t> images[7];
-		std::string where;
+		RomScan r;
 		for (const fs::path &dir : romDirs())
+			r.scan(dir);
+		publishRomSet(r);
+		if (!r.complete())
 		{
-			std::error_code ec;
-			if (!fs::is_directory(dir, ec))
-				continue;
-			for (const auto &e : fs::directory_iterator(dir, ec))
-			{
-				std::error_code ec2;
-				const auto sz = e.is_regular_file(ec2) ? e.file_size(ec2) : 0;
-				if (ec2 || (sz != kProgramRomBytes && sz != kWaveRomBytes))
-					continue;
-				std::vector<uint8_t> d = readFile(e.path());
-				const std::string h = sha1(d);
-				for (const KnownImage &k : kKnown)
-					if (h == k.sha1 && images[k.slot].empty())
-					{
-						images[k.slot] = std::move(d);
-						if (where.empty())
-							where = pstr(dir);
-						break;
-					}
-			}
-			// The factory dump may sit next to the ROMs, or in a sysex folder beside them.
-			for (const fs::path &sd : { dir, dir.parent_path() / "sysex" })
-				for (const auto &e : fs::directory_iterator(sd, ec))
-				{
-					std::string n = pstr(e.path().filename());
-					for (char &c : n) c = char(std::tolower(static_cast<unsigned char>(c)));
-					if (m_factoryPath.empty() && n.rfind("u220factory", 0) == 0
-					    && pstr(e.path().extension()).size() == 4
-					    && (n.size() > 4 && n.compare(n.size() - 4, 4, ".syx") == 0))
-						m_factoryPath = e.path();
-				}
-		}
-
-		std::string missing;
-		for (int s = 0; s < 7; s ++)
-			if (images[s].empty())
-				missing += std::string(missing.empty() ? "" : ", ") + kSlotNames[s];
-		if (!missing.empty())
-		{
+			if (missing)
+				*missing = r.missing();
 			std::string dirs;
 			for (const fs::path &d : romDirs())
 				dirs += (dirs.empty() ? "" : "  |  ") + pstr(d);
-			setStatus("Missing: " + missing + ".  Put the U-220 ROM images (any file names) into: " + dirs);
+			setStatus("Missing: " + r.missing() + ".  Put the U-220 ROM images (any file names) into: " + dirs);
+			return false;
+		}
+
+		std::lock_guard<std::mutex> lock(m_machine);
+		m_factoryPath = r.factory;
+		m_core.loadProgramRom(r.images[kSlotProgram].data(), r.images[kSlotProgram].size());
+		for (unsigned w = 0; w < kNumWaveRoms; w ++)
+			m_core.loadWaveRom(w, r.images[w].data(), r.images[w].size());
+		m_core.reset();
+		for (unsigned s = 0; s < kRomSlots; s ++)
+			m_romImages[s] = std::move(r.images[s]);
+		m_romsLoaded = true;
+		// A session's memory that came while the images were missing.
+		if (!m_pendingNvram.empty() && m_core.loadState(m_pendingNvram.data(), m_pendingNvram.size()))
+			m_needFirstBoot = false;
+		m_pendingNvram.clear();
+		setStatus("ROMs from " + pstr(r.where) + (m_factoryPath.empty()
+				? ".  No U220Factory.syx found: a new instance starts with empty memory."
+				: ".  Factory data: " + pstr(m_factoryPath)));
+		return true;
+	}
+
+	/// What the panel's ROM list shows (OstrichShared.hpp, kStateRomSet).
+	void publishRomSet(const RomScan &r)
+	{
+		std::string t;
+		for (unsigned s = 0; s < kRomSlots; s ++)
+			t += r.what[s] + kCardInfoFieldSep;
+		t += pstr(r.factory.filename()) + kCardInfoFieldSep;
+		const auto dirs = installDirs();
+		t += dirs.empty() ? std::string() : pstr(dirs.front());
+		std::lock_guard<std::mutex> lock(m_statusLock);
+		m_romSet = t;
+		m_romSetPending.store(true);
+	}
+
+	// From the panel: "<n> <path>", a file the user picked.  Its folder is searched for all
+	// the images, on a thread of its own: SHA-1 over a few MB, then the first boot.
+	void requestRomFile(const char *value)
+	{
+		unsigned n = 0;
+		int used = 0;
+		if (std::sscanf(value, "%u %n", &n, &used) < 1 || used == 0 || value[used] == '\0' || m_romsLoaded)
+			return;
+		if (m_romBusy.exchange(true))
+			return;
+		if (m_romThread.joinable())
+			m_romThread.join();
+		const fs::path picked = fs::u8path(value + used);
+		m_romThread = std::thread([this, picked] {
+			installRoms(picked);
+			m_romBusy.store(false);
+		});
+	}
+
+	/// Copies what the picked file's folder holds and the ROM folders lack into the first
+	/// install folder that takes it, then looks again.
+	void installRoms(const fs::path &picked)
+	{
+		RomScan have, found;
+		for (const fs::path &dir : romDirs())
+			have.scan(dir);
+		const fs::path dir = picked.parent_path();
+		found.scan(dir);
+		const std::string pickedName = pstr(picked.filename());
+
+		std::vector<fs::path> copy;
+		std::string what;
+		for (unsigned s = 0; s < kRomSlots; s ++)
+			if (have.images[s].empty() && !found.images[s].empty())
+			{
+				copy.push_back(found.from[s]);
+				what += std::string(what.empty() ? "" : ", ") + (s == kSlotProgram ? "firmware " + found.what[s] : kSlotNames[s]);
+			}
+		if (have.factory.empty() && !found.factory.empty())
+		{
+			copy.push_back(found.factory);
+			what += std::string(what.empty() ? "" : ", ") + "factory data";
+		}
+		if (!found.any())
+		{
+			setStatus(pickedName + " is not one of the U-220's ROM images, and its folder holds none of them either.");
+			publishRomSet(have);
 			return;
 		}
 
-		m_core.loadProgramRom(images[kSlotProgram].data(), images[kSlotProgram].size());
-		for (unsigned w = 0; w < kNumWaveRoms; w ++)
-			m_core.loadWaveRom(w, images[w].data(), images[w].size());
-		m_core.reset();
-		for (int s = 0; s < 7; s ++)
-			m_romImages[s] = std::move(images[s]);
-		m_romsLoaded = true;
-		setStatus("ROMs from " + where + (m_factoryPath.empty()
-				? ".  No U220Factory.syx found: a new instance starts with empty memory."
-				: ".  Factory data: " + pstr(m_factoryPath)));
+		std::string target, error;
+		for (const fs::path &to : installDirs())
+		{
+			if (copy.empty())
+				break;
+			std::error_code ec;
+			fs::create_directories(to, ec);
+			bool ok = !ec;
+			for (const fs::path &f : copy)
+			{
+				if (!ok)
+					break;
+				// Never over a file of the same name: the user's, whatever it is.
+				fs::path dest = to / f.filename();
+				for (int i = 2; fs::exists(dest, ec); i ++)
+					dest = to / fs::u8path(pstr(f.stem()) + " (" + std::to_string(i) + ")" + pstr(f.extension()));
+				ok = fs::copy_file(f, dest, ec) && !ec;
+				if (!ok)
+					error = pstr(dest) + ": " + ec.message();
+			}
+			if (ok)
+			{
+				target = pstr(to);
+				break;
+			}
+		}
+		if (!copy.empty() && target.empty())
+		{
+			setStatus("Could not copy the images: " + error);
+			publishRomSet(have);
+			return;
+		}
+
+		std::string missing;
+		const bool running = loadRoms(&missing);
+		std::string msg = copy.empty() ? "Nothing new in " + pstr(dir) + "."
+		                               : "Copied " + what + " from " + pstr(dir) + " to " + target + ".";
+		if (std::none_of(std::begin(found.from), std::end(found.from),
+				[&](const fs::path &p) { return p.filename() == picked.filename(); }))
+			msg += "  (" + pickedName + " itself is not one of them.)";
+		if (!running)
+		{
+			setStatus(msg + "  Still missing: " + missing + ".");
+			return;
+		}
+		std::lock_guard<std::mutex> lock(m_machine);
+		if (m_needFirstBoot)
+			firstBoot();
+		setStatus(msg + "  The U-220 is running." + (m_factoryPath.empty()
+				? "  No U220Factory.syx found: it starts with empty memory." : ""));
 	}
 
 	/// Power on a machine with no memory, as the factory would have: answer "Memory
@@ -1198,13 +1420,16 @@ private:
 	mutable std::mutex m_machine;
 	U220Core m_core;
 	U220Fx m_fx;                    // reverb/delay and chorus, tuned to Helge's U-220 (u220_fx.h)
-	bool m_romsLoaded = false;
+	std::atomic<bool> m_romsLoaded { false };
 	bool m_needFirstBoot = true;
 	fs::path m_factoryPath;
+	std::vector<uint8_t> m_pendingNvram;        // a session's memory, held till the ROMs come
+	std::thread m_romThread;                    // installRoms
+	std::atomic<bool> m_romBusy { false };
 
-	std::string m_status;
+	std::string m_status, m_romSet;             // m_romSet: kStateRomSet
 	mutable std::mutex m_statusLock;
-	std::atomic<bool> m_statusPending { false };
+	std::atomic<bool> m_statusPending { false }, m_romSetPending { false };
 	std::string m_uiSize;           // "<w> <h>", the panel's, saved with the session
 	mutable std::mutex m_uiSizeLock;
 

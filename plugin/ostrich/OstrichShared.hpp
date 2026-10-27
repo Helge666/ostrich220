@@ -71,8 +71,21 @@ enum States : uint32_t
 	kStateCard2,                ///< the same for slot 2
 	kStateCardInfo,             ///< DSP -> UI: what each slot shows, see cardInfo below
 	kStateSysex,                ///< UI -> DSP, "<n> save|load <path>": a .syx file
+	kStateRomSet,               ///< DSP -> UI: which ROM images were found, see romset below
+	kStateRomFile,              ///< UI -> DSP, "<n> <path>": a file to find ROM images by
 	kStateCount
 };
+
+/// The ROM images, in the plugin's order: wave ROMs A..F, then the firmware.
+constexpr unsigned kRomSlots = 7;
+constexpr const char *kRomChips[kRomSlots] = { "IC19", "IC20", "IC21", "IC22", "IC23", "IC24", "IC8" };
+constexpr const char *kRomTitles[kRomSlots] = {
+	"Wave ROM A", "Wave ROM B", "Wave ROM C", "Wave ROM D", "Wave ROM E", "Wave ROM F", "Firmware"
+};
+
+/// "romset" is fields separated by kCardInfoFieldSep: one per ROM slot, empty when the
+/// image is missing or what was found ("v1.02" for the firmware, "found" otherwise); then
+/// the factory dump's file name or empty; then the folder new images are copied to.
 
 constexpr unsigned kCardSlots = 2;
 constexpr const char *kCardStateKeys[kCardSlots] = { "card1", "card2" };
