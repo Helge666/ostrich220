@@ -33,6 +33,9 @@ Done and checked against a real U-220 (details in [analysis/](analysis/README-AN
 - [x] Release 0.1.0 (26.10.2026): Windows zip (VST3, CLAP, standalone) and Linux zip, no ROMs.
 - [x] Release 0.1.1 (27.10.2026): guided ROM setup in the panel; a new view in Cubase at
       125 % fills its window.
+- [x] Release 0.1.2 (27.10.2026): ROMs and cards from zips, known card dumps recognised,
+      MIDI MESSAGE lamp, computer keyboard and mouse wheel; Memory Initialize without a
+      factory dump; files from the panel written once under VST3.
 - [x] The repository is public (26.10.2026).
 
 Not before the release, and only after checking each project's policy on LLM-written
