@@ -18,8 +18,8 @@ Done and checked against a real U-220 (details in [analysis/](analysis/README-AN
   confirmed by ear.
 - **Plugin** (VST3, CLAP, standalone; Windows and Linux), tested in Cubase 15: panel with
   display and keys, factory data on first start, session state, MIX/DIRECT outputs, two
-  card slots (known dumps recognised, zips too), SysEx files, MIDI out, guided ROM setup
-  in the panel (loose files or zips). SN-MV30 cards untested.
+  card slots (known dumps recognised, zips too), SysEx files, MIDI out, MIDI MESSAGE lamp,
+  guided ROM setup in the panel (loose files or zips). SN-MV30 cards untested.
 
 ## Before the first public release (0.1)
 
@@ -47,7 +47,6 @@ Priorities as agreed on 27.10.2026.
 
 | What | Notes |
 |---|---|
-| Panel: MIDI LED | only if it is little work: Cubase and most DAWs show MIDI activity in the plugin window anyway |
 | Editing in the display | click a field, change it with the wheel: translated into key presses, closed-loop on the display's cursor position. Simplifies the workflow a lot. |
 
 ### Nice to have

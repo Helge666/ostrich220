@@ -113,7 +113,7 @@ struct PanelBlob
 	uint8_t cgram[64];          ///< the 8 custom glyphs
 	uint8_t cursor_pos;         ///< 0..47 into lcd[], 0xFF = none
 	uint8_t cursor_flags;       ///< bit 1 underline, bit 0 blinking block
-	uint8_t flags;              ///< bit 0: machine running (ROMs found)
+	uint8_t flags;              ///< bit 0: machine running (ROMs found); bit 1: MIDI MESSAGE lamp
 };
 
 inline void encodeHex(const uint8_t *p, size_t n, char *out)

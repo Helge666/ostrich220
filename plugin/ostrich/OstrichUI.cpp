@@ -219,6 +219,7 @@ protected:
 		fillColor(Color(170, 170, 170));
 		text(196, 44, "RS-PCM SOUND MODULE  \xc2\xb7  U-220 EMULATION", nullptr);
 
+		drawMidiLamp();
 		drawKnob();
 		if (romSetup())
 			drawRomSetup();
@@ -671,6 +672,31 @@ private:
 	void drawHwEq()
 	{
 		barButton(kHwEq, "HW-EQ", m_hwEq);
+	}
+
+	// MIDI MESSAGE, top right as on the unit (there above POWER): green while MIDI comes in.
+	void drawMidiLamp()
+	{
+		const bool lit = (m_panel.flags & 2) != 0;
+		const float cx = kSlotX + kSlotW - 6, cy = 40;
+		if (lit)
+		{
+			beginPath();
+			circle(cx, cy, 9);
+			fillPaint(radialGradient(cx, cy, 2, 9, Color(90, 255, 90, 120), Color(90, 255, 90, 0)));
+			fill();
+		}
+		beginPath();
+		circle(cx, cy, 4.5f);
+		fillColor(lit ? Color(120, 255, 120) : Color(28, 58, 30));
+		fill();
+		strokeColor(Color(70, 70, 76));
+		strokeWidth(1);
+		stroke();
+		fontSize(10);
+		textAlign(ALIGN_RIGHT | ALIGN_MIDDLE);
+		fillColor(Color(220, 220, 220));
+		text(cx - 12, cy + 1, "MIDI MESSAGE", nullptr);
 	}
 
 	void drawKnob()

@@ -798,6 +798,7 @@ protected:
 			if (coreFrames && off >= coreFrames)
 				off = coreFrames - 1;
 			m_core.midiIn(data, ev.size, off);
+			m_midiSeen = true;
 		}
 
 		if (m_coreBuf[0].size() < coreFrames)
@@ -1307,7 +1308,10 @@ private:
 			std::memcpy(blob.cgram, st.cgram, sizeof(blob.cgram));
 			blob.cursor_pos = st.cursor_pos;
 			blob.cursor_flags = st.cursor_flags;
-			blob.flags = 1;
+			// MIDI MESSAGE: the firmware has no part in it (nothing it writes follows MIDI
+			// IN), so the lamp is the line's.  Lit for one refresh after any MIDI in.
+			blob.flags = 1 | (m_midiSeen ? 2 : 0);
+			m_midiSeen = false;
 		}
 		else
 		{
@@ -1608,6 +1612,7 @@ private:
 
 	uint32_t m_publishPeriod = 1920, m_publishAccum = 0, m_publishesSame = 0;
 	PanelBlob m_lastBlob {};
+	bool m_midiSeen = false;        // MIDI in since the last refresh: the MIDI MESSAGE lamp
 	char m_blobHex[sizeof(PanelBlob) * 2 + 1] = {};
 
 	// SysEx files (requestSysex).  The ROM images stay for the machine's copies.

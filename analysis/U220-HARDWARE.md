@@ -146,6 +146,13 @@ Jump Page); `Util` = ROM Play / MIDI Monitor. Menus remember their last choice.
 Twelve keys, a green MIDI LED, VOLUME, PHONES, two PCM card slots, the backlit 24×2 LCD. The
 firmware marks the selected part with the controller's underline cursor.
 
+The MIDI LED ("MIDI MESSAGE", above POWER) is not the firmware's: traced while notes came in
+(27.10.2026), the firmware writes nothing that follows MIDI IN, neither IC12's register at
+`0x1001` (never changes after boot) nor any window bank it has no other use for (only bank
+`0x70`, once, during boot). So the lamp is most likely driven from the MIDI IN line itself,
+likely through IC12's LED0. Not checked on the board. The plugin lights it for any MIDI it
+receives.
+
 ## Checked against the real unit
 
 - All 128 timbres at C4: level within ±0.5 dB after a common offset, envelopes and pitch
