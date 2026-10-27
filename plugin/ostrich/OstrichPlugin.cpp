@@ -1357,6 +1357,7 @@ private:
 
 		std::string missing;
 		const bool running = loadRoms(&missing);
+		// What matters first: the status line is cut at the panel's width.
 		std::string msg = copy.empty() ? "Nothing new in " + pstr(dir) + "."
 		                               : "Copied " + what + " from " + pstr(dir) + " to " + target + ".";
 		if (std::none_of(std::begin(found.from), std::end(found.from),
@@ -1364,14 +1365,14 @@ private:
 			msg += "  (" + pickedName + " itself is not one of them.)";
 		if (!running)
 		{
-			setStatus(msg + "  Still missing: " + missing + ".");
+			setStatus("Still missing: " + missing + ".  " + msg);
 			return;
 		}
 		std::lock_guard<std::mutex> lock(m_machine);
 		if (m_needFirstBoot)
 			firstBoot();
-		setStatus(msg + "  The U-220 is running." + (m_factoryPath.empty()
-				? "  No U220Factory.syx found: it starts with empty memory." : ""));
+		setStatus(std::string("The U-220 is running") + (m_factoryPath.empty()
+				? " (no U220Factory.syx: it starts with empty memory).  " : ".  ") + msg);
 	}
 
 	/// Power on a machine with no memory, as the factory would have: answer "Memory
