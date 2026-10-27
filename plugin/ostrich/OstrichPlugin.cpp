@@ -128,7 +128,7 @@ std::vector<fs::path> romDirs()
 	std::vector<fs::path> dirs;
 	auto env = [&](const char *name, const char *tail) {
 		if (const char *v = std::getenv(name))
-			if (*v) dirs.push_back(fs::u8path(v) / fs::u8path(tail));
+			if (*v) dirs.push_back((fs::u8path(v) / fs::u8path(tail)).make_preferred());
 	};
 	// "Ostrich 220", and the "Ostrich" of the test builds before the first release.
 	env("OSTRICH_ROMS", "");
@@ -155,7 +155,7 @@ std::vector<fs::path> installDirs()
 	std::vector<fs::path> dirs;
 	auto env = [&](const char *name, const char *tail) {
 		if (const char *v = std::getenv(name))
-			if (*v) dirs.push_back(fs::u8path(v) / fs::u8path(tail));
+			if (*v) dirs.push_back((fs::u8path(v) / fs::u8path(tail)).make_preferred());
 	};
 #ifdef _WIN32
 	env("PROGRAMDATA", "Ostrich 220/roms");
