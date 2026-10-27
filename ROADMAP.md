@@ -55,7 +55,7 @@ Priorities as agreed on 27.10.2026.
 
 | What | Notes |
 |---|---|
-| Editing in the display | stage 1 (keyboard, wheel over the display) and stage 2 (a click on a field selects it: CURSOR, or PART/INST on the main page, until the firmware's selection stands on it; the arrows turn the page, the title goes up with EXIT, a double click adds ENTER) are in; the double click waits for the test in Cubase. |
+| Editing in the display | stage 1 (keyboard, wheel over the display) and stage 2 (a click on a field selects it: CURSOR, or PART/INST on the main page, until the firmware's selection stands on it; the arrows turn the page, the title goes up with EXIT, a double click adds ENTER) are in and tested in Cubase. |
 
 ### Nice to have
 
