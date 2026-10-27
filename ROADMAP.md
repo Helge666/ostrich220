@@ -18,7 +18,7 @@ Done and checked against a real U-220 (details in [analysis/](analysis/README-AN
   confirmed by ear.
 - **Plugin** (VST3, CLAP, standalone; Windows and Linux), tested in Cubase 15: panel with
   display and keys, factory data on first start, session state, MIX/DIRECT outputs, two
-  card slots, SysEx files, MIDI out.
+  card slots, SysEx files, MIDI out, guided ROM setup in the panel.
 
 ## Before the first public release (0.1)
 
@@ -46,7 +46,7 @@ improvements to emu110. Contact with emu110's author goes through Helge, not the
 | Effects, details | Room1's stereo image (model −0.29, unit ~0); what the unit does with Cho parts while the chorus is off |
 | Patch library | single patches and timbres instead of the whole memory |
 | Editing in the display | click a field, change it with the wheel: translated into key presses, closed-loop on the display's cursor position |
-| ROM setup | a dialog that names a missing image and lets the user pick the file |
+| ROM images in a zip | the guided setup reads loose files only; a MAME set (`u220.zip`) has to be unpacked first |
 | Card dumps | recognise known dumps by SHA-1; SN-MV30 cards untested |
 | ROM Play | keep unsaved temp edits across the demo songs (the unit loses them too) |
 | P-01 and Dir1/Dir2 | with the factory data, P-01's sounding part stayed on Rev after Asgn = Dir1/Dir2; with a unit's own memory it follows at once. Check on the unit. |

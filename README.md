@@ -48,14 +48,23 @@ for building it yourself.)
 
 1. Copy `Ostrich220.vst3` to `C:\Program Files\Common Files\VST3\` (or
    `%LOCALAPPDATA%\Programs\Common\VST3\`), or `Ostrich220.clap` to the CLAP folder.
-2. Put the ROM images in `C:\ProgramData\Ostrich 220\roms\`. File names do not matter: the
-   images are recognised by their SHA-1. Which ones you need: [roms/README.md](roms/README.md).
-3. Optional: put a U-220 factory SysEx dump whose name starts with `U220Factory` (`.syx`)
-   next to the ROMs. A new instance then starts like a unit fresh from the factory, with
-   the 64 factory patches. Without it the memory starts empty ("Memory Initialize").
+2. Load Ostrich 220 in your DAW (or start `Ostrich220.exe`). The first time, it asks for
+   the ROM images:
 
-The status line under the panel says which ROMs were found and where, or which are missing
-and where they were looked for. Folders searched, in this order, for "Ostrich 220" and then
+   ![The panel asking for the ROM images](docs/rom-setup.png)
+
+   Click **CHOOSE FILE** and pick any one of your U-220 ROM images. Ostrich 220 finds the
+   others in the same folder by their contents, whatever their names, copies them to
+   `C:\ProgramData\Ostrich 220\roms\` and starts. If some are in another folder, click
+   again and pick one of those. Which images you need: [roms/README.md](roms/README.md).
+3. Optional: a U-220 factory SysEx dump whose name starts with `U220Factory` (`.syx`) in
+   the same folder comes along. A new instance then starts like a unit fresh from the
+   factory, with the 64 factory patches. Without it the memory starts empty ("Memory
+   Initialize").
+
+You can also copy the images to `C:\ProgramData\Ostrich 220\roms\` yourself. The status
+line under the panel says which ROMs were found and where, or which are missing and where
+they were looked for. Folders searched, in this order, for "Ostrich 220" and then
 "Ostrich": `%PROGRAMDATA%\…\roms`, `%LOCALAPPDATA%\…\roms`, `Documents\…\roms`; on Linux
 `$XDG_DATA_HOME/…/roms`, `~/.local/share/…/roms`, `/usr/share/…/roms`. The environment
 variable `OSTRICH_ROMS` names a folder searched first.

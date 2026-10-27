@@ -15,6 +15,10 @@ A-F. They are recognised by their SHA-1, so the file names do not matter. The li
 checksums: roms/README.md in the source repository. No ROMs are included, and none ever
 will be.
 
+The easy way: load the plugin. While images are missing, the panel shows them; click
+CHOOSE FILE and pick any one of your ROM images. The others in the same folder are found
+by their contents and everything is copied to the ROM folder below; then it starts.
+
 Optional: a U-220 factory SysEx dump whose name starts with "U220Factory" (.syx) next to
 the ROMs. A new instance then starts with the 64 factory patches.
 
@@ -33,7 +37,7 @@ CLAP: copy Ostrich220.clap to
   C:\Program Files\Common Files\CLAP\
 Standalone: Ostrich220.exe, anywhere.
 
-ROMs go in
+ROMs go in (the panel copies them there for you)
   C:\ProgramData\Ostrich 220\roms\
 
 EOF
@@ -48,7 +52,7 @@ VST3: copy the folder Ostrich220.vst3 to ~/.vst3/
 CLAP: copy Ostrich220.clap to ~/.clap/
 Standalone: Ostrich220 (JACK), anywhere.
 
-ROMs go in
+ROMs go in (the panel copies them there for you)
   ~/.local/share/Ostrich 220/roms/
 
 EOF
