@@ -130,6 +130,14 @@ filtered steeply: below 16 kHz each frequency f brings an image at 32 kHz − f 
   SysEx.
 - Card IDs are the catalogue numbers (`02` for SN-U110-02); the header is
   `RolandU-110 N` + `B1 53 AC`, the card's name at `0x10`, the ID at `0x20`.
+- Card dumps exist in two address orders. Besides MAME's (`hash/u110_card.xml`), a set of
+  all 19 cards in that list circulates with address lines A8–A15 reversed (A8↔A15, A9↔A14,
+  A10↔A13, A11↔A12); data lines and the other address lines are the same. Put back in
+  order, every one matches MAME's SHA-1. SN-U110-08 checks against the U-220's own wave ROM
+  E (IC23) byte for byte. The header (`0x00`–`0xFF`) reads the same in both orders. Loaded
+  as it is, such a dump shows the tone names as garbage (a black bar), and the parts play
+  the wrong samples. The plugin recognises the order by the hash, or else by which order
+  gives the first tone records (`0x1000 + 0x50*n`) readable names (27.10.2026).
 - After the ROM Play demo songs the firmware reloads the current patch from memory; unsaved
   temp edits are lost, on the unit as in the emulation.
 - A pseudo-random generator (`0x1084/0x1085`, seeded 02/00 at power-on, routine `0x93B3`)

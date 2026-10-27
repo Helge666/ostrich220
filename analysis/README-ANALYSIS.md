@@ -5,7 +5,7 @@
 1. U220-HARDWARE.md: the board, the memory map and IC12's window, the keys and the card
    detect lines, the PCM chip and where the wave ROMs and cards sit, IC25's mixer and the
    output routing, the analogue output stage, MIDI and SysEx addresses, the data in RAM and
-   ROM, the menus, the MIDI lamp (not driven by the firmware), and what was checked against a
+   ROM, the two address orders card dumps come in, the menus, the MIDI lamp (not driven by the firmware), and what was checked against a
    real unit.
 2. U220-EFFECTS.md: the reverb/delay and chorus — what the unit has, how they were measured,
    the models and how close they are, what is open.

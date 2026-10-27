@@ -26,7 +26,9 @@ and Linux; see [Download](#download) below).
 - **Two PCM card slots** for SN-U110 card dumps. Click a slot to insert a card (a dump, or
   its zip from MAME's software list), the eject button takes it out; the firmware notices
   either while running ("Checking PCM Card..."). A dump known to be good shows its card's
-  number with a check mark. Only the file's path is saved with the session.
+  number and name. Dumps with address lines A8–A15 in reverse order (they circulate for
+  every card) are put back in order when they go in. Only the file's path is saved with the
+  session.
 - **SysEx files:** SAVE SYSEX writes the unit's own bulk dump (Data > Bulk > All) to a
   `.syx`; LOAD SYSEX sends a `.syx` into the machine.
 - **MIDI OUT:** what the firmware sends appears on the plugin's MIDI output.
