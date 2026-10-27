@@ -904,6 +904,8 @@ private:
 	static constexpr uint32_t kKeySettleFrames = kCoreSampleRate * 3 / 25; // 120 ms
 	static constexpr uint32_t kKeyMaxWaitFrames = kCoreSampleRate * 3 / 5; // 600 ms
 	static constexpr uint32_t kKeyMaxQueued = 16;
+	// trackSelection: pieces of one blink closer than this are one field
+	static constexpr uint32_t kSelPieceFrames = kCoreSampleRate / 10;      // 100 ms
 
 	void setupRate(double rate)
 	{
@@ -987,7 +989,11 @@ private:
 	// and on name pages the controller's own cursor marks it.  A frame in which cells only
 	// go blank, or come back as they were, is a blink: those cells are the field.  Any other
 	// change is a new page or a new value: the selection is not known until the next blink.
-	void trackSelection(const PanelState &st)
+	// The firmware writes a field a few characters per display update, so the pieces of one
+	// blink that follow each other closely, with only blank cells between them, are joined.
+	// A field coming back only counts while the selection is not known: it may be the old
+	// one, back after a CURSOR press blanked the new.
+	void trackSelection(const PanelState &st, uint32_t coreFrames)
 	{
 		constexpr int n = int(kLcdColumns * 2);
 		int lo = n, hi = -1, backLo = n, backHi = -1;
@@ -1010,22 +1016,42 @@ private:
 			else
 				other = true;
 		}
+		const int cols = int(kLcdColumns);
+
+		// Whether [a, b] continues the selection: the same row, nothing but blank between.
+		const auto joins = [&](int a, int b) {
+			if (m_selLo < 0 || m_selAge > kSelPieceFrames || a / cols != m_selLo / cols)
+				return false;
+			const int from = std::min(b, m_selHi) + 1, to = std::max(a, m_selLo);
+			for (int c = from; c < to; c ++)
+				if (st.lcd[c] != ' ')
+					return false;
+			return true;
+		};
+		const auto select = [&](int a, int b, bool blank) {
+			if (m_selBlank == blank && joins(a, b))
+			{
+				a = std::min(a, m_selLo);
+				b = std::max(b, m_selHi);
+			}
+			m_selLo = a;
+			m_selHi = b;
+			m_selBlank = blank;
+			m_selAge = 0;
+		};
 		if (other)
 		{
 			m_selLo = m_selHi = -1;
 			m_hwCursor = -1;
 			m_pageStamp ++;
 		}
-		else if (hi >= 0 && lo / int(kLcdColumns) == hi / int(kLcdColumns))
-		{
-			m_selLo = lo;
-			m_selHi = hi;
-		}
-		else if (hi < 0 && backHi >= 0 && backLo / int(kLcdColumns) == backHi / int(kLcdColumns))
-		{
-			m_selLo = backLo;
-			m_selHi = backHi;
-		}
+		else if (hi >= 0 && lo / cols == hi / cols)
+			select(lo, hi, true);
+		else if (hi < 0 && backHi >= 0 && backLo / cols == backHi / cols
+			&& (m_selLo < 0 || (!m_selBlank && m_selAge <= kSelPieceFrames)))
+			select(backLo, backHi, false);
+		if (m_selAge <= kSelPieceFrames)
+			m_selAge += coreFrames;
 		for (int c = 0; c < n; c ++)
 		{
 			m_selLcd[c] = st.lcd[c];
@@ -1114,7 +1140,7 @@ private:
 	{
 		PanelState st;
 		m_core.snapshot(st);
-		trackSelection(st);
+		trackSelection(st, coreFrames);
 
 		const uint32_t seq = m_gotoSeq.load();
 		if (seq != m_gotoSeen)
@@ -1180,6 +1206,8 @@ private:
 		int lo = m_selLo, hi = m_selHi;
 		if (m_hwCursor >= 0)
 			lo = hi = m_hwCursor;
+		else if (lo >= 0 && m_selAge <= kSelPieceFrames)
+			return;                                 // the field may not be whole yet
 		if (lo < 0)
 		{
 			if (m_gotoWait > (m_gotoPresses == 0 ? kFirstWait : kMoveWait))
@@ -1957,6 +1985,8 @@ private:
 	uint32_t m_gotoWait = 0, m_gotoPage = 0;
 	uint8_t m_selLcd[kLcdColumns * 2] = {}, m_selShadow[kLcdColumns * 2] = {};
 	int m_selLo = -1, m_selHi = -1;             // the field seen blinking, -1 = not known
+	bool m_selBlank = false;                    // seen going blank (else coming back)
+	uint32_t m_selAge = 0;                      // frames since, up to a little past 100 ms
 	int m_hwCursor = -1;                        // the controller's cursor, once shown on this page
 	bool m_cursorWasOn = false;
 	uint8_t m_cursorWasAt = 0xff;
