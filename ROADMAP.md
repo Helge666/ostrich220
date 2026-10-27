@@ -29,6 +29,8 @@ Done and checked against a real U-220 (details in [analysis/](analysis/README-AN
       a `v*` tag publishes a release.
 - [x] The plugin's home page (`getHomePage`): https://github.com/Helge666/ostrich220
 - [x] Release 0.1.0 (26.10.2026): Windows zip (VST3, CLAP, standalone) and Linux zip, no ROMs.
+- [x] Release 0.1.1 (27.10.2026): guided ROM setup in the panel; a new view in Cubase at
+      125 % fills its window.
 - [x] The repository is public (26.10.2026).
 
 Not before the release, and only after checking each project's policy on LLM-written
