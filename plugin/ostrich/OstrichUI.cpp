@@ -291,7 +291,14 @@ protected:
 				const int row = int(std::floor((y - kLcd.y - kLcdPadY) / ch));
 				if (col >= 0 && col < 24 && row >= 0 && row < 2)
 				{
-					const std::string msg = std::to_string(++ m_gotoSeq) + " " + std::to_string(row * 24 + col);
+					// A second click on the same cell within 500 ms (Windows' default) is a
+					// double click: ENTER as well, once the field is selected.
+					const int cell = row * 24 + col;
+					const auto now = std::chrono::steady_clock::now();
+					const bool twice = cell == m_lastClickCell && now - m_lastClickAt < std::chrono::milliseconds(500);
+					m_lastClickCell = twice ? -1 : cell;
+					m_lastClickAt = now;
+					const std::string msg = std::to_string(++ m_gotoSeq) + " " + std::to_string(cell) + (twice ? " enter" : "");
 					setState("lcdgoto", msg.c_str());
 				}
 				return true;
@@ -1146,6 +1153,8 @@ private:
 	uint m_kbdHeld[kNumKeys] = {};              // onKeyboard: the computer key holding each
 	float m_wheel = 0.0f;                       // onScroll over the display, part notches
 	unsigned m_gotoSeq = 0;                     // makes the same cell clicked twice two clicks
+	int m_lastClickCell = -1;                   // the display's last click, for double clicks
+	std::chrono::steady_clock::time_point m_lastClickAt;
 	int m_pressed = -1;
 	bool m_dragKnob = false;
 	float m_dragY = 0, m_dragStartDb = 0;

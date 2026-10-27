@@ -755,9 +755,12 @@ protected:
 		{
 			unsigned n = 0;
 			int cell = -1;
-			if (std::sscanf(value, "%u %d", &n, &cell) == 2 && cell >= 0 && cell < int(kLcdColumns * 2))
+			char what[8] = {};
+			const int got = std::sscanf(value, "%u %d %7s", &n, &cell, what);
+			if (got >= 2 && cell >= 0 && cell < int(kLcdColumns * 2))
 			{
-				m_gotoCell.store(cell);
+				// "enter": a double click, ENTER once the field is selected.
+				m_gotoCell.store(got == 3 && std::strcmp(what, "enter") == 0 ? cell | kGotoEnter : cell);
 				m_gotoSeq.fetch_add(1);
 			}
 			return;
@@ -906,6 +909,8 @@ private:
 	static constexpr uint32_t kKeyMaxQueued = 16;
 	// trackSelection: pieces of one blink closer than this are one field
 	static constexpr uint32_t kSelPieceFrames = kCoreSampleRate / 10;      // 100 ms
+	// m_gotoCell: the click was a double click, ENTER when the field is reached
+	static constexpr int kGotoEnter = 0x100;
 
 	void setupRate(double rate)
 	{
@@ -1091,7 +1096,10 @@ private:
 
 	void startGoto(int cell, const PanelState &st)
 	{
+		const bool enter = (cell & kGotoEnter) != 0;
+		cell &= ~kGotoEnter;
 		m_gotoTarget = -1;
+		m_gotoEnter = false;
 		m_gotoTurn = -1;
 		m_gotoKey = -1;
 		m_gotoPresses = 0;
@@ -1118,6 +1126,7 @@ private:
 			if (col < 4 || (col - 4) % 3 == 2)
 				return;                             // a separator
 			m_gotoMain = true;
+			m_gotoEnter = enter;
 			m_gotoTarget = cols + 5 + 3 * ((col - 4) / 3);
 			return;
 		}
@@ -1140,11 +1149,16 @@ private:
 		// Else a field: anything but blank cells and separators.  The selected field may be
 		// blank just now, in its blink; on a name page every character is one.
 		if (m_selLo >= 0 && cell >= m_selLo && cell <= m_selHi)
+		{
+			if (enter)
+				m_keySeq[5].fetch_add(1);      // a double click on it: ENTER
 			return;
+		}
 		const uint8_t ch = st.lcd[cell];
 		if ((ch == ' ' && m_hwCursor < 0) || ch < 0x10 || ch == '|')
 			return;
 		m_gotoMain = false;
+		m_gotoEnter = enter;
 		m_gotoTarget = cell;
 	}
 
@@ -1184,6 +1198,11 @@ private:
 		constexpr uint32_t kFirstWait = kCoreSampleRate * 3 / 2;  // a blink comes once a second
 		constexpr uint32_t kMoveWait = kCoreSampleRate * 4 / 5;
 		const auto done = [&]() { m_gotoTarget = -1; };
+		const auto arrived = [&]() {
+			if (m_gotoEnter)
+				m_keySeq[5].fetch_add(1);          // a double click: ENTER, once there
+			done();
+		};
 
 		if (m_gotoMain)
 		{
@@ -1200,7 +1219,9 @@ private:
 					done();
 				return;
 			}
-			if (cur == m_gotoTarget || m_gotoPresses >= 12)
+			if (cur == m_gotoTarget)
+				return arrived();
+			if (m_gotoPresses >= 12)
 				return done();
 			if (cur == m_gotoLastPos)
 			{
@@ -1248,7 +1269,7 @@ private:
 			return;
 		}
 		if (m_gotoTarget >= lo && m_gotoTarget <= hi)
-			return done();
+			return arrived();
 		if (lo == m_gotoLastPos)
 		{
 			if (m_gotoWait > kMoveWait)
@@ -2015,6 +2036,7 @@ private:
 	int m_gotoTarget = -1;                      // the cell clicked, -1 = nothing to do
 	bool m_gotoMain = false;                    // on the main page: PART/INST to a part
 	int m_gotoTurn = -1;                        // an arrow: the CURSOR key turning the page
+	bool m_gotoEnter = false;                   // a double click: ENTER once there
 	int m_gotoKey = -1, m_gotoPresses = 0, m_gotoLastPos = -1;
 	uint32_t m_gotoWait = 0, m_gotoPage = 0;
 	uint8_t m_selLcd[kLcdColumns * 2] = {}, m_selShadow[kLcdColumns * 2] = {};
