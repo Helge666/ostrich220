@@ -67,7 +67,8 @@ the page; any key you press yourself stops it.
 
 A click on the arrows ◀ ▶ at the ends of the second row turns the page of parameters that
 way. A click on the first row, the page's title (such as `Edit/Timbre[2]/Level`), presses
-EXIT and goes one level up.
+EXIT and goes one level up. A double click on a field selects it and presses ENTER, so
+a double click on a menu entry opens it.
 
 ## Download
 

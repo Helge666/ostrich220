@@ -47,7 +47,8 @@ devices use nothing of the plugin, so they can go back to MAME.
   It stops when the selection no longer moves, would go past the cell, or the page changes
   (then one press back); a key of the user's stops it at once. The arrow glyphs at the ends
   of the second row press CURSOR until the page changes; the first row (a title, except on
-  the main page) presses EXIT.
+  the main page) presses EXIT. A double click (the same cell again within 500 ms) sends
+  `<n> <cell> enter`: ENTER once the selection stands on the field, never before.
 - The panel talks to the DSP by state messages: keys (`key`), card slots, SysEx files
   (`sysex`), a picked ROM file (`romfile`); the DSP sends the display (`panel`), the status
   line (`status`), the card slots' contents (`cardinfo`) and which ROM images it has
