@@ -674,29 +674,30 @@ private:
 		barButton(kHwEq, "HW-EQ", m_hwEq);
 	}
 
-	// MIDI MESSAGE, top right as on the unit (there above POWER): green while MIDI comes in.
+	// MIDI MESSAGE: green while MIDI comes in.  Narrow, as the unit's; under VOLUME, since
+	// the panel has no POWER switch for it to sit above.
 	void drawMidiLamp()
 	{
 		const bool lit = (m_panel.flags & 2) != 0;
-		const float cx = kSlotX + kSlotW - 6, cy = 40;
+		const float cx = kKnob.x + kKnob.w / 2, cy = 204, w = 18, h = 5;
 		if (lit)
 		{
 			beginPath();
-			circle(cx, cy, 9);
-			fillPaint(radialGradient(cx, cy, 2, 9, Color(90, 255, 90, 120), Color(90, 255, 90, 0)));
+			rect(cx - w / 2 - 8, cy - h / 2 - 8, w + 16, h + 16);
+			fillPaint(boxGradient(cx - w / 2, cy - h / 2, w, h, 2, 8, Color(90, 255, 90, 110), Color(90, 255, 90, 0)));
 			fill();
 		}
 		beginPath();
-		circle(cx, cy, 4.5f);
+		roundedRect(cx - w / 2, cy - h / 2, w, h, 1.5f);
 		fillColor(lit ? Color(120, 255, 120) : Color(28, 58, 30));
 		fill();
 		strokeColor(Color(70, 70, 76));
 		strokeWidth(1);
 		stroke();
-		fontSize(10);
-		textAlign(ALIGN_RIGHT | ALIGN_MIDDLE);
-		fillColor(Color(220, 220, 220));
-		text(cx - 12, cy + 1, "MIDI MESSAGE", nullptr);
+		fontSize(9);
+		textAlign(ALIGN_CENTER | ALIGN_BASELINE);
+		fillColor(Color(170, 170, 170));
+		text(cx, cy + 20, "MIDI MESSAGE", nullptr);
 	}
 
 	void drawKnob()
