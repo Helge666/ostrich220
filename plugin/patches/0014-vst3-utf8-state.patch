@@ -150,7 +150,7 @@ index 461a7ec5..cad37f44 100644
  
  // --------------------------------------------------------------------------------------------------------------------
 diff --git a/distrho/src/DistrhoPluginVST3.cpp b/distrho/src/DistrhoPluginVST3.cpp
-index 0a5ca3cd..ee820ef0 100644
+index ee40e693..a8a50db6 100644
 --- a/distrho/src/DistrhoPluginVST3.cpp
 +++ b/distrho/src/DistrhoPluginVST3.cpp
 @@ -2447,17 +2447,19 @@ public:
@@ -191,34 +191,6 @@ index 0a5ca3cd..ee820ef0 100644
          std::free(key16);
          std::free(value16);
          return V3_OK;
-@@ -2490,8 +2494,8 @@ public:
- 
-         std::vector<int16_t> key16(static_cast<size_t>(keyLength + 1), 0);
-         std::vector<int16_t> value16(static_cast<size_t>(valueLength + 1), 0);
--        std::vector<char> key8(static_cast<size_t>(keyLength + 1), '\0');
--        std::vector<char> value8(static_cast<size_t>(valueLength + 1), '\0');
-+        std::vector<char> key8(static_cast<size_t>(keyLength) * 3 + 1, '\0');
-+        std::vector<char> value8(static_cast<size_t>(valueLength) * 3 + 1, '\0');
- 
-         res = v3_cpp_obj(attrs)->get_string(attrs, "key", key16.data(), sizeof(int16_t)*(keyLength+1));
-         DISTRHO_SAFE_ASSERT_INT2_RETURN(res == V3_OK, res, keyLength, res);
-@@ -2502,11 +2506,11 @@ public:
-             DISTRHO_SAFE_ASSERT_INT2_RETURN(res == V3_OK, res, valueLength, res);
-         }
- 
--        // the same cheap conversion as notify_state: state is ASCII
--        for (int64_t i=0; i<keyLength; ++i)
--            key8[i] = static_cast<char>(key16[i]);
--        for (int64_t i=0; i<valueLength; ++i)
--            value8[i] = static_cast<char>(value16[i]);
-+        // back to UTF-8, as in notify_state (patch 0014)
-+        key16.back() = 0;
-+        value16.back() = 0;
-+        strncpy_utf8(key8.data(), key16.data(), key8.size());
-+        strncpy_utf8(value8.data(), value16.data(), value8.size());
- 
-         key = key8.data();
-         value = value8.data();
 diff --git a/distrho/src/DistrhoUIVST3.cpp b/distrho/src/DistrhoUIVST3.cpp
 index 5f8f76cf..c02055ae 100644
 --- a/distrho/src/DistrhoUIVST3.cpp

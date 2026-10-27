@@ -1,5 +1,5 @@
 diff --git a/distrho/src/DistrhoPluginVST3.cpp b/distrho/src/DistrhoPluginVST3.cpp
-index 7295c892..ef01d46e 100644
+index 7295c892..5e82e5ce 100644
 --- a/distrho/src/DistrhoPluginVST3.cpp
 +++ b/distrho/src/DistrhoPluginVST3.cpp
 @@ -54,6 +54,8 @@
@@ -89,7 +89,7 @@ index 7295c892..ef01d46e 100644
              sendReadyToUI();
              return V3_OK;
          }
-@@ -2419,8 +2469,86 @@ public:
+@@ -2419,8 +2469,87 @@ public:
          std::free(value16);
          return V3_OK;
      }
@@ -111,8 +111,8 @@ index 7295c892..ef01d46e 100644
 +
 +        std::vector<int16_t> key16(static_cast<size_t>(keyLength + 1), 0);
 +        std::vector<int16_t> value16(static_cast<size_t>(valueLength + 1), 0);
-+        std::vector<char> key8(static_cast<size_t>(keyLength + 1), '\0');
-+        std::vector<char> value8(static_cast<size_t>(valueLength + 1), '\0');
++        std::vector<char> key8(static_cast<size_t>(keyLength) * 3 + 1, '\0');
++        std::vector<char> value8(static_cast<size_t>(valueLength) * 3 + 1, '\0');
 +
 +        res = v3_cpp_obj(attrs)->get_string(attrs, "key", key16.data(), sizeof(int16_t)*(keyLength+1));
 +        DISTRHO_SAFE_ASSERT_INT2_RETURN(res == V3_OK, res, keyLength, res);
@@ -123,11 +123,12 @@ index 7295c892..ef01d46e 100644
 +            DISTRHO_SAFE_ASSERT_INT2_RETURN(res == V3_OK, res, valueLength, res);
 +        }
 +
-+        // the same cheap conversion as notify_state: state is ASCII
-+        for (int64_t i=0; i<keyLength; ++i)
-+            key8[i] = static_cast<char>(key16[i]);
-+        for (int64_t i=0; i<valueLength; ++i)
-+            value8[i] = static_cast<char>(value16[i]);
++        // back to UTF-8 (in full once patch 0014 is in); the lengths are the sender's UTF-8
++        // byte counts, and UTF-8 may be longer than the UTF-16 it came from
++        key16.back() = 0;
++        value16.back() = 0;
++        strncpy_utf8(key8.data(), key16.data(), key8.size());
++        strncpy_utf8(value8.data(), value16.data(), value8.size());
 +
 +        key = key8.data();
 +        value = value8.data();
@@ -176,7 +177,7 @@ index 7295c892..ef01d46e 100644
     #if DISTRHO_PLUGIN_WANT_MIDI_INPUT
      v3_result notify_midi(v3_attribute_list** const attrs)
      {
-@@ -2473,6 +2601,16 @@ private:
+@@ -2473,6 +2602,16 @@ private:
     #if DISTRHO_PLUGIN_HAS_UI
      bool* fParameterValueChangesForUI; // basic offset + real
      bool fConnectedToUI;
@@ -193,7 +194,7 @@ index 7295c892..ef01d46e 100644
     #endif
     #if DISTRHO_PLUGIN_WANT_LATENCY
      uint32_t fLastKnownLatency;
-@@ -3060,6 +3198,34 @@ private:
+@@ -3060,6 +3199,34 @@ private:
      }
     #endif
  
