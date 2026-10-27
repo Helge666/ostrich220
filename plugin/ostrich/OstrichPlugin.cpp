@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <chrono>
+#include <cctype>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -237,6 +238,42 @@ std::vector<uint8_t> readCardFile(const fs::path &p)
 	if (pick == nullptr || !zip::extract(p, *pick, d))
 		d.clear();
 	return d;
+}
+
+/// Card dumps also go round with address lines A8-A15 in reverse order against MAME's:
+/// every card of MAME's list turned up that way too, byte for byte the same once the lines
+/// were put back.  This puts them back; it is its own inverse.  Sizes not a multiple of
+/// 64 KB come back as they are.
+std::vector<uint8_t> reverseA8toA15(const std::vector<uint8_t> &d)
+{
+	if (d.size() % 0x10000 != 0)
+		return d;
+	std::vector<uint8_t> out(d.size());
+	for (size_t x = 0; x < d.size(); x ++)
+	{
+		unsigned mid = unsigned(x >> 8) & 0xff, rev = 0;
+		for (int b = 0; b < 8; b ++)
+			rev |= ((mid >> b) & 1u) << (7 - b);
+		out[(x & ~size_t(0xff00)) | (size_t(rev) << 8)] = d[x];
+	}
+	return out;
+}
+
+/// How many of the first eight tone records in a prepared card carry a readable name
+/// (0x1000 + 0x50*n, analysis/ROM-ANALYSIS.md 6.6).  In the wrong address order nearly
+/// none do: that tells the two orders apart for a dump that is not a known one.
+int readableTones(const std::vector<uint8_t> &img)
+{
+	int n = 0;
+	for (size_t r = 0; r < 8 && 0x1000 + 0x50 * r + 10 <= img.size(); r ++)
+	{
+		const uint8_t *name = img.data() + 0x1000 + 0x50 * r;
+		bool ok = std::isalnum(name[0]) != 0;
+		for (int i = 0; i < 10; i ++)
+			ok = ok && name[i] >= 0x20 && name[i] < 0x7f;
+		n += ok ? 1 : 0;
+	}
+	return n;
 }
 
 /// Whether a file name is a factory dump's, "U220Factory*.syx" in any case.
@@ -1132,7 +1169,7 @@ private:
 		{
 			const fs::path p = fs::u8path(path);
 			const std::string name = pstr(p.filename());
-			const std::vector<uint8_t> raw = readCardFile(p);
+			std::vector<uint8_t> raw = readCardFile(p);
 			std::error_code ec;
 			if (raw.empty() && !fs::exists(p, ec))
 				info = std::string("err") + kCardInfoFieldSep + "File not found" + kCardInfoFieldSep + name;
@@ -1143,6 +1180,29 @@ private:
 			}
 			else
 			{
+				// The address order: MAME's, or A8-A15 reversed.  A known dump says by its
+				// hash; any other by which order gives its tones readable names.
+				auto known = [](const std::vector<uint8_t> &d) {
+					const std::string h = sha1(d);
+					for (const KnownCard &k : kKnownCards)
+						if (h == k.sha1)
+							return &k;
+					return static_cast<const KnownCard *>(nullptr);
+				};
+				const KnownCard *card = known(raw);
+				if (card == nullptr)
+				{
+					std::vector<uint8_t> other = reverseA8toA15(raw), otherPrepared;
+					const KnownCard *otherCard = known(other);
+					if (U220Core::prepareCard(other.data(), other.size(), otherPrepared) == LoadResult::Ok
+						&& (otherCard != nullptr || readableTones(otherPrepared) > readableTones(prepared)))
+					{
+						raw.swap(other);
+						prepared.swap(otherPrepared);
+						card = otherCard;
+					}
+				}
+
 				// The header is plain text in a dump: "RolandU-110 N", the card's name at
 				// 0x10, its ID at 0x20 -- what the firmware reads, through its tables.
 				std::string title(reinterpret_cast<const char *>(raw.data()) + 0x10, 16);
@@ -1150,11 +1210,9 @@ private:
 					title.pop_back();
 				const char *sub = raw.size() > 0x20 ? cardTitle(raw[0x20]) : nullptr;
 				info = std::string("ok") + kCardInfoFieldSep + title + kCardInfoFieldSep + (sub ? sub : name.c_str());
-				// A known dump: its card's number, checked.
-				const std::string h = sha1(raw);
-				for (const KnownCard &k : kKnownCards)
-					if (h == k.sha1)
-						info = std::string("ok") + kCardInfoFieldSep + k.id + " \xe2\x9c\x93" + kCardInfoFieldSep + k.title;
+				// A known dump: its card's number and name.
+				if (card != nullptr)
+					info = std::string("ok") + kCardInfoFieldSep + card->id + kCardInfoFieldSep + card->title;
 			}
 		}
 
