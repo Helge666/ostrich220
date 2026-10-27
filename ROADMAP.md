@@ -36,6 +36,9 @@ Done and checked against a real U-220 (details in [analysis/](analysis/README-AN
 - [x] Release 0.1.2 (27.10.2026): ROMs and cards from zips, known card dumps recognised,
       MIDI MESSAGE lamp, computer keyboard and mouse wheel; Memory Initialize without a
       factory dump; files from the panel written once under VST3.
+- [x] Release 0.1.3 (27.10.2026): card dumps with address lines A8–A15 reversed are put
+      back in order; known cards show their name again; the card and SysEx dialogs start in
+      the folder last picked from.
 - [x] The repository is public (26.10.2026).
 
 Not before the release, and only after checking each project's policy on LLM-written
