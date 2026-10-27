@@ -37,39 +37,6 @@ and Linux; see [Download](#download) below).
 Formats: VST3, CLAP and a standalone program on Windows (64-bit); VST3, CLAP and a JACK
 standalone on Linux. No macOS build.
 
-## Keyboard and mouse
-
-The panel's keys can be clicked, or played from the computer keyboard once the Ostrich
-panel has the focus: click into the panel itself first (a click on the DAW's frame or
-toolbar around it is not enough; until then the keys belong to the DAW):
-
-| Computer key | U-220 key |
-|---|---|
-| ← → | CURSOR ◀ ▶ |
-| Shift + ← → | PART/INST ◀◀ ▶▶ |
-| ↑ ↓ | VALUE ▲ ▼ |
-| Enter | ENTER |
-| Esc | EXIT |
-| E, D, M, J | EDIT, DATA, MARK, JUMP |
-
-A key held down is held on the unit too, so the firmware repeats as the unit does. Keys
-with Ctrl, Alt or the Windows key are left to the DAW.
-
-The mouse wheel over the display presses VALUE ▲ ▼, one press a notch: on the main page
-that steps through the patches. The wheel over VOLUME turns it.
-
-A click on a field in the display selects it: the plugin presses CURSOR ◀ ▶ for you until
-the unit's own selection (the blinking field, or the cursor on a name page) stands on it.
-On the main page a click on a part's column selects that part (PART/INST), and a click on
-the row's name (RX, OUT, EFT, PAN, RSV) shows the next row. Then turn the wheel to change
-the value. A click on a label or between fields goes to the nearest field without leaving
-the page; any key you press yourself stops it.
-
-A click on the arrows ◀ ▶ at the ends of the second row turns the page of parameters that
-way. A click on the first row, the page's title (such as `Edit/Timbre[2]/Level`), presses
-EXIT and goes one level up. A double click on a field selects it and presses ENTER, so
-a double click on a menu entry opens it.
-
 ## Download
 
 **[Download the latest version](https://github.com/Helge666/ostrich220/releases/latest)** —
@@ -107,6 +74,36 @@ they were looked for. Folders searched, in this order, for "Ostrich 220" and the
 "Ostrich": `%PROGRAMDATA%\…\roms`, `%LOCALAPPDATA%\…\roms`, `Documents\…\roms`; on Linux
 `$XDG_DATA_HOME/…/roms`, `~/.local/share/…/roms`, `/usr/share/…/roms`. The environment
 variable `OSTRICH_ROMS` names a folder searched first.
+
+## Keyboard and mouse shortcuts (optional)
+
+The plugin is played like the unit: click its keys. Everything below is a shortcut and
+only presses those keys for you; nothing of it is needed.
+
+**Computer keyboard.** Click into the panel itself first (a click on the DAW's frame or
+toolbar around it is not enough; until then the keys belong to the DAW):
+
+| Computer key | U-220 key |
+|---|---|
+| ← → | CURSOR ◀ ▶ |
+| Shift + ← → | PART/INST ◀◀ ▶▶ |
+| ↑ ↓ | VALUE ▲ ▼ |
+| Enter | ENTER |
+| Esc | EXIT |
+| E, D, M, J | EDIT, DATA, MARK, JUMP |
+
+A key held down is held on the unit too, so the firmware repeats as the unit does. Keys
+with Ctrl, Alt or the Windows key are left to the DAW.
+
+**Mouse wheel** over the display: VALUE ▲ ▼ (on the main page, the patches). Over VOLUME:
+the volume.
+
+**Clicks in the display** press the keys you would press to get there:
+
+- a field: CURSOR until it is selected (on the main page, a part's column: PART/INST);
+- the arrows ◀ ▶ at the row's ends: the next or previous page;
+- the title in the first row: EXIT, one level up;
+- a double click on a field: select it, then ENTER (opens a menu entry).
 
 ## The effects are an approximation
 
