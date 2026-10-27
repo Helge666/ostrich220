@@ -58,6 +58,13 @@ with Ctrl, Alt or the Windows key are left to the DAW.
 The mouse wheel over the display presses VALUE ▲ ▼, one press a notch: on the main page
 that steps through the patches. The wheel over VOLUME turns it.
 
+A click on a field in the display selects it: the plugin presses CURSOR ◀ ▶ for you until
+the unit's own selection (the blinking field, or the cursor on a name page) stands on it.
+On the main page a click on a part's column selects that part (PART/INST), and a click on
+the row's name (RX, OUT, EFT, PAN, RSV) shows the next row. Then turn the wheel to change
+the value. A click on a label or between fields goes to the nearest field without leaving
+the page; any key you press yourself stops it.
+
 ## Download
 
 **[Download the latest version](https://github.com/Helge666/ostrich220/releases/latest)** —

@@ -154,6 +154,22 @@ Jump Page); `Util` = ROM Play / MIDI Monitor. Menus remember their last choice.
 Twelve keys, a green MIDI LED, VOLUME, PHONES, two PCM card slots, the backlit 24×2 LCD. The
 firmware marks the selected part with the controller's underline cursor.
 
+How the firmware shows what is selected (u220_render with factory data, 27.10.2026):
+
+- Menus and parameter pages: the selected field blinks by being written blank for ~0.3 s
+  a second. After a CURSOR press the new field goes blank at once (within ~60 ms) and the old
+  one comes back. The firmware writes a field a few characters per display update, so one
+  blink takes two or three updates. Fields are separated by the controller's own glyphs
+  (codes below 0x10) or by blanks, as in `Prm1=` `Off` `Timbre Level`. CURSOR stops at a
+  menu's ends; on parameter pages it goes on to the next or previous page past the last
+  field. Neither VALUE nor PART/INST moves the selection.
+- Main page: the second row is one of five views (RX, OUT, EFT, PAN, RSV) that CURSOR pages
+  through, without wrapping round. The first PART/INST press selects part 1 (first row
+  `T-001:`). Each press moves the underline by one part (row 2 columns 5, 8, … 20, and 23
+  for the rhythm part, `R-1:`). The underline stays until the page is left.
+- Name pages (`Patch Name=`): the underline marks the character, shown for ~150 ms after
+  each press; CURSOR moves it one character.
+
 The MIDI LED ("MIDI MESSAGE", above POWER) is not the firmware's: traced while notes came in
 (27.10.2026), the firmware writes nothing that follows MIDI IN, neither IC12's register at
 `0x1001` (never changes after boot) nor any window bank it has no other use for (only bank

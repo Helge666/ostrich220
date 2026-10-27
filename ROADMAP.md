@@ -19,7 +19,8 @@ Done and checked against a real U-220 (details in [analysis/](analysis/README-AN
 - **Plugin** (VST3, CLAP, standalone; Windows and Linux), tested in Cubase 15: panel with
   display and keys, factory data on first start, session state, MIX/DIRECT outputs, two
   card slots (known dumps recognised, zips too), SysEx files, MIDI out, MIDI MESSAGE lamp,
-  computer keyboard and mouse wheel for the panel keys, guided ROM setup in the panel
+  computer keyboard and mouse wheel for the panel keys, a click on a display field selects
+  it, guided ROM setup in the panel
   (loose files or zips). SN-MV30 cards untested.
 
 ## Before the first public release (0.1)
@@ -54,7 +55,7 @@ Priorities as agreed on 27.10.2026.
 
 | What | Notes |
 |---|---|
-| Editing in the display | the keyboard and the wheel over the display are in (stage 1). Stage 2: click a field and the cursor goes there -- CURSOR presses until the firmware's cursor stands on it; on the main page a click on a part's column selects it with PART/INST. Simplifies the workflow a lot. |
+| Editing in the display | stage 1 (keyboard, wheel over the display) and stage 2 (a click on a field selects it: CURSOR, or PART/INST on the main page, until the firmware's selection stands on it) are in; stage 2 waits for the test in Cubase. |
 
 ### Nice to have
 
