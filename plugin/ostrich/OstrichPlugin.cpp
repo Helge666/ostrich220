@@ -398,6 +398,7 @@ public:
 		: Plugin(kParamCount, 0, kStateCount)
 	{
 		for (auto &k : m_keySeq) k.store(0);
+		for (auto &f : m_keyFreeFrames) f = kKeyMaxWaitFrames;     // the first press goes at once
 		m_core.setEffects(&m_fx);
 		loadRoms();
 		setupRate(getSampleRate());
@@ -842,6 +843,12 @@ private:
 	static inline const bool s_debug = std::getenv("OSTRICH_DEBUG") != nullptr;
 	static constexpr double kPanelRefreshHz = 25.0;
 	static constexpr uint32_t kKeyHoldFrames = kCoreSampleRate / 8;    // 125 ms emulated
+	// tickKeys: between queued presses at least the gap, then the display still for the
+	// settle time, or the longest wait.  At most this many presses wait.
+	static constexpr uint32_t kKeyGapFrames = kCoreSampleRate / 25;        // 40 ms
+	static constexpr uint32_t kKeySettleFrames = kCoreSampleRate * 3 / 25; // 120 ms
+	static constexpr uint32_t kKeyMaxWaitFrames = kCoreSampleRate * 3 / 5; // 600 ms
+	static constexpr uint32_t kKeyMaxQueued = 16;
 
 	void setupRate(double rate)
 	{
@@ -858,14 +865,38 @@ private:
 		setLatency(m_dac[0].latency());
 	}
 
+	// Presses queue up (the wheel over the display, a fast hand on the keyboard), and each
+	// is played as a press of its own.  The next waits for the firmware: after a patch change
+	// it takes ~0.4 s before it reads the keys again, in a menu much less, so the cue is the
+	// display having stood still a moment, not a fixed time (measured with u220_render:
+	// ten VALUE presses 125 ms long arrive all only 300 ms apart).
 	void tickKeys(uint32_t coreFrames)
 	{
+		char r0[kLcdColumns + 1], r1[kLcdColumns + 1];
+		m_core.lcdText(r0, r1);
+		if (std::memcmp(r0, m_keyLcd, kLcdColumns) != 0 || std::memcmp(r1, m_keyLcd + kLcdColumns, kLcdColumns) != 0)
+		{
+			std::memcpy(m_keyLcd, r0, kLcdColumns);
+			std::memcpy(m_keyLcd + kLcdColumns, r1, kLcdColumns);
+			m_lcdStillFrames = 0;
+		}
+		else if (m_lcdStillFrames < kKeySettleFrames)
+			m_lcdStillFrames += coreFrames;
+
 		for (unsigned k = 0; k < kNumKeys; k ++)
 		{
 			const uint32_t seq = m_keySeq[k].load();
+			if (!m_keyHeld[k] && m_keyFreeFrames[k] < kKeyMaxWaitFrames)
+				m_keyFreeFrames[k] += coreFrames;
 			if (!m_keyHeld[k] && seq != m_keySeen[k])
 			{
-				m_keySeen[k] = seq;
+				const bool settled = m_keyFreeFrames[k] >= kKeyGapFrames
+					&& (m_lcdStillFrames >= kKeySettleFrames || m_keyFreeFrames[k] >= kKeyMaxWaitFrames);
+				if (!settled)
+					continue;
+				if (seq - m_keySeen[k] > kKeyMaxQueued)
+					m_keySeen[k] = seq - kKeyMaxQueued;     // a spun wheel: not minutes of it
+				m_keySeen[k] ++;
 				m_keyHeld[k] = true;
 				m_keyHeldFrames[k] = 0;
 				m_core.setButton(Button(kKeyBits[k]), true);
@@ -876,9 +907,11 @@ private:
 			if (m_keyHeld[k])
 			{
 				m_keyHeldFrames[k] += coreFrames;
-				if (!m_keyDown[k].load() && m_keyHeldFrames[k] >= kKeyHoldFrames)
+				// Held while the key is down, or the press is not over, or more are queued.
+				if ((!m_keyDown[k].load() || m_keySeq[k].load() != m_keySeen[k]) && m_keyHeldFrames[k] >= kKeyHoldFrames)
 				{
 					m_keyHeld[k] = false;
+					m_keyFreeFrames[k] = 0;
 					m_core.setButton(Button(kKeyBits[k]), false);
 					if (s_debug)
 					{
@@ -1621,6 +1654,9 @@ private:
 	uint32_t m_keySeen[kNumKeys] = {};
 	bool m_keyHeld[kNumKeys] = {};
 	uint32_t m_keyHeldFrames[kNumKeys] = {};
+	uint32_t m_keyFreeFrames[kNumKeys] = {};    // since the key's last release
+	char m_keyLcd[kLcdColumns * 2] = {};        // tickKeys: the display, to see it settle
+	uint32_t m_lcdStillFrames = 0;
 
 	uint32_t m_publishPeriod = 1920, m_publishAccum = 0, m_publishesSame = 0;
 	PanelBlob m_lastBlob {};

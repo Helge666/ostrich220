@@ -35,6 +35,26 @@ and Linux; see [Download](#download) below).
 Formats: VST3, CLAP and a standalone program on Windows (64-bit); VST3, CLAP and a JACK
 standalone on Linux. No macOS build.
 
+## Keyboard and mouse
+
+The panel's keys can be clicked, or played from the computer keyboard once the Ostrich
+window has the focus (click into it first; until then the keys belong to the DAW):
+
+| Computer key | U-220 key |
+|---|---|
+| ← → | CURSOR ◀ ▶ |
+| Shift + ← → | PART/INST ◀◀ ▶▶ |
+| ↑ ↓ | VALUE ▲ ▼ |
+| Enter | ENTER |
+| Esc | EXIT |
+| E, D, M, J | EDIT, DATA, MARK, JUMP |
+
+A key held down is held on the unit too, so the firmware repeats as the unit does. Keys
+with Ctrl, Alt or the Windows key are left to the DAW.
+
+The mouse wheel over the display presses VALUE ▲ ▼, one press a notch: on the main page
+that steps through the patches. The wheel over VOLUME turns it.
+
 ## Download
 
 **[Download the latest version](https://github.com/Helge666/ostrich220/releases/latest)** —

@@ -264,6 +264,7 @@ protected:
 
 		if (ev.press)
 		{
+			getWindow().focus();                // for the computer keyboard (onKeyboard)
 			if (romSetup())
 			{
 				bool hit = kRomChoose.contains(x, y);
@@ -366,10 +367,74 @@ protected:
 		return true;
 	}
 
+	// The computer keyboard plays the panel keys (README.md has the table): arrows CURSOR,
+	// with Shift PART/INST, up/down VALUE, Enter ENTER, Esc EXIT, E D M J.  Held as long as
+	// the key is; the system's auto-repeat is not passed on -- the firmware repeats itself.
+	// Keys with Ctrl, Alt or the Windows key stay the host's.
+	bool onKeyboard(const KeyboardEvent &ev) override
+	{
+		if (ev.mod & (kModifierControl | kModifierAlt | kModifierSuper))
+			return false;
+		if (!ev.press)
+		{
+			for (unsigned k = 0; k < kNumKeys; k ++)
+				if (m_kbdHeld[k] == ev.key)
+				{
+					m_kbdHeld[k] = 0;
+					m_keyLit[k] = false;
+					sendKey(k, false);
+					repaint();
+					return true;
+				}
+			return false;
+		}
+		const bool shift = (ev.mod & kModifierShift) != 0;
+		int k = -1;
+		switch (ev.key)
+		{
+		case 'e': k = 0; break;                         // EDIT
+		case 'd': k = 1; break;                         // DATA
+		case 'm': k = 2; break;                         // MARK
+		case 'j': k = 3; break;                         // JUMP
+		case kKeyEscape: k = 4; break;                  // EXIT
+		case kKeyEnter: case kKeyPadEnter: k = 5; break;
+		// The keypad's arrows (NumLock off) as well.
+		case kKeyLeft:  case kKeyPadLeft:  k = shift ? 6 : 8; break;   // PART/INST <<, CURSOR <
+		case kKeyRight: case kKeyPadRight: k = shift ? 7 : 9; break;   // PART/INST >>, CURSOR >
+		case kKeyDown:  case kKeyPadDown:  k = 10; break;              // VALUE -
+		case kKeyUp:    case kKeyPadUp:    k = 11; break;              // VALUE +
+		default: return false;
+		}
+		if (m_kbdHeld[k] == ev.key)
+			return true;                                // auto-repeat
+		m_kbdHeld[k] = ev.key;
+		m_keyLit[k] = true;
+		sendKey(uint32_t(k), true);
+		repaint();
+		return true;
+	}
+
 	bool onScroll(const ScrollEvent &ev) override
 	{
 		const float s = mouseScale();
-		if (!kKnob.contains(float(ev.pos.getX()) / s, float(ev.pos.getY()) / s))
+		const float x = float(ev.pos.getX()) / s, y = float(ev.pos.getY()) / s;
+		if (!romSetup() && kLcd.contains(x, y))
+		{
+			// The wheel over the display: VALUE, one press a notch (the plugin queues them).
+			m_wheel += float(ev.delta.getY());
+			for (; m_wheel >= 1.0f; m_wheel -= 1.0f)
+			{
+				sendKey(11, true);
+				sendKey(11, false);
+			}
+			for (; m_wheel <= -1.0f; m_wheel += 1.0f)
+			{
+				sendKey(10, true);
+				sendKey(10, false);
+			}
+			return true;
+		}
+		if (!kKnob.contains(x, y))
 			return false;
 		const float db = std::fmax(-40.0f, std::fmin(12.0f, m_volumeDb + float(ev.delta.getY())));
 		m_volumeDb = db;
@@ -975,6 +1040,8 @@ private:
 	float m_volumeDb = 0.0f;
 	bool m_hwEq = true;
 	bool m_keyLit[kNumKeys] = {};
+	uint m_kbdHeld[kNumKeys] = {};              // onKeyboard: the computer key holding each
+	float m_wheel = 0.0f;                       // onScroll over the display, part notches
 	int m_pressed = -1;
 	bool m_dragKnob = false;
 	float m_dragY = 0, m_dragStartDb = 0;

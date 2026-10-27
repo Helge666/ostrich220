@@ -35,6 +35,10 @@ devices use nothing of the plugin, so they can go back to MAME.
 - Parameters: Volume, the twelve panel keys (automatable), HW-EQ, "Direct outs".
 - State saved with the session: the battery RAM (`nvram`), the panel size (`uisize`), the
   card files' paths (`card1`, `card2`).
+- Panel keys, from a click, the computer keyboard or the wheel over the display, queue up
+  in the DSP and are played one press at a time; the next waits until the display has
+  stood still for 120 ms (at most 600 ms), since the firmware reads no keys while it
+  changes a patch (~0.4 s).
 - The panel talks to the DSP by state messages: keys (`key`), card slots, SysEx files
   (`sysex`), a picked ROM file (`romfile`); the DSP sends the display (`panel`), the status
   line (`status`), the card slots' contents (`cardinfo`) and which ROM images it has
