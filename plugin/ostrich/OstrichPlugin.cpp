@@ -1092,6 +1092,7 @@ private:
 	void startGoto(int cell, const PanelState &st)
 	{
 		m_gotoTarget = -1;
+		m_gotoTurn = -1;
 		m_gotoKey = -1;
 		m_gotoPresses = 0;
 		m_gotoWait = 0;
@@ -1120,8 +1121,24 @@ private:
 			m_gotoTarget = cols + 5 + 3 * ((col - 4) / 3);
 			return;
 		}
-		// Elsewhere a field: anything but blank cells and separators.  The selected field
-		// may be blank just now, in its blink; on a name page every character is one.
+		// Elsewhere the first row is the page's title: EXIT, one level up, as on the unit.
+		if (cell < cols)
+		{
+			m_keySeq[4].fetch_add(1);
+			return;
+		}
+		// The arrows at the ends of the second row (the controller's glyphs) say that more
+		// pages lie that way: turn the page, CURSOR until it changes.
+		const bool glyph = st.lcd[cell] < 0x10;
+		if (glyph && (cell == cols || cell == 2 * cols - 1))
+		{
+			m_gotoMain = false;
+			m_gotoTurn = cell == cols ? 8 : 9;
+			m_gotoTarget = cell;
+			return;
+		}
+		// Else a field: anything but blank cells and separators.  The selected field may be
+		// blank just now, in its blink; on a name page every character is one.
 		if (m_selLo >= 0 && cell >= m_selLo && cell <= m_selHi)
 			return;
 		const uint8_t ch = st.lcd[cell];
@@ -1193,6 +1210,22 @@ private:
 			}
 			m_gotoLastPos = cur;
 			return gotoPress(cur < m_gotoTarget ? 7 : 6);
+		}
+
+		if (m_gotoTurn >= 0)
+		{
+			// Turning the page: CURSOR, each press once the last has moved the selection on,
+			// until the page changes.
+			if (m_pageStamp != m_gotoPage || m_gotoPresses >= 12)
+				return done();
+			if (m_gotoPresses > 0 && (m_selLo < 0 || m_selLo == m_gotoLastPos || m_selAge <= kSelPieceFrames))
+			{
+				if (m_gotoWait > kMoveWait)
+					done();                         // nothing more that way
+				return;
+			}
+			m_gotoLastPos = m_selLo;
+			return gotoPress(m_gotoTurn);
 		}
 
 		if (m_pageStamp != m_gotoPage)
@@ -1981,6 +2014,7 @@ private:
 	uint32_t m_gotoSeen = 0;
 	int m_gotoTarget = -1;                      // the cell clicked, -1 = nothing to do
 	bool m_gotoMain = false;                    // on the main page: PART/INST to a part
+	int m_gotoTurn = -1;                        // an arrow: the CURSOR key turning the page
 	int m_gotoKey = -1, m_gotoPresses = 0, m_gotoLastPos = -1;
 	uint32_t m_gotoWait = 0, m_gotoPage = 0;
 	uint8_t m_selLcd[kLcdColumns * 2] = {}, m_selShadow[kLcdColumns * 2] = {};
