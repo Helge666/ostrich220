@@ -817,6 +817,24 @@ private:
 		setState("uisize", value);
 	}
 
+	// Cubase at 125 % tells a new view "scale 1.0" before it opens and sizes it for that,
+	// while its own window is made for 125 %: the view sat in a black margin right and below
+	// until reopened (the second time Cubase gives the right size).  A view below its least
+	// size at the desktop's scale is that; it asks the host for the least size, as a
+	// reopened view gets.  Once, after DPF's first idle (until then it drops the request).
+	void fitHostFrame()
+	{
+		if (std::chrono::steady_clock::now() - m_created < std::chrono::milliseconds(200))
+			return;
+		m_frameFitted = true;
+		bool keep = false;
+		const Size<uint> least = getWindow().getGeometryConstraints(keep);
+		const double scale = getWindow().getScaleFactor();
+		const uint lw = uint(std::lround(least.getWidth() * scale)), lh = uint(std::lround(least.getHeight() * scale));
+		if (getWindow().getWidth() + 2 < lw || getWindow().getHeight() + 2 < lh)
+			getWindow().setSize(lw, lh);
+	}
+
 	// Mouse events come in the window's own pixels.  The panel is drawn in design units
 	// scaled by getWidth() / kW on top of DGL's automatic scaling (the window is larger than
 	// the minimum size), so the full factor is the window width over the design width --
@@ -836,6 +854,8 @@ private:
 
 	void uiIdle() override
 	{
+		if (!m_frameFitted && std::chrono::steady_clock::now() - m_created < std::chrono::seconds(2))
+			fitHostFrame();
 		saveSizeWhenSettled();
 		if (m_panel.cursor_flags & 1)
 			repaint();
@@ -924,6 +944,7 @@ private:
 	std::string m_sizeSaved;                    // "<w> <h>" unscaled, as in the plugin state
 	uint m_sizeSeenW = 0, m_sizeSeenH = 0;
 	std::chrono::steady_clock::time_point m_sizeSeenSince {};
+	bool m_frameFitted = false;                 // fitHostFrame
 	float m_volumeDb = 0.0f;
 	bool m_hwEq = true;
 	bool m_keyLit[kNumKeys] = {};
