@@ -10,7 +10,11 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <filesystem>
 #include <string>
+#include <vector>
 
 START_NAMESPACE_DISTRHO
 
@@ -166,6 +170,7 @@ protected:
 		{
 			std::string path = filename;
 			m_syxDir = dirOf(path);
+			rememberFolder("sysex", m_syxDir);
 			if (what == kBrowseSyxSave)
 			{
 				const size_t dot = path.find_last_of('.'), cut = path.find_last_of("/\\");
@@ -177,6 +182,7 @@ protected:
 			return;
 		}
 		const unsigned s = unsigned(what);
+		rememberFolder("card", dirOf(filename));
 		m_cardPath[s] = filename;
 		setState(kCardStateKeys[s], filename);
 	}
@@ -292,7 +298,8 @@ protected:
 				opts.saving = save;
 				opts.defaultName = save ? "U-220 bulk dump.syx" : nullptr;
 				opts.title = save ? "Save a bulk dump of the whole machine (.syx)" : "Load SysEx into the machine (.syx)";
-				opts.startDir = m_syxDir.empty() ? nullptr : m_syxDir.c_str();
+				const std::string dir = m_syxDir.empty() ? lastFolder("sysex") : m_syxDir;
+				opts.startDir = dir.empty() ? nullptr : dir.c_str();
 				m_browseSlot = save ? kBrowseSyxSave : kBrowseSyxLoad;
 				if (!openFileBrowser(opts))
 					m_browseSlot = -1;
@@ -456,11 +463,12 @@ private:
 
 	void browseCard(unsigned s)
 	{
-		// Start where the slot's card came from, or where the other slot's did.
-		std::string dir;
+		// Start where the last card was picked from, in any instance or session; else where
+		// this slot's card came from, or the other slot's.
+		std::string dir = lastFolder("card");
 		for (const std::string &p : { m_cardPath[s], m_cardPath[s ^ 1] })
-			if (!(dir = dirOf(p)).empty())
-				break;
+			if (dir.empty())
+				dir = dirOf(p);
 		const std::string title = "Insert a PCM card into slot " + std::to_string(s + 1) + " (a card dump, or its MAME zip)";
 		FileBrowserOptions opts;
 		opts.title = title.c_str();
@@ -592,6 +600,87 @@ private:
 	{
 		const size_t cut = p.find_last_of("/\\");
 		return cut == std::string::npos ? std::string() : p.substr(0, cut);
+	}
+
+	// The folders last picked from, for every instance and the next session: lines of
+	// "<kind> <folder>" in %APPDATA%\Ostrich 220\folders.txt (~/.config/Ostrich 220/ on Linux).
+	static std::filesystem::path foldersFile()
+	{
+		namespace fs = std::filesystem;
+#ifdef _WIN32
+		const wchar_t *base = _wgetenv(L"APPDATA");
+		if (base == nullptr || *base == L'\0')
+			return {};
+		return fs::path(base) / L"Ostrich 220" / L"folders.txt";
+#else
+		if (const char *x = std::getenv("XDG_CONFIG_HOME"))
+			if (*x)
+				return fs::u8path(x) / "Ostrich 220" / "folders.txt";
+		const char *home = std::getenv("HOME");
+		if (home == nullptr || *home == '\0')
+			return {};
+		return fs::u8path(home) / ".config" / "Ostrich 220" / "folders.txt";
+#endif
+	}
+
+	static std::vector<std::string> readFolders()
+	{
+		std::vector<std::string> lines;
+		const auto p = foldersFile();
+		if (p.empty())
+			return lines;
+#ifdef _WIN32
+		FILE *f = _wfopen(p.c_str(), L"rb");
+#else
+		FILE *f = std::fopen(p.c_str(), "rb");
+#endif
+		if (f == nullptr)
+			return lines;
+		std::string line;
+		for (int c; (c = std::fgetc(f)) != EOF; )
+			if (c == '\n')
+			{
+				lines.push_back(line);
+				line.clear();
+			}
+			else if (c != '\r')
+				line += char(c);
+		if (!line.empty())
+			lines.push_back(line);
+		std::fclose(f);
+		return lines;
+	}
+
+	static std::string lastFolder(const std::string &kind)
+	{
+		for (const std::string &l : readFolders())
+			if (l.compare(0, kind.size() + 1, kind + " ") == 0)
+				return l.substr(kind.size() + 1);
+		return std::string();
+	}
+
+	static void rememberFolder(const std::string &kind, const std::string &dir)
+	{
+		const auto p = foldersFile();
+		if (p.empty() || dir.empty() || dir.find('\n') != std::string::npos)
+			return;
+		std::vector<std::string> lines;
+		for (const std::string &l : readFolders())
+			if (l.compare(0, kind.size() + 1, kind + " ") != 0)
+				lines.push_back(l);
+		lines.push_back(kind + " " + dir);
+		std::error_code ec;
+		std::filesystem::create_directories(p.parent_path(), ec);
+#ifdef _WIN32
+		FILE *f = _wfopen(p.c_str(), L"wb");
+#else
+		FILE *f = std::fopen(p.c_str(), "wb");
+#endif
+		if (f == nullptr)
+			return;
+		for (const std::string &l : lines)
+			std::fprintf(f, "%s\n", l.c_str());
+		std::fclose(f);
 	}
 
 	void drawSyxButtons()
