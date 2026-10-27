@@ -655,6 +655,12 @@ protected:
 			state.label = "ROM image file";
 			state.hints = kStateIsOnlyForDSP;
 			break;
+		case kStateGoto:
+			// "<n> <cell>": see tickGoto.
+			state.key = "lcdgoto";
+			state.label = "Display click";
+			state.hints = kStateIsOnlyForDSP;
+			break;
 		}
 		state.defaultValue = "";
 	}
@@ -745,6 +751,17 @@ protected:
 				requestRomFile(value);
 			return;
 		}
+		if (std::strcmp(key, "lcdgoto") == 0)
+		{
+			unsigned n = 0;
+			int cell = -1;
+			if (std::sscanf(value, "%u %d", &n, &cell) == 2 && cell >= 0 && cell < int(kLcdColumns * 2))
+			{
+				m_gotoCell.store(cell);
+				m_gotoSeq.fetch_add(1);
+			}
+			return;
+		}
 		if (std::strcmp(key, "nvram") != 0 || value[0] == '\0')
 			return;
 		std::vector<uint8_t> raw(std::strlen(value) / 2);
@@ -827,6 +844,7 @@ protected:
 
 		const uint32_t coreFrames = m_dac[0].inputsFor(frames);
 		tickKeys(coreFrames);
+		tickGoto(coreFrames);
 		tickCards(coreFrames);
 
 		for (uint32_t i = 0; i < midiEventCount; i ++)
@@ -959,6 +977,228 @@ private:
 				}
 			}
 		}
+	}
+
+	// ---- a click on the display -----------------------------------------------------------
+
+	// Which field the firmware has selected, from what the display shows.  In menus and on
+	// parameter pages it blanks the selected field for ~0.3 s a second, and blanks the new one
+	// at once after a CURSOR press (measured with u220_render); on the main page (PART/INST)
+	// and on name pages the controller's own cursor marks it.  A frame in which cells only
+	// go blank, or come back as they were, is a blink: those cells are the field.  Any other
+	// change is a new page or a new value: the selection is not known until the next blink.
+	void trackSelection(const PanelState &st)
+	{
+		constexpr int n = int(kLcdColumns * 2);
+		int lo = n, hi = -1, backLo = n, backHi = -1;
+		bool other = false;
+		for (int c = 0; c < n; c ++)
+		{
+			const uint8_t was = m_selLcd[c], now = st.lcd[c];
+			if (was == now)
+				continue;
+			if (now == ' ')
+			{
+				lo = std::min(lo, c);
+				hi = std::max(hi, c);
+			}
+			else if (was == ' ' && now == m_selShadow[c])
+			{
+				backLo = std::min(backLo, c);
+				backHi = std::max(backHi, c);
+			}
+			else
+				other = true;
+		}
+		if (other)
+		{
+			m_selLo = m_selHi = -1;
+			m_hwCursor = -1;
+			m_pageStamp ++;
+		}
+		else if (hi >= 0 && lo / int(kLcdColumns) == hi / int(kLcdColumns))
+		{
+			m_selLo = lo;
+			m_selHi = hi;
+		}
+		else if (hi < 0 && backHi >= 0 && backLo / int(kLcdColumns) == backHi / int(kLcdColumns))
+		{
+			m_selLo = backLo;
+			m_selHi = backHi;
+		}
+		for (int c = 0; c < n; c ++)
+		{
+			m_selLcd[c] = st.lcd[c];
+			if (st.lcd[c] != ' ')
+				m_selShadow[c] = st.lcd[c];
+		}
+		// The controller's cursor counts when it appears or moves: when the main page gives
+		// way to a menu it stays on a moment, where it was.
+		const bool on = st.cursor_flags != 0;
+		if (on && st.cursor_pos < n && (!m_cursorWasOn || st.cursor_pos != m_cursorWasAt))
+			m_hwCursor = st.cursor_pos;
+		m_cursorWasOn = on;
+		m_cursorWasAt = st.cursor_pos;
+	}
+
+	// The main page: its second row starts with one of the five views CURSOR pages through,
+	// then one of the controller's own glyphs.
+	static bool mainPage(const uint8_t *lcd)
+	{
+		static const char *const views[] = { "RX ", "OUT", "EFT", "PAN", "RSV" };
+		const uint8_t *row = lcd + kLcdColumns;
+		if (row[3] >= 0x10)
+			return false;
+		for (const char *v : views)
+			if (std::memcmp(row, v, 3) == 0)
+				return true;
+		return false;
+	}
+
+	void gotoPress(int k)
+	{
+		m_keySeq[k].fetch_add(1);           // m_keyDown stays false: tickKeys lets it go
+		m_gotoKey = k;
+		m_gotoPresses ++;
+		m_gotoWait = 0;
+	}
+
+	void startGoto(int cell, const PanelState &st)
+	{
+		m_gotoTarget = -1;
+		m_gotoKey = -1;
+		m_gotoPresses = 0;
+		m_gotoWait = 0;
+		m_gotoLastPos = -1;
+		m_gotoPage = m_pageStamp;
+		const int cols = int(kLcdColumns);
+		if (mainPage(st.lcd))
+		{
+			// The second row: a view's name pages on to the next view (back to the first
+			// after the last), a part's column selects that part.  The first row: nothing.
+			const int col = cell - cols;
+			if (col < 0)
+				return;
+			if (col < 3)
+			{
+				if (std::memcmp(st.lcd + cols, "RSV", 3) == 0)
+					for (int i = 0; i < 4; i ++)
+						m_keySeq[8].fetch_add(1);
+				else
+					m_keySeq[9].fetch_add(1);
+				return;
+			}
+			if (col < 4 || (col - 4) % 3 == 2)
+				return;                             // a separator
+			m_gotoMain = true;
+			m_gotoTarget = cols + 5 + 3 * ((col - 4) / 3);
+			return;
+		}
+		// Elsewhere a field: anything but blank cells and separators.  The selected field
+		// may be blank just now, in its blink; on a name page every character is one.
+		if (m_selLo >= 0 && cell >= m_selLo && cell <= m_selHi)
+			return;
+		const uint8_t ch = st.lcd[cell];
+		if ((ch == ' ' && m_hwCursor < 0) || ch < 0x10 || ch == '|')
+			return;
+		m_gotoMain = false;
+		m_gotoTarget = cell;
+	}
+
+	// A click on the display (state "lcdgoto"): press CURSOR, or PART/INST on the main page,
+	// until the firmware's selection stands on the field clicked.  A closed loop on what the
+	// display shows, one press at a time through the key queue; it gives up when the
+	// selection stops moving, would go past the field, or the page changes, and the user's
+	// own keys stop it at once.
+	void tickGoto(uint32_t coreFrames)
+	{
+		PanelState st;
+		m_core.snapshot(st);
+		trackSelection(st);
+
+		const uint32_t seq = m_gotoSeq.load();
+		if (seq != m_gotoSeen)
+		{
+			m_gotoSeen = seq;
+			startGoto(m_gotoCell.load(), st);
+		}
+		if (m_gotoTarget < 0)
+			return;
+		for (unsigned k = 0; k < kNumKeys; k ++)
+		{
+			if (m_keyDown[k].load())
+			{
+				m_gotoTarget = -1;
+				return;
+			}
+			if (m_keyHeld[k] || m_keySeq[k].load() != m_keySeen[k])
+			{
+				m_gotoWait = 0;
+				return;                             // wait for the presses on their way
+			}
+		}
+		m_gotoWait += coreFrames;
+		constexpr uint32_t kFirstWait = kCoreSampleRate * 3 / 2;  // a blink comes once a second
+		constexpr uint32_t kMoveWait = kCoreSampleRate * 4 / 5;
+		const auto done = [&]() { m_gotoTarget = -1; };
+
+		if (m_gotoMain)
+		{
+			// The underline stands still on the selected part, for as long as one is.
+			if (!mainPage(st.lcd))
+				return done();
+			const int cur = st.cursor_flags != 0 ? int(st.cursor_pos) : -1;
+			if (cur < 0)
+			{
+				// No part selected yet: the first PART/INST press selects one.
+				if (m_gotoPresses == 0)
+					return gotoPress(7);
+				if (m_gotoWait > kFirstWait)
+					done();
+				return;
+			}
+			if (cur == m_gotoTarget || m_gotoPresses >= 12)
+				return done();
+			if (cur == m_gotoLastPos)
+			{
+				if (m_gotoWait > kMoveWait)
+					done();                         // the last part: it does not move on
+				return;
+			}
+			m_gotoLastPos = cur;
+			return gotoPress(cur < m_gotoTarget ? 7 : 6);
+		}
+
+		if (m_pageStamp != m_gotoPage)
+		{
+			// CURSOR went past the page's last field onto the next page: the click was not
+			// on a field.  One press back, and stop.
+			if (m_gotoKey == 8 || m_gotoKey == 9)
+				m_keySeq[m_gotoKey == 8 ? 9 : 8].fetch_add(1);
+			return done();
+		}
+		int lo = m_selLo, hi = m_selHi;
+		if (m_hwCursor >= 0)
+			lo = hi = m_hwCursor;
+		if (lo < 0)
+		{
+			if (m_gotoWait > (m_gotoPresses == 0 ? kFirstWait : kMoveWait))
+				done();
+			return;
+		}
+		if (m_gotoTarget >= lo && m_gotoTarget <= hi)
+			return done();
+		if (lo == m_gotoLastPos)
+		{
+			if (m_gotoWait > kMoveWait)
+				done();                             // it does not move on: the end
+			return;
+		}
+		const int key = m_gotoTarget < lo ? 8 : 9;
+		if ((m_gotoKey >= 0 && key != m_gotoKey) || m_gotoPresses >= 24)
+			return done();                          // past it: the click was between fields
+		m_gotoLastPos = lo;
+		gotoPress(key);
 	}
 
 	// ---- SysEx files -------------------------------------------------------------------
@@ -1707,6 +1947,20 @@ private:
 	bool m_outputStage = true;
 	bool m_directOuts = true;
 
+	// tickGoto: a click on the display, and the field the firmware has selected
+	std::atomic<uint32_t> m_gotoSeq {0};
+	std::atomic<int> m_gotoCell {-1};
+	uint32_t m_gotoSeen = 0;
+	int m_gotoTarget = -1;                      // the cell clicked, -1 = nothing to do
+	bool m_gotoMain = false;                    // on the main page: PART/INST to a part
+	int m_gotoKey = -1, m_gotoPresses = 0, m_gotoLastPos = -1;
+	uint32_t m_gotoWait = 0, m_gotoPage = 0;
+	uint8_t m_selLcd[kLcdColumns * 2] = {}, m_selShadow[kLcdColumns * 2] = {};
+	int m_selLo = -1, m_selHi = -1;             // the field seen blinking, -1 = not known
+	int m_hwCursor = -1;                        // the controller's cursor, once shown on this page
+	bool m_cursorWasOn = false;
+	uint8_t m_cursorWasAt = 0xff;
+	uint32_t m_pageStamp = 0;                   // counts new pages and values
 	std::atomic<bool> m_keyDown[kNumKeys] {};
 	std::atomic<uint32_t> m_keySeq[kNumKeys];
 	uint32_t m_keySeen[kNumKeys] = {};

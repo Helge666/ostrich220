@@ -73,6 +73,7 @@ enum States : uint32_t
 	kStateSysex,                ///< UI -> DSP, "<n> save|load <path>": a .syx file
 	kStateRomSet,               ///< DSP -> UI: which ROM images were found, see romset below
 	kStateRomFile,              ///< UI -> DSP, "<n> <path>": a file to find ROM images by
+	kStateGoto,                 ///< UI -> DSP, "<n> <cell>": a click on the display, cell 0..47
 	kStateCount
 };
 

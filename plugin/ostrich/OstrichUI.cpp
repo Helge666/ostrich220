@@ -282,6 +282,20 @@ protected:
 					return true;
 				}
 			}
+			else if (kLcd.contains(x, y))
+			{
+				// A field in the display: the plugin presses CURSOR (PART/INST on the main
+				// page) until the firmware's selection stands on it (tickGoto).
+				const float cw = (kLcd.w - 2 * kLcdPadX) / 24.0f, ch = (kLcd.h - 2 * kLcdPadY) / 2.0f;
+				const int col = int(std::floor((x - kLcd.x - kLcdPadX) / cw));
+				const int row = int(std::floor((y - kLcd.y - kLcdPadY) / ch));
+				if (col >= 0 && col < 24 && row >= 0 && row < 2)
+				{
+					const std::string msg = std::to_string(++ m_gotoSeq) + " " + std::to_string(row * 24 + col);
+					setState("lcdgoto", msg.c_str());
+				}
+				return true;
+			}
 			else for (unsigned k = 0; k < kNumKeys; k ++)
 				if (kKeyRects[k].contains(x, y))
 				{
@@ -1131,6 +1145,7 @@ private:
 	bool m_keyLit[kNumKeys] = {};
 	uint m_kbdHeld[kNumKeys] = {};              // onKeyboard: the computer key holding each
 	float m_wheel = 0.0f;                       // onScroll over the display, part notches
+	unsigned m_gotoSeq = 0;                     // makes the same cell clicked twice two clicks
 	int m_pressed = -1;
 	bool m_dragKnob = false;
 	float m_dragY = 0, m_dragStartDb = 0;
