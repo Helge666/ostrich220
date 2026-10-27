@@ -409,7 +409,7 @@ private:
 		if (m_romChecking)
 			return;
 		FileBrowserOptions opts;
-		opts.title = "Pick a U-220 ROM image -- the others in its folder are found too";
+		opts.title = "Pick a U-220 ROM image or a zip -- the rest of its folder is searched too";
 		opts.startDir = m_romDir.empty() ? nullptr : m_romDir.c_str();
 		m_browseSlot = kBrowseRom;
 		if (!openFileBrowser(opts))
@@ -463,8 +463,8 @@ private:
 		fillColor(Color(190, 190, 194));
 		textBox(180, 114, 430,
 			"Ostrich 220 runs the U-220's own firmware and needs dumps of its ROM chips. "
-			"Click CHOOSE FILE and pick any one of the images: the others in the same folder "
-			"are found too, by their contents, whatever their names. They are copied to:", nullptr);
+			"Click CHOOSE FILE and pick any one of the images, or a zip such as MAME's u220.zip: "
+			"the rest of that folder is searched too, by contents, not names. They are copied to:", nullptr);
 		fillColor(Color(140, 140, 146));
 		text(180, 176, fit(m_romTarget, 430, 11).c_str(), nullptr);
 		textLineHeight(1.0f);

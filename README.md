@@ -53,14 +53,17 @@ for building it yourself.)
 
    ![The panel asking for the ROM images](docs/rom-setup.png)
 
-   Click **CHOOSE FILE** and pick any one of your U-220 ROM images. Ostrich 220 finds the
-   others in the same folder by their contents, whatever their names, copies them to
-   `C:\ProgramData\Ostrich 220\roms\` and starts. If some are in another folder, click
-   again and pick one of those. Which images you need: [roms/README.md](roms/README.md).
+   Click **CHOOSE FILE** and pick any one of your U-220 ROM images, or a zip with them
+   (MAME's `u220.zip` will do; zips beside it, such as `u110.zip`, are searched too).
+   Ostrich 220 finds the others in the same folder by their contents, whatever their
+   names, copies them to `C:\ProgramData\Ostrich 220\roms\` and starts. If some are in
+   another folder, click again and pick one of those. Which images you need:
+   [roms/README.md](roms/README.md).
 3. Optional: a U-220 factory SysEx dump whose name starts with `U220Factory` (`.syx`) in
-   the same folder comes along. A new instance then starts like a unit fresh from the
-   factory, with the 64 factory patches. Without it the memory starts empty ("Memory
-   Initialize").
+   the same folder (or zip) comes along. A new instance then starts like a unit fresh from
+   the factory, with the 64 factory patches. Without it a new instance runs Memory
+   Initialize, as a unit does that has lost its memory: playable, but with the firmware's
+   default settings instead of the factory patches.
 
 You can also copy the images to `C:\ProgramData\Ostrich 220\roms\` yourself. The status
 line under the panel says which ROMs were found and where, or which are missing and where

@@ -40,9 +40,11 @@ devices use nothing of the plugin, so they can go back to MAME.
   line (`status`), the card slots' contents (`cardinfo`) and which ROM images it has
   (`romset`).
 - ROM setup: while images are missing the panel shows them in place of the display. A
-  picked file's folder is searched by SHA-1 on a thread of its own; what the ROM folders
-  lack is copied to the first install folder that takes it (ProgramData on Windows), and
-  the machine boots without a reload. A session's memory that arrives meanwhile is held.
+  picked file's folder is searched by SHA-1 on a thread of its own, loose files first,
+  then zips (`ZipReader.hpp`: a zip's directory lists each entry's CRC32, so only an entry
+  that matches a known image's is unpacked). What the ROM folders lack is written to the
+  first install folder that takes it (ProgramData on Windows) as plain files, and the
+  machine boots without a reload. A session's memory that arrives meanwhile is held.
 - SysEx files are made on a copy of the machine on a thread of its own: SAVE presses
   Data > Bulk > All on the copy and writes its MIDI OUT; LOAD sends the file into the copy's
   MIDI IN and then moves the copy's memory into the machine.

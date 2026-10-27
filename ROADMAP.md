@@ -18,7 +18,7 @@ Done and checked against a real U-220 (details in [analysis/](analysis/README-AN
   confirmed by ear.
 - **Plugin** (VST3, CLAP, standalone; Windows and Linux), tested in Cubase 15: panel with
   display and keys, factory data on first start, session state, MIX/DIRECT outputs, two
-  card slots, SysEx files, MIDI out, guided ROM setup in the panel.
+  card slots, SysEx files, MIDI out, guided ROM setup in the panel (loose files or zips).
 
 ## Before the first public release (0.1)
 
@@ -40,21 +40,39 @@ improvements to emu110. Contact with emu110's author goes through Helge, not the
 
 ## Open
 
+Priorities as agreed on 27.10.2026.
+
+### Next
+
 | What | Notes |
 |---|---|
-| SysEx out of the VST3 in Cubase | the plugin hands the messages over; Cubase 15 does not record or forward them, with or without its SysEx filter. Next: does any MIDI from the plugin reach Cubase (a test build sending notes/CCs)? Check a CLAP host (Reaper, Bitwig). |
+| Card dumps | recognise known dumps by SHA-1 (`mame/hash/u110_card.xml` has them); SN-MV30 cards untested |
+| Panel: MIDI LED | only if it is little work: Cubase and most DAWs show MIDI activity in the plugin window anyway |
+| Editing in the display | click a field, change it with the wheel: translated into key presses, closed-loop on the display's cursor position. Simplifies the workflow a lot. |
+
+### Nice to have
+
+| What | Notes |
+|---|---|
 | SysEx into the VST3 | DPF's VST3 input leaves SysEx out (commented out); a DPF patch would allow importing from the DAW |
-| Effect processor IC25 | understand its program (EPROM `0x1A000`, the values the CPU writes while idle) and emulate it; would help MAME's CM-32P, D-70, KR-55 too |
-| Effects, details | Room1's stereo image (model −0.29, unit ~0); what the unit does with Cho parts while the chorus is off |
 | Patch library | single patches and timbres instead of the whole memory |
-| Editing in the display | click a field, change it with the wheel: translated into key presses, closed-loop on the display's cursor position |
-| ROM images in a zip | the guided setup reads loose files only; a MAME set (`u220.zip`) has to be unpacked first |
-| Card dumps | recognise known dumps by SHA-1; SN-MV30 cards untested |
+| SysEx out of the VST3 in Cubase | the plugin hands the messages over; Cubase 15 does not record or forward them, with or without its SysEx filter. Next: does any MIDI from the plugin reach Cubase (a test build sending notes/CCs)? Check a CLAP host (Reaper, Bitwig). |
 | ROM Play | keep unsaved temp edits across the demo songs (the unit loses them too) |
+| Platforms | the Windows standalone has seen little use; the Windows CLAP and the Linux builds are untested; no macOS build |
+
+### Needs the real unit
+
+| What | Notes |
+|---|---|
 | P-01 and Dir1/Dir2 | with the factory data, P-01's sounding part stayed on Rev after Asgn = Dir1/Dir2; with a unit's own memory it follows at once. Check on the unit. |
-| Panel | the MIDI LED |
+| Effects, details | Room1's stereo image (model −0.29, unit ~0); what the unit does with Cho parts while the chorus is off |
+
+### Some day, or for another enthusiast
+
+| What | Notes |
+|---|---|
+| Effect processor IC25 | understand its program (EPROM `0x1A000`, the values the CPU writes while idle) and emulate it; would help MAME's CM-32P, D-70, KR-55 too |
 | MAME | a display (needs the LCD controller's character ROM, never dumped, or a drawn one) |
-| Platforms | the Windows standalone has seen little use; no macOS build |
 
 ## Reference recordings
 

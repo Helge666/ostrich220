@@ -19,6 +19,10 @@ ROMs.
 | IC23 | wave ROM E = card SN-U110-08 | 512 KB | `71b6f97df6dd4e573db5743c10c77e86d67965a3` | `roland-e_r15179947_mb834000a-20_3a1-aa.bin` | `roland_u220_waverom4_(sn-u110-08).bin` |
 | IC24 | wave ROM F = card SN-U110-09 | 512 KB | `aea715a0a554c071a2e912894805a8d819802e1d` | `roland-f_r15179948_mb834000a-20_3a2-aa.bin` | `roland_u220_waverom5_(sn-u110-09).bin` |
 
+The images may also be in zips, under any names (MAME's `u220.zip`, with wave ROMs A–D
+perhaps in a `u110.zip` beside it): each entry is matched by the CRC32 the zip lists for it
+and then checked by SHA-1.
+
 Optional:
 
 - a factory SysEx dump whose name starts with `U220Factory` (`.syx`), next to the ROMs or in

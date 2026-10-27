@@ -16,8 +16,9 @@ checksums: roms/README.md in the source repository. No ROMs are included, and no
 will be.
 
 The easy way: load the plugin. While images are missing, the panel shows them; click
-CHOOSE FILE and pick any one of your ROM images. The others in the same folder are found
-by their contents and everything is copied to the ROM folder below; then it starts.
+CHOOSE FILE and pick any one of your ROM images, or a zip with them (MAME's u220.zip will
+do). The others in the same folder, and in zips there, are found by their contents and
+everything is copied to the ROM folder below; then it starts.
 
 Optional: a U-220 factory SysEx dump whose name starts with "U220Factory" (.syx) next to
 the ROMs. A new instance then starts with the 64 factory patches.

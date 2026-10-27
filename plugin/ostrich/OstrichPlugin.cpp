@@ -13,6 +13,7 @@
 #include "u220_core.h"
 #include "u220_fx.h"
 #include "DacStage.hpp"
+#include "ZipReader.hpp"
 
 #include <algorithm>
 #include <array>
@@ -83,18 +84,20 @@ std::string sha1(const std::vector<uint8_t> &data)
 
 // ---- the images, by SHA-1 (roms/README.md) --------------------------------------
 
-struct KnownImage { const char *sha1; int slot; const char *what; };
+// The CRC32s are what a zip lists for each entry (mame/src/mame/roland/roland_u220.cpp has
+// both): a zip is searched by them without unpacking anything else.
+struct KnownImage { const char *sha1; uint32_t crc; int slot; const char *what; };
 constexpr int kSlotProgram = 6;             // 0..5 = wave ROMs A..F
 const KnownImage kKnown[] = {
-	{ "9d72b1688a173505b5e1c5ddac01efa78ee76c7f", kSlotProgram, "firmware v1.02" },
-	{ "d0b66c0ea0e3af284a1806226aed79d8da2f3dd4", kSlotProgram, "firmware v1.01" },
-	{ "e1c6f1ee29cebe8663cb0c6989b8faebb3d841fd", kSlotProgram, "firmware v1.00" },
-	{ "55d36199ea489969a729782afe4cbff5b1cede0e", 0, "wave ROM A (IC19)" },
-	{ "8b8067fbc6fa7b2e8694a3785f123627ea458d1f", 1, "wave ROM B (IC20)" },
-	{ "8dd9826d7d3e67b9a568eadeaaf7856a05f3e068", 2, "wave ROM C (IC21)" },
-	{ "35b98a0fb5cf643fb7b761a74581486eee3bd8c3", 3, "wave ROM D (IC22)" },
-	{ "71b6f97df6dd4e573db5743c10c77e86d67965a3", 4, "wave ROM E (IC23)" },
-	{ "aea715a0a554c071a2e912894805a8d819802e1d", 5, "wave ROM F (IC24)" },
+	{ "9d72b1688a173505b5e1c5ddac01efa78ee76c7f", 0xd5492e9b, kSlotProgram, "firmware v1.02" },
+	{ "d0b66c0ea0e3af284a1806226aed79d8da2f3dd4", 0x893afa9c, kSlotProgram, "firmware v1.01" },
+	{ "e1c6f1ee29cebe8663cb0c6989b8faebb3d841fd", 0x82abd055, kSlotProgram, "firmware v1.00" },
+	{ "55d36199ea489969a729782afe4cbff5b1cede0e", 0xd5475560, 0, "wave ROM A (IC19)" },
+	{ "8b8067fbc6fa7b2e8694a3785f123627ea458d1f", 0x43a5b26c, 1, "wave ROM B (IC20)" },
+	{ "8dd9826d7d3e67b9a568eadeaaf7856a05f3e068", 0xe79ee88a, 2, "wave ROM C (IC21)" },
+	{ "35b98a0fb5cf643fb7b761a74581486eee3bd8c3", 0xda9fbf6d, 3, "wave ROM D (IC22)" },
+	{ "71b6f97df6dd4e573db5743c10c77e86d67965a3", 0x104f3974, 4, "wave ROM E (IC23)" },
+	{ "aea715a0a554c071a2e912894805a8d819802e1d", 0xaf1c2778, 5, "wave ROM F (IC24)" },
 };
 const char *const kSlotNames[kRomSlots] = { "A", "B", "C", "D", "E", "F", "firmware" };
 
@@ -118,6 +121,20 @@ std::vector<uint8_t> readFile(const fs::path &p, size_t limit = 0x200000)
 		data.clear();
 	std::fclose(f);
 	return data;
+}
+
+bool writeFile(const fs::path &p, const std::vector<uint8_t> &data)
+{
+	FILE *f = nullptr;
+#ifdef _WIN32
+	f = _wfopen(p.c_str(), L"wb");
+#else
+	f = std::fopen(p.c_str(), "wb");
+#endif
+	if (!f)
+		return false;
+	const bool ok = std::fwrite(data.data(), 1, data.size(), f) == data.size();
+	return std::fclose(f) == 0 && ok;
 }
 
 /// Where the user puts the images, most specific first.  On Windows ProgramData comes
@@ -168,14 +185,25 @@ std::vector<fs::path> installDirs()
 	return dirs;
 }
 
+/// Whether a file name is a factory dump's, "U220Factory*.syx" in any case.
+bool isFactoryName(std::string n)
+{
+	for (char &c : n) c = char(std::tolower(static_cast<unsigned char>(c)));
+	return n.rfind("u220factory", 0) == 0 && n.size() > 4 && n.compare(n.size() - 4, 4, ".syx") == 0;
+}
+
 /// What one or more folders hold: the images by slot, the first of each found, and a
-/// factory dump.
+/// factory dump.  An image or dump out of a zip has the zip as @c from and its own file
+/// name as @c member.
 struct RomScan
 {
 	std::vector<uint8_t> images[kRomSlots];
 	fs::path from[kRomSlots];
+	std::string member[kRomSlots];
 	std::string what[kRomSlots];
 	fs::path factory;
+	std::string factoryMember;
+	std::vector<uint8_t> factoryData;   ///< only for a dump out of a zip
 	fs::path where;             ///< the folder the first image came from
 
 	bool complete() const
@@ -199,40 +227,76 @@ struct RomScan
 		return m;
 	}
 
-	/// Adds what @p dir holds, by SHA-1 whatever the names; the factory dump may sit next
-	/// to the ROMs, or in a sysex folder in or beside them.
+	/// Adds what @p dir holds, by SHA-1 whatever the names: loose files first, then what
+	/// zips in it hold (a MAME set).  The factory dump may sit next to the ROMs, in a sysex
+	/// folder in or beside them, or in one of the zips.
 	void scan(const fs::path &dir)
 	{
 		std::error_code ec;
 		if (!fs::is_directory(dir, ec))
 			return;
+		std::vector<fs::path> zips;
 		for (const auto &e : fs::directory_iterator(dir, ec))
 		{
 			std::error_code ec2;
 			const auto sz = e.is_regular_file(ec2) ? e.file_size(ec2) : 0;
-			if (ec2 || (sz != kProgramRomBytes && sz != kWaveRomBytes))
+			if (ec2)
 				continue;
-			std::vector<uint8_t> d = readFile(e.path());
-			const std::string h = sha1(d);
-			for (const KnownImage &k : kKnown)
-				if (h == k.sha1 && images[k.slot].empty())
-				{
-					images[k.slot] = std::move(d);
-					from[k.slot] = e.path();
-					what[k.slot] = k.slot == kSlotProgram ? std::string(k.what + 9) : "found";
-					if (where.empty())
-						where = dir;
-					break;
-				}
+			std::string ext = pstr(e.path().extension());
+			for (char &c : ext) c = char(std::tolower(static_cast<unsigned char>(c)));
+			if (ext == ".zip")
+				zips.push_back(e.path());
+			if (sz == kProgramRomBytes || sz == kWaveRomBytes)
+				take(readFile(e.path()), e.path(), std::string(), dir);
 		}
 		for (const fs::path &sd : { dir, dir / "sysex", dir.parent_path() / "sysex" })
 			for (const auto &e : fs::directory_iterator(sd, ec))
-			{
-				std::string n = pstr(e.path().filename());
-				for (char &c : n) c = char(std::tolower(static_cast<unsigned char>(c)));
-				if (factory.empty() && n.rfind("u220factory", 0) == 0
-				    && n.size() > 4 && n.compare(n.size() - 4, 4, ".syx") == 0)
+				if (factory.empty() && isFactoryName(pstr(e.path().filename())))
 					factory = e.path();
+
+		std::sort(zips.begin(), zips.end());
+		for (const fs::path &z : zips)
+		{
+			if (complete() && !factory.empty())
+				break;
+			for (const zip::Entry &e : zip::list(z))
+			{
+				// Windows PowerShell 5's Compress-Archive writes folders with '\'.
+				const size_t cut = e.name.find_last_of("/\\");
+				const std::string name = cut == std::string::npos ? e.name : e.name.substr(cut + 1);
+				std::vector<uint8_t> d;
+				if (factory.empty() && e.size <= 0x100000 && isFactoryName(name) && zip::extract(z, e, d))
+				{
+					factory = z;
+					factoryMember = name;
+					factoryData = std::move(d);
+					continue;
+				}
+				// Only an entry a known image could be is unpacked; the SHA-1 decides.
+				const bool candidate = std::any_of(std::begin(kKnown), std::end(kKnown), [&](const KnownImage &k) {
+					return k.crc == e.crc && images[k.slot].empty()
+					    && e.size == (k.slot == kSlotProgram ? kProgramRomBytes : kWaveRomBytes);
+				});
+				if (candidate && zip::extract(z, e, d))
+					take(std::move(d), z, name, dir);
+			}
+		}
+	}
+
+private:
+	void take(std::vector<uint8_t> d, const fs::path &path, const std::string &inZip, const fs::path &dir)
+	{
+		const std::string h = sha1(d);
+		for (const KnownImage &k : kKnown)
+			if (h == k.sha1 && images[k.slot].empty())
+			{
+				images[k.slot] = std::move(d);
+				from[k.slot] = path;
+				member[k.slot] = inZip;
+				what[k.slot] = k.slot == kSlotProgram ? std::string(k.what + 9) : "found";
+				if (where.empty())
+					where = dir;
+				return;
 			}
 	}
 };
@@ -1241,6 +1305,7 @@ private:
 
 		std::lock_guard<std::mutex> lock(m_machine);
 		m_factoryPath = r.factory;
+		m_factoryData = std::move(r.factoryData);
 		m_core.loadProgramRom(r.images[kSlotProgram].data(), r.images[kSlotProgram].size());
 		for (unsigned w = 0; w < kNumWaveRoms; w ++)
 			m_core.loadWaveRom(w, r.images[w].data(), r.images[w].size());
@@ -1253,8 +1318,8 @@ private:
 			m_needFirstBoot = false;
 		m_pendingNvram.clear();
 		setStatus("ROMs from " + pstr(r.where) + (m_factoryPath.empty()
-				? ".  No U220Factory.syx found: a new instance starts with empty memory."
-				: ".  Factory data: " + pstr(m_factoryPath)));
+				? ".  No U220Factory.syx found: a new instance runs Memory Initialize instead."
+				: ".  Factory data: " + pstr(m_factoryPath) + (r.factoryMember.empty() ? "" : " (" + r.factoryMember + ")")));
 		return true;
 	}
 
@@ -1264,7 +1329,7 @@ private:
 		std::string t;
 		for (unsigned s = 0; s < kRomSlots; s ++)
 			t += r.what[s] + kCardInfoFieldSep;
-		t += pstr(r.factory.filename()) + kCardInfoFieldSep;
+		t += (r.factoryMember.empty() ? pstr(r.factory.filename()) : r.factoryMember) + kCardInfoFieldSep;
 		const auto dirs = installDirs();
 		t += dirs.empty() ? std::string() : pstr(dirs.front());
 		std::lock_guard<std::mutex> lock(m_statusLock);
@@ -1302,17 +1367,26 @@ private:
 		found.scan(dir);
 		const std::string pickedName = pstr(picked.filename());
 
-		std::vector<fs::path> copy;
+		// What goes into the install folder: a loose file is copied, one out of a zip is
+		// written out under its own name -- the folder then holds plain files only.
+		struct Copy { fs::path from; std::string name; const std::vector<uint8_t> *data; };
+		std::vector<Copy> copy;
 		std::string what;
 		for (unsigned s = 0; s < kRomSlots; s ++)
 			if (have.images[s].empty() && !found.images[s].empty())
 			{
-				copy.push_back(found.from[s]);
+				if (found.member[s].empty())
+					copy.push_back({ found.from[s], pstr(found.from[s].filename()), nullptr });
+				else
+					copy.push_back({ found.from[s], found.member[s], &found.images[s] });
 				what += std::string(what.empty() ? "" : ", ") + (s == kSlotProgram ? "firmware " + found.what[s] : kSlotNames[s]);
 			}
 		if (have.factory.empty() && !found.factory.empty())
 		{
-			copy.push_back(found.factory);
+			if (found.factoryMember.empty())
+				copy.push_back({ found.factory, pstr(found.factory.filename()), nullptr });
+			else
+				copy.push_back({ found.factory, found.factoryMember, &found.factoryData });
 			what += std::string(what.empty() ? "" : ", ") + "factory data";
 		}
 		if (!found.any())
@@ -1330,17 +1404,27 @@ private:
 			std::error_code ec;
 			fs::create_directories(to, ec);
 			bool ok = !ec;
-			for (const fs::path &f : copy)
+			for (const Copy &c : copy)
 			{
 				if (!ok)
 					break;
 				// Never over a file of the same name: the user's, whatever it is.
-				fs::path dest = to / f.filename();
+				const fs::path name = fs::u8path(c.name);
+				fs::path dest = to / name;
 				for (int i = 2; fs::exists(dest, ec); i ++)
-					dest = to / fs::u8path(pstr(f.stem()) + " (" + std::to_string(i) + ")" + pstr(f.extension()));
-				ok = fs::copy_file(f, dest, ec) && !ec;
-				if (!ok)
-					error = pstr(dest) + ": " + ec.message();
+					dest = to / fs::u8path(pstr(name.stem()) + " (" + std::to_string(i) + ")" + pstr(name.extension()));
+				if (c.data != nullptr)
+				{
+					ok = writeFile(dest, *c.data);
+					if (!ok)
+						error = pstr(dest) + ": cannot write";
+				}
+				else
+				{
+					ok = fs::copy_file(c.from, dest, ec) && !ec;
+					if (!ok)
+						error = pstr(dest) + ": " + ec.message();
+				}
 			}
 			if (ok)
 			{
@@ -1361,7 +1445,8 @@ private:
 		std::string msg = copy.empty() ? "Nothing new in " + pstr(dir) + "."
 		                               : "Copied " + what + " from " + pstr(dir) + " to " + target + ".";
 		if (std::none_of(std::begin(found.from), std::end(found.from),
-				[&](const fs::path &p) { return p.filename() == picked.filename(); }))
+				[&](const fs::path &p) { return p.filename() == picked.filename(); })
+		    && found.factory.filename() != picked.filename())
 			msg += "  (" + pickedName + " itself is not one of them.)";
 		if (!running)
 		{
@@ -1372,7 +1457,7 @@ private:
 		if (m_needFirstBoot)
 			firstBoot();
 		setStatus(std::string("The U-220 is running") + (m_factoryPath.empty()
-				? " (no U220Factory.syx: it starts with empty memory).  " : ".  ") + msg);
+				? " (no U220Factory.syx, so Memory Initialize).  " : ".  ") + msg);
 	}
 
 	/// Power on a machine with no memory, as the factory would have: answer "Memory
@@ -1381,9 +1466,11 @@ private:
 	void firstBoot()
 	{
 		m_needFirstBoot = false;
+		// Asked before the firmware runs: after that its stack and variables are in the RAM.
+		const bool blank = m_core.nvramBlank();
 		m_core.reset();
 		m_core.runUntilIdle(3000);
-		if (!m_core.nvramBlank() && m_factoryPath.empty())
+		if (!blank && m_factoryPath.empty())
 			return;
 
 		auto press = [&](Button b) {
@@ -1392,12 +1479,21 @@ private:
 			m_core.setButton(b, false);
 			m_core.runUntilIdle(800);
 		};
-		press(kButtonEnter);
-		m_core.runUntilIdle(2000);
+		// The first key after power-on can go unseen (as in saveSysex): press again while
+		// the display still asks for it.
+		for (int tries = 0; tries < 3; tries ++)
+		{
+			press(kButtonEnter);
+			m_core.runUntilIdle(2000);
+			char r0[kLcdColumns + 1], r1[kLcdColumns + 1];
+			m_core.lcdText(r0, r1);
+			if (std::strstr(r1, "[ENTER]") == nullptr)
+				break;
+		}
 
 		if (m_factoryPath.empty())
 			return;
-		const auto msgs = parseDump(readFile(m_factoryPath, 0x100000));
+		const auto msgs = parseDump(m_factoryData.empty() ? readFile(m_factoryPath, 0x100000) : m_factoryData);
 		if (msgs.empty())
 		{
 			setStatus("Factory data not loaded: " + pstr(m_factoryPath) + " holds no valid U-220 SysEx.");
@@ -1424,6 +1520,7 @@ private:
 	std::atomic<bool> m_romsLoaded { false };
 	bool m_needFirstBoot = true;
 	fs::path m_factoryPath;
+	std::vector<uint8_t> m_factoryData;         // the dump, when it came out of a zip
 	std::vector<uint8_t> m_pendingNvram;        // a session's memory, held till the ROMs come
 	std::thread m_romThread;                    // installRoms
 	std::atomic<bool> m_romBusy { false };
