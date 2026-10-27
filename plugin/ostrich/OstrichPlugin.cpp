@@ -99,7 +99,32 @@ const KnownImage kKnown[] = {
 	{ "71b6f97df6dd4e573db5743c10c77e86d67965a3", 0x104f3974, 4, "wave ROM E (IC23)" },
 	{ "aea715a0a554c071a2e912894805a8d819802e1d", 0xaf1c2778, 5, "wave ROM F (IC24)" },
 };
-const char *const kSlotNames[kRomSlots] = { "A", "B", "C", "D", "E", "F", "firmware" };
+// Card dumps known to be good: MAME's software list (mame/hash/u110_card.xml).  A dump
+// that matches shows its card's number and name; any other still goes in, by its header.
+struct KnownCard { const char *sha1; uint32_t crc; const char *id; const char *title; };
+const KnownCard kKnownCards[] = {
+	{ "6d3f17c44f42b79401416910be624b65b4db8e33", 0x12a18917, "Musitronics 1", "Akkordeon (U-25)" },
+	{ "9f2dced30b9bcc9c4ae841661ee334f1daa6dd68", 0x90ea2ea8, "SN-MV30-01", "Rhythm Section (U-31)" },
+	{ "bbe0b2aa7badcc5061b648745f1bd957771f134b", 0x57c740c9, "SN-MV30-02", "Orchestral (U-30)" },
+	{ "c248ba8fcfe79c83339132a855dfe047bfa79983", 0xe51284a1, "SN-SPLA-01", "Sound Elements Vol. 1 (U-01)" },
+	{ "b57b215828d292505c4d5c3e85aefb3e34086514", 0x8a99cfce, "SN-U110-01", "Pipe Organ & Harpsichord" },
+	{ "5e4edc717adcf7e078ea4bc1ce3bd04eacece672", 0x7f347263, "SN-U110-02", "Latin & F.X. Percussions" },
+	{ "1cb93d7bfeb499f22cba316a5732af97d7311a4e", 0x7f14c801, "SN-U110-03", "Ethnic" },
+	{ "a369fbb1874c222a0c9e1066275e3174917b3725", 0x39e0e70b, "SN-U110-04", "Electric Grand & Clavi" },
+	{ "b1a59971153e0cc5c4c2631a9bdb57433f47ca0e", 0x844b2456, "SN-U110-05", "Orchestral Strings" },
+	{ "02d8dfb9bd45721e34b0eec3db69b3f5e182e7bc", 0xc715c9aa, "SN-U110-06", "Orchestral Winds" },
+	{ "1e16c98cf776598b726d4f48ca3f3d677cd32c54", 0x6fb3a4f4, "SN-U110-07", "Electric Guitar" },
+	{ "71b6f97df6dd4e573db5743c10c77e86d67965a3", 0x104f3974, "SN-U110-08", "Synthesizer" },
+	{ "aea715a0a554c071a2e912894805a8d819802e1d", 0xaf1c2778, "SN-U110-09", "Guitar & Keyboards" },
+	{ "3249ff037a165e57173bd45c543a665810d2c57b", 0xc219c27e, "SN-U110-10", "Rock Drums" },
+	{ "f5cbe2272d03e21403bfca029476d015f6a34d3a", 0x0ee5274d, "SN-U110-11", "Sound Effects" },
+	{ "bac35550bdd719da4e5dc703d3829523cfee9b8a", 0x39c78747, "SN-U110-12", "Sax & Trombone" },
+	{ "4a6ca2b45c83991e62023dfc0114b40baed0e0fd", 0x4cbf140a, "SN-U110-13", "Super Strings" },
+	{ "dfe87d385068201d3a31a55466e171fda614e412", 0xcf5e6371, "SN-U110-14", "Super Ac Guitar" },
+	{ "56918595d39b480a6a15b7ecc8d1c836cca842a3", 0x2df93109, "SN-U110-15", "Super Brass" },
+};
+
+const char *const kSlotNames[kRomSlots] ={ "A", "B", "C", "D", "E", "F", "firmware" };
 
 std::vector<uint8_t> readFile(const fs::path &p, size_t limit = 0x200000)
 {
@@ -183,6 +208,35 @@ std::vector<fs::path> installDirs()
 	env("HOME", ".local/share/Ostrich 220/roms");
 #endif
 	return dirs;
+}
+
+/// A card file's bytes: the file itself, or out of a zip (MAME's software list keeps a card
+/// as sn_u110_02.zip) the entry that is a known card, else its only entry of a card's size.
+std::vector<uint8_t> readCardFile(const fs::path &p)
+{
+	std::string ext = pstr(p.extension());
+	for (char &c : ext) c = char(std::tolower(static_cast<unsigned char>(c)));
+	if (ext != ".zip")
+		return readFile(p);
+	const auto entries = zip::list(p);
+	const zip::Entry *pick = nullptr;
+	for (const zip::Entry &e : entries)
+		for (const KnownCard &k : kKnownCards)
+			if (pick == nullptr && e.crc == k.crc)
+				pick = &e;
+	if (pick == nullptr)
+	{
+		int sized = 0;
+		for (const zip::Entry &e : entries)
+			if (e.size > 0 && e.size <= kCardBytes && ++ sized == 1)
+				pick = &e;
+		if (sized != 1)
+			pick = nullptr;
+	}
+	std::vector<uint8_t> d;
+	if (pick == nullptr || !zip::extract(p, *pick, d))
+		d.clear();
+	return d;
 }
 
 /// Whether a file name is a factory dump's, "U220Factory*.syx" in any case.
@@ -1039,7 +1093,7 @@ private:
 		{
 			const fs::path p = fs::u8path(path);
 			const std::string name = pstr(p.filename());
-			const std::vector<uint8_t> raw = readFile(p);
+			const std::vector<uint8_t> raw = readCardFile(p);
 			std::error_code ec;
 			if (raw.empty() && !fs::exists(p, ec))
 				info = std::string("err") + kCardInfoFieldSep + "File not found" + kCardInfoFieldSep + name;
@@ -1057,6 +1111,11 @@ private:
 					title.pop_back();
 				const char *sub = raw.size() > 0x20 ? cardTitle(raw[0x20]) : nullptr;
 				info = std::string("ok") + kCardInfoFieldSep + title + kCardInfoFieldSep + (sub ? sub : name.c_str());
+				// A known dump: its card's number, checked.
+				const std::string h = sha1(raw);
+				for (const KnownCard &k : kKnownCards)
+					if (h == k.sha1)
+						info = std::string("ok") + kCardInfoFieldSep + k.id + " \xe2\x9c\x93" + kCardInfoFieldSep + k.title;
 			}
 		}
 

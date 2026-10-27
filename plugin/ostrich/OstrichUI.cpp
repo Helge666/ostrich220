@@ -395,7 +395,7 @@ private:
 		for (const std::string &p : { m_cardPath[s], m_cardPath[s ^ 1] })
 			if (!(dir = dirOf(p)).empty())
 				break;
-		const std::string title = "Insert a PCM card into slot " + std::to_string(s + 1) + " (SN-U110 card dump)";
+		const std::string title = "Insert a PCM card into slot " + std::to_string(s + 1) + " (a card dump, or its MAME zip)";
 		FileBrowserOptions opts;
 		opts.title = title.c_str();
 		opts.startDir = dir.empty() ? nullptr : dir.c_str();
