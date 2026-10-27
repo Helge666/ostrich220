@@ -136,7 +136,8 @@ was emu110 commit `5990a16` ([`.upstream-base`](.upstream-base)).
 
 The history was started afresh rather than forked, because emu110 carries Roland ROM images
 in its history; Ostrich 220 contains no Roland file, not even in the past.
-[`tools/sync_upstream.sh`](tools/sync_upstream.sh) brings in emu110 updates.
+[`tools/sync_upstream.sh`](tools/sync_upstream.sh) shows what changed in emu110 since then,
+without its ROMs; with `--apply` it brings the changes in, for review before the commit.
 
 Submodules:
 
