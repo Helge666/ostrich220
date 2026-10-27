@@ -728,6 +728,7 @@ protected:
 
 	void activate() override
 	{
+		m_activated = true;
 		for (DacStage &d : m_dac)
 			d.reset();
 		m_gain = m_gainTarget;
@@ -737,6 +738,8 @@ protected:
 		if (m_romsLoaded && m_needFirstBoot)
 			firstBoot();
 	}
+
+	void deactivate() override { m_activated = false; }
 
 	void run(const float **, float **outputs, uint32_t frames,
 	         const MidiEvent *midiEvents, uint32_t midiEventCount) override
@@ -904,6 +907,8 @@ private:
 		const bool save = std::strcmp(verb, "save") == 0;
 		if (!save && std::strcmp(verb, "load") != 0)
 			return;
+		if (!m_activated)
+			return;                         // not the instance that plays: see m_activated
 		if (!m_romsLoaded)
 		{
 			setStatus("SysEx: no machine to work with -- the ROM images are missing.");
@@ -1408,6 +1413,8 @@ private:
 		int used = 0;
 		if (std::sscanf(value, "%u %n", &n, &used) < 1 || used == 0 || value[used] == '\0' || m_romsLoaded)
 			return;
+		if (!m_activated)
+			return;                         // not the instance that plays: see m_activated
 		if (m_romBusy.exchange(true))
 			return;
 		if (m_romThread.joinable())
@@ -1587,6 +1594,11 @@ private:
 	std::vector<uint8_t> m_pendingNvram;        // a session's memory, held till the ROMs come
 	std::thread m_romThread;                    // installRoms
 	std::atomic<bool> m_romBusy { false };
+	// Whether the host has activated this instance.  Under VST3, DPF runs a second, whole
+	// instance for the edit controller, and the panel's state messages reach both: two
+	// installs of the same ROM files raced (the loser wrote to %LOCALAPPDATA%), two SysEx
+	// saves to one file.  Files are written only by the instance that plays.
+	std::atomic<bool> m_activated { false };
 
 	std::string m_status, m_romSet;             // m_romSet: kStateRomSet
 	mutable std::mutex m_statusLock;
