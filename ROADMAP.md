@@ -40,6 +40,9 @@ Done and checked against a real U-220 (details in [analysis/](analysis/README-AN
 - [x] Release 0.1.3 (27.10.2026): card dumps with address lines A8–A15 reversed are put
       back in order; known cards show their name again; the card and SysEx dialogs start in
       the folder last picked from.
+- [x] Release 0.1.4 (27.10.2026): file paths with umlauts under VST3 (DPF patch 0014);
+      the display by mouse: a click selects a field, the arrows turn the page, the title
+      goes up, a double click adds ENTER.
 - [x] The repository is public (26.10.2026).
 
 Not before the release, and only after checking each project's policy on LLM-written
@@ -55,7 +58,7 @@ Priorities as agreed on 27.10.2026.
 
 | What | Notes |
 |---|---|
-| Editing in the display | stage 1 (keyboard, wheel over the display) and stage 2 (a click on a field selects it: CURSOR, or PART/INST on the main page, until the firmware's selection stands on it; the arrows turn the page, the title goes up with EXIT, a double click adds ENTER) are in and tested in Cubase. |
+| Editing in the display | stage 1 (keyboard, wheel over the display) and stage 2 (a click on a field selects it: CURSOR, or PART/INST on the main page, until the firmware's selection stands on it; the arrows turn the page, the title goes up with EXIT, a double click adds ENTER) are in and tested in Cubase. Open: it sometimes snags while MIDI plays through the plugin (guesses: the firmware answers keys later under load and the loop gives up after 0.8 s, or MIDI changes the display and the loop takes it for a new page; reproduce on kk2 with a MIDI file playing). Clicks on the main page feel unexpected; Helge will describe what he expects. |
 
 ### Nice to have
 
