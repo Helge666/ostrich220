@@ -38,7 +38,8 @@ standalone on Linux. No macOS build.
 ## Keyboard and mouse
 
 The panel's keys can be clicked, or played from the computer keyboard once the Ostrich
-window has the focus (click into it first; until then the keys belong to the DAW):
+panel has the focus: click into the panel itself first (a click on the DAW's frame or
+toolbar around it is not enough; until then the keys belong to the DAW):
 
 | Computer key | U-220 key |
 |---|---|
