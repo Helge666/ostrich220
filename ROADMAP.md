@@ -59,12 +59,13 @@ Priorities as agreed on 27.10.2026.
 | What | Notes |
 |---|---|
 | Editing in the display | stage 1 (keyboard, wheel over the display) and stage 2 (a click on a field selects it: CURSOR, or PART/INST on the main page, until the firmware's selection stands on it; the arrows turn the page, the title goes up with EXIT, a double click adds ENTER) are in and tested in Cubase. Open: it sometimes snags while MIDI plays through the plugin (guesses: the firmware answers keys later under load and the loop gives up after 0.8 s, or MIDI changes the display and the loop takes it for a new page; reproduce on kk2 with a MIDI file playing). Clicks on the main page feel unexpected; Helge will describe what he expects. |
+| Hanging notes when DIRECT OUT is switched on | Seen 29.10.2026 in Cubase (VST3 built against the DPF fork `logan-1`): switching a DIRECT OUT on while the plugin plays leaves sounds without a natural end, such as strings, sounding for good. Not known whether this is new. Probably not: for Ostrich the fork's DPF is the same code as the patches of 0.1.4 (bus activation included, patches/0011), plus only Drumship One's additions (runtime parameter names, VST3 units), which do not touch buses or MIDI. Next: try the same with the 0.1.4 release; watch what Cubase calls when a bus is switched on (`activateBus`, `setActive`/`setProcessing` off and on?) and whether note-offs get lost or the core is reset in between. |
 
 ### Nice to have
 
 | What | Notes |
 |---|---|
-| SysEx into the VST3 | DPF's VST3 input leaves SysEx out (commented out); a DPF patch would allow importing from the DAW |
+| SysEx into the VST3 | DPF's VST3 input leaves SysEx out (commented out); a change in our DPF fork (DPF-LOGAN.md) would allow importing from the DAW |
 | Patch library | single patches and timbres instead of the whole memory |
 | SysEx out of the VST3 in Cubase | the plugin hands the messages over; Cubase 15 does not record or forward them, with or without its SysEx filter. Next: does any MIDI from the plugin reach Cubase (a test build sending notes/CCs)? Check a CLAP host (Reaper, Bitwig). |
 | ROM Play | keep unsaved temp edits across the demo songs (the unit loses them too) |
