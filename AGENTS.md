@@ -33,6 +33,7 @@ ROADMAP.md what is open, analysis/ what is known about the hardware.
 
 - The core runs at 32 kHz; the plugin resamples. The core and the MAME driver are
   BSD-3-Clause, the plugin and the tools GPL-3.0-or-later.
-- DPF is patched at build time (`plugin/patches`); `plugin/dpf` always shows as modified.
+- DPF is our fork Helge666/DPF (branch `logan`, pinned to a tag); nothing is patched at
+  build time and `plugin/dpf` stays clean. Changes to DPF are commits in the fork.
 - On Windows, files written by tools inside a packaged (MSIX) app under `%LOCALAPPDATA%` are
   invisible to the DAW; use `C:\ProgramData`.

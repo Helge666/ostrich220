@@ -11,9 +11,8 @@ plugin/
              unchanged.
   ostrich/   GPL-3.0-or-later.  The plugin (DPF): OstrichPlugin.cpp, OstrichUI.cpp, the
              DAC stage and the resampler from 32 kHz to the host's rate.
-  patches/   the DPF patches (BUILDING.md lists them).
   tools/     build_u220_core.sh, u220_render, u220_reverb_run, ostrich_clap_render.
-  dpf/       DPF, a submodule.
+  dpf/       DPF, a submodule: our fork Helge666/DPF, branch logan (BUILDING.md).
 ```
 
 The licence boundary runs one way: the plugin may use the core; the core and the MAME

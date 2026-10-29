@@ -551,7 +551,7 @@ protected:
 	}
 
 	// The unit's three stereo pairs.  DIRECT OUT 1 and 2 are extra outputs, off until the
-	// user switches them on in the host (patches/0011): a plug in the jack.
+	// user switches them on in the host (our DPF fork): a plug in the jack.
 	void initAudioPort(bool input, uint32_t index, AudioPort &port) override
 	{
 		if (input)

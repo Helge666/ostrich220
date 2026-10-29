@@ -34,8 +34,6 @@ git submodule update --init --recursive
 ```
 
 `git submodule status --recursive` shows a leading space on every line when all is in place.
-`plugin/dpf` always shows as modified (`m`): the patches below are applied to its working
-tree. That is expected; never commit a new DPF pointer to make it go away.
 
 ## 3. Build
 
@@ -47,44 +45,48 @@ make -j5 win      # Windows: VST3, CLAP, standalone       -> plugin/ostrich/bin-
 
 Each run, in order:
 
-1. applies the DPF patches (`make patches`, see below);
-2. builds the emulation core, `plugin/tools/build_u220_core.sh`: MAME's CPU and PCM-chip
+1. builds the emulation core, `plugin/tools/build_u220_core.sh`: MAME's CPU and PCM-chip
    sources, unmodified, against the shim in `plugin/compat/`, plus `plugin/core/`, into
    `plugin/build-u220/libu220core.a` (Windows: `plugin/ostrich/build-win/core/`), and the
    tools `u220_render` and `u220_reverb_run`;
-3. links the plugin. A core newer than a binary forces the relink.
+2. links the plugin. A core newer than a binary forces the relink.
 
 The Windows binaries are statically linked and depend on nothing beyond Windows. The
 standalone uses DPF's RtAudio backend on Windows and JACK on Linux.
 
-## 4. The DPF patches
+## 4. DPF
 
-DPF is not forked; what we need changed travels as patches in `plugin/patches/`, applied in
-order by `make patches`, which first checks whether each one is already in. A patch newly
-applied throws DGL's objects away, because DGL's build does not notice a change in a file
-that `pugl.cpp` includes. `WARNING: … does not apply` means the DPF pin has moved: regenerate
-that patch against the new tree, never force it.
+`plugin/dpf` is our fork of DPF, [Helge666/DPF](https://github.com/Helge666/DPF), branch
+`logan`; DPF's own pugl submodule points at [Helge666/pugl](https://github.com/Helge666/pugl),
+branch `logan`. The changes we need are commits there, not patches here, and the submodule
+is pinned to a tag (`logan-1`, ...). Nothing is applied at build time: `plugin/dpf` stays
+clean, and `git submodule status --recursive` shows a leading space on its lines as well.
 
-| Patch | What it does |
+What the fork adds to DISTRHO/DPF, as far as Ostrich uses it:
+
+| Change | What it does |
 |---|---|
-| 0001 | JACK standalone: DSP → UI state (the display reaches the panel) |
-| 0002 | silences a debug message on every DSP → UI update |
-| 0003 | CLAP: DSP → UI state (the stub threw it away) |
-| 0004 | LV2: ask the host to resize, without pinning the window's minimum |
-| 0005 | VST3: DSP → UI state |
-| 0006 | VST3: the MIDI input bus has 16 channels (Cubase folded all onto channel 1) |
-| 0007 | VST3: ask the controller again when an idle answer is lost |
-| 0008 | pugl (Windows): a draw that throws, or one that never returns, cannot stop the view from redrawing |
-| 0010 | VST3: accept sizes within rounding; the minimum size in physical pixels on Windows |
-| 0011 | VST3: extra outputs are main buses, off until the host switches them on |
-| 0012 | MIDI output of SysEx (VST3, CLAP) and program change (VST3) |
-| 0013 | Windows: closing a running file dialog closes the dialog, not the host's plugin window |
-| 0014 | VST3: state strings (file paths, card names) converted between UTF-8 and UTF-16 for real; DPF kept only ASCII |
+| JACK, CLAP, VST3: DSP → UI state | `updateStateValue()` reaches the UI (the display reaches the panel); under CLAP it was a stub that threw the value away |
+| quiet state updates | no debug message on every DSP → UI update |
+| LV2: `requestSizeChange()` | asks the host to resize, without pinning the window's minimum |
+| VST3: 16 MIDI channels | the MIDI input bus has 16 channels (Cubase folded all onto channel 1) |
+| VST3: UI idle watchdog | asks the controller again when an idle answer is lost |
+| pugl (Windows) | a draw that throws, or one that never returns, cannot stop the view from redrawing |
+| VST3: size rounding | accepts sizes within rounding; the minimum size in physical pixels on Windows |
+| VST3: extra outputs off | extra outputs are main buses, off until the host switches them on |
+| MIDI output | SysEx (VST3, CLAP) and program change (VST3) |
+| Windows: file dialog | closing a running file dialog closes the dialog, not the host's plugin window |
+| VST3: UTF-8 state | state strings (file paths, card names) converted between UTF-8 and UTF-16 for real; DPF kept only ASCII |
 
-Back to clean DPF: `git -C plugin/dpf checkout -- .` and
-`git -C plugin/dpf/dgl/src/pugl-upstream checkout -- .`; the next `make` re-applies.
-A new patch: edit in `plugin/dpf`, `git diff > ../patches/NNNN-what.patch`, return to clean,
-build. Patches for pugl are named `*.pugl.patch` and are diffs inside the pugl submodule.
+The fork also carries changes from Drumship One that Ostrich does not use:
+`Plugin::setParameterName()`, `Plugin::setPortGroupName()`, and parameter groups as VST3
+units and CLAP modules.
+
+A change to DPF is a commit on the fork's `logan` branch and a new tag; then move the pin
+here (`git -C plugin/dpf fetch --tags`, `git -C plugin/dpf checkout logan-N`) and commit the
+new pointer. After the pin moves, build DGL from clean (`rm -rf plugin/dpf/build*`): its
+build does not notice a change in a file that `pugl.cpp` includes, and the old library
+would be linked as it was.
 
 ## 5. Checking it
 
@@ -126,7 +128,6 @@ git log --all --name-only --format= | sort -u | grep -iE '\.(bin|rom|syx|ic[0-9]
 | `plugin/ostrich/` | the plugin: DSP (`OstrichPlugin.cpp`), panel (`OstrichUI.cpp`), DAC stage, resampler |
 | `plugin/core/` | the emulation core `U220Core` and the effect models |
 | `plugin/compat/` | the minimal MAME framework the core compiles MAME's devices against |
-| `plugin/patches/` | the DPF patches |
 | `plugin/tools/` | core build script, `u220_render`, `u220_reverb_run`, `ostrich_clap_render` |
 | `mame/src/mame/roland/roland_u220.cpp` | the MAME driver; `roland_u220_ic25.h` is shared with the core |
 | `tools/` | measurement, A/B and SysEx tools (Python), MAME helper scripts |

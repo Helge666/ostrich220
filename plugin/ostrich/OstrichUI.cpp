@@ -191,7 +191,7 @@ protected:
 	{
 		// Nothing may escape a draw: under Windows it unwinds through the window
 		// procedure, which swallows it and leaves pugl believing it is still drawing --
-		// the panel then never redraws (patches/0008).
+		// the panel then never redraws (our pugl fork guards against it, too).
 		try
 		{
 			drawPanel();
