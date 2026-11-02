@@ -13,6 +13,11 @@ later ([LICENSE](LICENSE)). It contains, or is built from, the following.
 | stb_truetype, stb_image | `plugin/dpf/dgl/src/nanovg` | public domain / MIT | Sean Barrett |
 | DejaVu Sans | the panel's font, built into DGL | Bitstream Vera / DejaVu licence (`plugin/dpf/dgl/src/resources/LICENSE-DejaVuSans.ttf.txt`) | Bitstream, DejaVu authors |
 | RtAudio | the Windows standalone's audio, through DPF | MIT-style (RtAudio licence) | Gary P. Scavone |
+| RtMidi | built into the standalone through DPF | MIT-style (RtMidi licence) | Gary P. Scavone |
+
+The release zips carry these licence texts in their folder `licenses`, next to the GPL 3.0
+(`LICENSE`); `.github/licenses.sh` puts them together, with the copyright holders of every
+BSD-3-Clause file built into the core.
 
 Our own files say which licence they are under in their first lines: the core
 (`plugin/core`), the compatibility layer (`plugin/compat`) and the MAME driver and devices

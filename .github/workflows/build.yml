@@ -179,6 +179,7 @@ jobs:
             printf 'Ostrich 220\nversion  %s\ncommit   %s\n' "$VERSION" "$GITHUB_SHA" > "$dir/VERSION.txt"
             .github/release-text.sh "$section" > "$dir/INSTALL.txt"
             cp LICENSE THIRD-PARTY.md "$dir/"
+            .github/licenses.sh "$dir/licenses"
             ( cd "$dir" && zip -q -r -y "../../dist/$zip" . )
           }
           pack Ostrich220-Windows.zip windows \
