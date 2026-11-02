@@ -69,6 +69,7 @@ Priorities as agreed on 27.10.2026.
 | Patch library | single patches and timbres instead of the whole memory |
 | SysEx out of the VST3 in Cubase | the plugin hands the messages over; Cubase 15 does not record or forward them, with or without its SysEx filter. Next: does any MIDI from the plugin reach Cubase (a test build sending notes/CCs)? Check a CLAP host (Reaper, Bitwig). |
 | ROM Play | keep unsaved temp edits across the demo songs (the unit loses them too) |
+| MIDI IN for the Windows standalone | the standalone opens no MIDI input: DPF's native (RtAudio) standalone has no settings dialog and opens MIDI only when the plugin calls `requestMIDI()`, and then every port at once. Ostrich 55 adds a MIDI IN port choice to its panel bar (WinMM in the plugin, standalone only, the choice saved per user); take it over from there once it has proven itself |
 | Platforms | the Windows standalone has seen little use; the Windows CLAP and the Linux builds are untested; no macOS build |
 
 ### Needs the real unit
