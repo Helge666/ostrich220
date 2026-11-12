@@ -59,7 +59,7 @@ standalone uses DPF's RtAudio backend on Windows and JACK on Linux.
 `plugin/dpf` is our fork of DPF, [Helge666/DPF](https://github.com/Helge666/DPF), branch
 `logan`; DPF's own pugl submodule points at [Helge666/pugl](https://github.com/Helge666/pugl),
 branch `logan`. The changes we need are commits there, not patches here, and the submodule
-is pinned to a tag (`logan-1`, ...). Nothing is applied at build time: `plugin/dpf` stays
+is pinned to a tag (`logan-2`). Nothing is applied at build time: `plugin/dpf` stays
 clean, and `git submodule status --recursive` shows a leading space on its lines as well.
 
 What the fork adds to DISTRHO/DPF, as far as Ostrich uses it:
@@ -77,6 +77,7 @@ What the fork adds to DISTRHO/DPF, as far as Ostrich uses it:
 | MIDI output | SysEx (VST3, CLAP) and program change (VST3) |
 | Windows: file dialog | closing a running file dialog closes the dialog, not the host's plugin window |
 | VST3: UTF-8 state | state strings (file paths, card names) converted between UTF-8 and UTF-16 for real; DPF kept only ASCII |
+| CLAP: version string | the plugin's version reaches the host (`logan-2`) |
 
 The fork also carries changes from Drumship One that Ostrich does not use:
 `Plugin::setParameterName()`, `Plugin::setPortGroupName()`, and parameter groups as VST3

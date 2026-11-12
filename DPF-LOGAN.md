@@ -20,9 +20,19 @@ for this project. It is the same file in every project; the master copy lives in
   recursive clone gets the right pugl.
 - Both forks are public and keep DPF's and pugl's ISC licence files unchanged.
 
-## Current tag: `logan-1`
+## Current tag: `logan-2`
 
 Base: DISTRHO/DPF `4238e1c` ("Merge branch 'develop'", 23.10.2025), pugl `5e2621d`.
+DPF `logan-2` = `b9424f1`, pugl `logan-2` = `logan-1` = `24c660a` (pugl did not change).
+
+### New in `logan-2` (8.11.2026, from Ostrich 7765)
+
+| Change | What it does |
+|---|---|
+| CLAP: port type of the plugin's own groups | a bus in a port group of the plugin's own reports mono or stereo from its width; it had no port type before |
+| CLAP: version string | the descriptor's version comes from `Plugin::getVersion()`; it was empty |
+
+### In `logan-1` (29.10.2026)
 
 Fixes:
 
@@ -50,7 +60,7 @@ Additions:
 Behaviour change to know about: under CLAP a parameter **without** a group now has an empty
 module path; upstream put the parameter's symbol there.
 
-`git log --oneline 4238e1c..logan-1` in a clone of the fork lists the commits. Each commit message
+`git log --oneline 4238e1c..logan-2` in a clone of the fork lists the commits. Each commit message
 says why the change was made and which project it came from.
 
 ## Using the fork in a project
@@ -59,7 +69,7 @@ says why the change was made and which project it came from.
 
 ```bash
 git submodule add -b logan https://github.com/Helge666/DPF.git dpf
-git -C dpf checkout logan-1
+git -C dpf checkout logan-2
 git -C dpf submodule update --init --recursive
 git add .gitmodules dpf
 ```
@@ -154,4 +164,7 @@ Not done yet; to be settled separately. The idea, agreed in principle on 29.10.2
 | Project | Submodule path | Build | Tag |
 |---|---|---|---|
 | Drumship One | `dpf` | CMake | `logan-1` |
-| Ostrich 220 | `plugin/dpf` | Make | `logan-1` |
+| Ostrich 220 | `plugin/dpf` | Make | `logan-2` |
+| Ostrich 55 | `plugin/dpf` | Make | `logan-2` |
+| Ostrich 7765 | `plugin/dpf` | Make | `logan-2` |
+| Ostrich 32 | `plugin/dpf` | Make | `logan-2` |
